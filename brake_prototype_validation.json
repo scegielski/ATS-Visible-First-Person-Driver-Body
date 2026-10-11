@@ -1,0 +1,21 @@
+{
+  "frames": 3901,
+  "blocks": 83,
+  "duration_seconds": 162.5,
+  "brake_reach_left_m": 0.08,
+  "brake_hover_lift_m": 0.005,
+  "transition_peak_lift_m": 0.0175,
+  "ankle_press_degrees": 12,
+  "modified_brake_bones": [
+    54,
+    55,
+    57
+  ],
+  "gas_tracks_byte_exact": true,
+  "steering_tracks_byte_exact": true,
+  "other_bones_unchanged": true,
+  "leg_lengths_preserved": true,
+  "ankle_target_error_under_m": 2e-05,
+  "brake_toe_height_delta_m": -0.02895788274961636,
+  "runtime_validated": false
+}

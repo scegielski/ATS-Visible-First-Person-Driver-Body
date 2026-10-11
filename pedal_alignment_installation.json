@@ -1,0 +1,10 @@
+{
+  "archive_version": "0.5.1 pedal alignment test",
+  "plugin_version": "0.4.0 unchanged",
+  "brake_reach_left_m": 0.12,
+  "left_static_shift_m": 0.06,
+  "archive_sha256": "b54aa1ecd599cc63bd46b793970b2c8cd3c148fab56a8de15f0a19a3215c6f7d",
+  "installed_bytes_verified": true,
+  "runtime_alignment_validated": true,
+  "validation_evidence": "live_pedals_validation.json"
+}

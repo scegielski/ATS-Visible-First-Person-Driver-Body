@@ -1,0 +1,19 @@
+{
+  "user_confirmed_initial_brake_sequence": true,
+  "user_confirmed_12cm_brake_6cm_left_rest": true,
+  "user_confirmed_16cm_brake_with_clutch_looks_good": true,
+  "latest_brake_reach_m": 0.14,
+  "latest_archive": "0.6.1 pedal alignment test",
+  "latest_alignment_installed": false,
+  "latest_alignment_runtime_validated": false,
+  "latest_alignment_offline_checks_passed": true,
+  "plugin_version": "0.5.0",
+  "user_requested_commit_without_relaunch": true,
+  "clutch_overrides": 16682,
+  "observed_clutch_min": 0.0,
+  "observed_clutch_max": 1.0,
+  "brake_overrides": 16682,
+  "observed_brake_min": 0.0,
+  "observed_brake_max": 0.762989,
+  "caught_faults": 0
+}

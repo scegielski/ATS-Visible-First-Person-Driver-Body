@@ -1,5 +1,15 @@
 # Driver animation diagnostics
 
+Current result: the user confirmed the 0.5.0 plugin with the 0.6.0 archive works, including clutch motion. The final 0.6.1 archive adjusts brake reach to 14 cm and keeps the same plugin. It is built and checked but not installed or visually tested, per the request to commit without relaunching. Earlier pending-validation notes below describe the prior test handoffs.
+
+## Experimental clutch version: 0.5.0
+
+The 0.6.0 clutch-test archive adds an independent left ankle press, keeping its 6 cm resting shift and the right brake reach of 16 cm. The expanded clip has 35109 frames and duration 1462.833333 seconds. Prior clips remain supported. See CLUTCH_INTEGRATION.md for checks, VR testing and rollback. Clutch visual alignment and performance are pending runtime validation.
+
+## Experimental brake version: 0.4.0
+
+The 0.5.0 brake-test archive adds a staged lift, leftward leg reach, brake hover, ankle press and return sequence. Brake takes priority over gas; the prior gas and steering clips remain supported. The new clip has 3901 frames and a 162.5-second duration. See BRAKE_INTEGRATION.md for build validation, test instructions and rollback. Visual brake alignment is pending the VR test.
+
 ## Experimental throttle version: 0.3.0
 
 Paired with the 0.4.0 throttle-test archive, this version also selects a right-ankle pose from raw accelerator input, independent of steering. The expanded clip has 1551 frames (33 throttle blocks of 47 steering frames); the clip guard recognizes its 64.583333-second duration. Missing/stale pedal input releases the ankle. The verified 47-frame steering clip remains supported. See THROTTLE_INTEGRATION.md for validation, testing and rollback details. The user confirmed the first VR foot test works; runtime override logs report no caught faults. See live_throttle_validation.json.

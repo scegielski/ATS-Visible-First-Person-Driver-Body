@@ -1,0 +1,7 @@
+# Pedal alignment adjustment
+
+The user confirmed the initial brake reach/hover/press sequence works, but the foot lands to the right of the brake. Per the requested correction, the right brake reach is now 12 cm left from the gas position, compared with 8 cm in the initial test. The left resting ankle is shifted 6 cm left and remains static through every steering, throttle, reach and brake frame. No left pedal animation is introduced.
+
+The 0.5.1 pedal-alignment archive uses the same 0.4.0 SPF plugin as the initial brake prototype. Only the archive manifest and private animation data change. All steering tracks and accelerator tracks outside the static left-leg adjustment remain byte-identical to the validated throttle release. The two-joint leg solves preserve thigh and shin lengths and keep both ankle orientations stable during lateral placement. The brake press remains the same 12-degree downward ankle rotation and its timing is unchanged.
+
+build_brake_prototype.py now generates this adjusted archive with explicit BRAKE_REACH and LEFT_REST_SHIFT values. Its checks validate ankle targets, unchanged leg lengths, normalized rotations, correct PMA pointers and duration, static left-leg tracks across all 3901 frames, preserved gas/arm tracks and downward toe motion. See pedal_alignment_validation.json. The twelve-centimetre brake landing and six-centimetre left-leg rest still require a VR alignment check. Installation requires ATS closed because it locks the mod archive. The prior 0.5.0 brake archive is retained for rollback.

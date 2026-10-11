@@ -7,6 +7,7 @@
 #include <SPF_TelemetryData.h>
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
+#include "PedalMotion.hpp"
 #include <atomic>
 #include <mutex>
 #include <cstdio>
@@ -43,6 +44,11 @@ std::atomic<uint64_t> steeringOverrides{0},steeringFaults{0};
 std::atomic<float> lastPose{0};
 std::atomic<float> userThrottle{0},lastThrottle{0};
 std::atomic<uint64_t> throttleOverrides{0};
+std::atomic<float> userBrake{0},lastBrake{0},lastTransfer{0},lastAnklePress{0};
+std::atomic<uint64_t> brakeOverrides{0};
+std::atomic<uint32_t> lastPedalFrame{0};
+std::atomic<float> userClutch{0},lastClutch{0},lastClutchPress{0};
+std::atomic<uint64_t> clutchOverrides{0};
 std::atomic<uint64_t> driverCalls{0}, advanceCalls{0}, rejected{0};
 std::atomic<float> userSteering{0}, effectiveSteering{0};
 std::atomic<uint64_t> telemetryTick{0};
@@ -101,6 +107,8 @@ void Controls(const SPF_Controls* data,void*) {
  userSteering.store(data->userInput.steering,std::memory_order_relaxed);
  effectiveSteering.store(data->effectiveInput.steering,std::memory_order_relaxed);
  userThrottle.store(data->userInput.throttle,std::memory_order_relaxed);
+ userBrake.store(data->userInput.brake,std::memory_order_relaxed);
+ userClutch.store(data->userInput.clutch,std::memory_order_relaxed);
  telemetryTick.store(GetTickCount64(),std::memory_order_relaxed);
 }
 void Reset() {
@@ -135,10 +143,10 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.3.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.5.0");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
- api->Info_SetDescriptionLiteral(h,"Live steering and experimental accelerator foot pose for the private Mustang interior body.");
+ api->Info_SetDescriptionLiteral(h,"Live steering, right gas/brake motion and independent left clutch ankle press for the private Mustang interior body.");
  api->Policy_SetAllowUserConfig(h,true);
  api->Policy_AddConfigurableSystem(h,"logging");
  api->Defaults_SetLogging(h,"info",true);
@@ -174,7 +182,7 @@ void Activated(const SPF_Core_API* api) {
   core->telemetry->Tel_RegisterForControls(context,Controls,nullptr);
  }
  enabled.store(true);
- Log(SPF_LOG_INFO,"STEERING: hooks requested for private interior model; supports verified steering clip and experimental 1551-frame steering/throttle clip. Foot pose validation pending.");
+ Log(SPF_LOG_INFO,"PEDALS: hooks requested for private interior model; supports prior steering/pedal clips and independent clutch clip. New brake alignment and clutch visual validation pending.");
 }
 void Update() {
  if(!enabled.load()) return;
@@ -207,6 +215,12 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"CLUTCH overrides=%llu input=%.6f ankle=%.6f",
+   static_cast<unsigned long long>(clutchOverrides.load()),lastClutch.load(),lastClutchPress.load());
+  Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"BRAKE overrides=%llu input=%.6f transfer=%.6f ankle=%.6f start_frame=%u",
+   static_cast<unsigned long long>(brakeOverrides.load()),lastBrake.load(),lastTransfer.load(),lastAnklePress.load(),lastPedalFrame.load());
+  Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"STEERING overrides=%llu faults=%llu normalized=%.6f THROTTLE overrides=%llu input=%.6f start_frame=%u",
    static_cast<unsigned long long>(steeringOverrides.load()),static_cast<unsigned long long>(steeringFaults.load()),lastPose.load(),
    static_cast<unsigned long long>(throttleOverrides.load()),lastThrottle.load(),ThrottleStartFrame(lastThrottle.load()));
@@ -239,6 +253,11 @@ extern "C" void CaptureDriver(uintptr_t controller) noexcept {
 // including the original function's return value and caller's stack arguments.
 void ApplyInteriorSteering(uintptr_t model,uint32_t index,float* replacement) noexcept {
  static thread_local bool applying=false;
+ static thread_local PedalMotion motion;
+ static thread_local uintptr_t motionModel=0;
+ static thread_local uint32_t motionIndex=0;
+ static thread_local uint64_t motionGeneration=0,motionTick=0;
+ static thread_local float clutchPress=0;
  if(applying || !replacement || index>=4096 || steeringFaults.load())return;
  char path[192]{};
  if(!ReadModelPath(model,path) || std::strcmp(path,"/model/spf_stock_driver/driver.pmd"))return;
@@ -251,18 +270,46 @@ void ApplyInteriorSteering(uintptr_t model,uint32_t index,float* replacement) no
   const float duration=durationQuery(model,index);
   const uint32_t frames=frameQuery(model,index);
   const bool hasThrottle=IsThrottleClip(duration,frames);
-  if(!hasThrottle && !IsSteeringClip(duration,frames)) {applying=false;return;}
+  const bool hasBrake=IsBrakeClip(duration,frames);
+  const bool hasClutch=IsClutchClip(duration,frames);
+  if(!hasClutch && !hasBrake && !hasThrottle && !IsSteeringClip(duration,frames)) {applying=false;return;}
   const uint64_t now=GetTickCount64(),tick=telemetryTick.load();
   const float input=effectiveSteering.load();
   const bool fresh=tick && now-tick<=250;
   const float fraction=(fresh && std::isfinite(input)) ? SteeringFraction(input) : 0.f;
   const float gas=userThrottle.load();
   const float throttle=(fresh && std::isfinite(gas)) ? std::clamp(gas,0.f,1.f) : 0.f;
-  resetAnimation(model,index,hasThrottle ? ThrottleStartFrame(throttle) : 0);
+  const float brake=fresh?PedalValue(userBrake.load()):0.f;
+  const float clutch=fresh?PedalValue(userClutch.load()):0.f;
+  uint32_t startFrame=hasThrottle?ThrottleStartFrame(throttle):0;
+  if(hasBrake || hasClutch) {
+   const auto generation=worldGeneration.load();
+   if(model!=motionModel || index!=motionIndex || generation!=motionGeneration) {
+    motion={};clutchPress=0;motionTick=now;motionModel=model;motionIndex=index;motionGeneration=generation;
+   }
+   const auto prior=motion.phase;
+   const float dt=std::clamp(static_cast<float>(now-motionTick)/1000.f,0.f,.05f);
+   if(fresh) {
+    motion.Step(throttle,brake,dt);
+    clutchPress=Approach(clutchPress,clutch,dt/.1f);
+   } else {motion={};clutchPress=0;}
+   motionTick=now;startFrame=motion.StartFrame();
+   if(prior!=motion.phase) {
+    char phaseText[192];std::snprintf(phaseText,sizeof(phaseText),"PEDAL_PHASE %s brake=%.4f gas=%.4f transfer=%.4f ankle=%.4f",
+     PedalPhaseName(motion.phase),brake,throttle,motion.transfer,motion.press);Log(SPF_LOG_INFO,phaseText);
+   }
+   lastBrake.store(brake);lastTransfer.store(motion.transfer);lastAnklePress.store(motion.press);lastPedalFrame.store(startFrame);
+   brakeOverrides.fetch_add(1);
+   if(hasClutch) {
+    startFrame=ClutchStartFrame(startFrame,clutchPress);
+    lastClutch.store(clutch);lastClutchPress.store(clutchPress);clutchOverrides.fetch_add(1);
+   }
+  }
+  resetAnimation(model,index,startFrame);
   enableAnimation(model,index,true);
-  *replacement=(hasThrottle ? 1.9166667f : duration)*fraction;
+  *replacement=((hasClutch || hasBrake || hasThrottle) ? 1.9166667f : duration)*fraction;
   lastPose.store(fraction);steeringOverrides.fetch_add(1);
-  if(hasThrottle) {lastThrottle.store(throttle);throttleOverrides.fetch_add(1);}
+  if(hasClutch || hasBrake || hasThrottle) {lastThrottle.store(throttle);throttleOverrides.fetch_add(1);}
  } __except(EXCEPTION_EXECUTE_HANDLER) {steeringFaults.fetch_add(1);}
  applying=false;
 }

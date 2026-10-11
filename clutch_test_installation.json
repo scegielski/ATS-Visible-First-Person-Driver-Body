@@ -1,0 +1,12 @@
+{
+  "plugin_version": "0.5.0",
+  "archive_version": "0.6.0 clutch test",
+  "brake_reach_left_m": 0.16,
+  "left_static_shift_m": 0.06,
+  "plugin_sha256": "c5b14c5bdbc80629321d42d92b2bcda35aacf19ba353bff6e47973d1c7b781d7",
+  "archive_sha256": "ad28d3f168e808dfc559ce4ed5ff0bfa747ae04c0041574b7cc38ab27f6dde1b",
+  "installed_bytes_verified": true,
+  "duration_header_verified": true,
+  "clutch_runtime_validated": true,
+  "validation_evidence": "live_pedals_validation.json"
+}

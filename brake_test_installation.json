@@ -1,0 +1,9 @@
+{
+  "plugin_version": "0.4.0",
+  "archive_version": "0.5.0 brake test",
+  "plugin_sha256": "54a4ebde194569f742332d7590895104d2606be68c76f0edcaa879e6e3eabdaa",
+  "archive_sha256": "7d5b544e530c2a9d22dcab7c0361867e5f9ae831b3b2fd1a06acf5ef372dee12",
+  "installed_bytes_verified": true,
+  "duration_header_verified": true,
+  "brake_runtime_validated": false
+}

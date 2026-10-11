@@ -1,0 +1,17 @@
+{
+  "frames": 35109,
+  "right_pedal_blocks": 83,
+  "clutch_levels": 9,
+  "duration_seconds": 1462.8333333333333,
+  "brake_reach_left_m": 0.14,
+  "left_rest_shift_m": 0.06,
+  "clutch_ankle_degrees": 12,
+  "clutch_bone": 51,
+  "left_ankle_position_fixed": true,
+  "steering_and_right_pedals_byte_exact_all_clutch_levels": true,
+  "released_clutch_matches_previous_clip": true,
+  "clutch_toe_height_delta_m": -0.026622979557247017,
+  "uncompressed_clip_bytes": 120072925,
+  "archive_bytes": 52349604,
+  "runtime_validated": false
+}
