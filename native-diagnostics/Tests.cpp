@@ -6,6 +6,7 @@
 #include "GameHorn.hpp"
 #include "WindowGesture.hpp"
 #include "LiveGesturePose.hpp"
+#include "RightGestureTargets.hpp"
 #include <iomanip>
 #include <cstring>
 #include <cstdio>
@@ -59,6 +60,22 @@ int main() {
  for(int tick=0;tick<40;++tick)staged.Step(false,.01f);
  Check(staged.reach==0 && staged.press==0 && staged.extend==0,"direct release ends at steering grip");
  WindowGestureMotion brief;brief.Step(true,.05f);brief.Step(false,.05f);Check(brief.extend==0,"short tap never raises middle finger before arrival");
+ LiveGesturePose rightFile{kRightGestureTargets};std::string rightError;
+ Check(rightFile.Replace(encodeV2(kRightGestureTargets),rightError),"right pose file accepts its own bone set");
+ const auto rightSnapshot=rightFile.Snapshot();
+ Check(!rightFile.Replace(encodeV2(kWindowGestureTargets),rightError) && rightFile.Snapshot()==rightSnapshot,"right pose file rejects left bones and keeps prior pose");
+ auto rightRotations=std::array<std::array<float,4>,61>{};for(auto& q:rightRotations)q={1,0,0,0};const auto beforeRight=rightRotations;
+ WindowGestureMotion rightFinal;rightFinal.reach=rightFinal.press=rightFinal.extend=1;
+ BlendWindowGesture(rightRotations,rightFinal,*rightSnapshot);
+ for(unsigned i=0;i<61;++i) {
+  if(i<25 || i>45)Check(rightRotations[i]==beforeRight[i],"right gesture preserves left hand torso and pedals");
+  float norm=0;for(float v:rightRotations[i])norm+=v*v;Check(std::abs(norm-1)<.00001f,"right gesture keeps normalized joints");
+ }
+ auto both=rightRotations;BlendWindowGesture(both,rightFinal,kWindowGestureTargets);
+ for(unsigned i=25;i<=45;++i)Check(both[i]==rightRotations[i],"left gesture does not overwrite right pose");
+ BlendHornPose(both,HornMotion{1,1});for(unsigned i=25;i<=45;++i)Check(both[i]==rightRotations[i],"left horn does not overwrite right gesture");
+ WindowGestureMotion independentRight;independentRight.Step(true,.05f);LeftArmGestures independentLeft;independentLeft.Step(true,false,.05f);
+ Check(independentRight.reach>0 && independentLeft.window.reach==0,"right gesture operates independently of left horn");
  LiveGesturePose stagedFile;std::string stagedError;auto stagedTargets=kWindowGestureTargets;
  stagedTargets[1].intermediate={0,1,0,0};stagedTargets[1].pressed={1,0,0,0};
  Check(stagedFile.Replace(encodeV2(stagedTargets),stagedError),"three-keyframe live pose accepted");

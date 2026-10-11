@@ -25,3 +25,5 @@ The user confirmed the arrival sequence looks good but observed an unwanted open
 ## Final confirmation
 
 The user confirmed the final finger-down entry, held pose and direct return work great. The latest runtime logged 1405 gesture pose updates with 0 caught pose-write faults. The installed pose file matches the committed release file. Runtime reloads and live joint edits were confirmed during the earlier tuning session.
+
+A later runtime left-only edit moves the left hand target 6 inches (15.24 cm) left through shoulder/clavicle and two-joint arm retargeting, preserving arm lengths. The right pose file is not replaced. Visual confirmation of the left reach is pending.

@@ -52,10 +52,16 @@ The latest installed input update is the **0.7.2 game horn test** plugin. It rea
 
 ## Middle-finger gesture and live pose editing
 
-The installed and user-validated **0.9.2 direct return test** plugin adds a held middle-finger gesture above the steering wheel. Default F10 can be reassigned through SPF's existing Gestures.LeftWindowBird action. The hand reaches with the middle finger down, raises it after arrival, and returns directly to the current steering grip on release. Gesture transitions run 1.5 times faster than the first prototype. The game-state horn takes priority, while steering and pedals remain independent.
+The installed and user-validated **0.10.0 right gesture test** plugin supports a held middle-finger gesture above the steering wheel. Default F10 can be reassigned through SPF's existing Gestures.LeftWindowBird action. The hand reaches with the middle finger down, raises it after arrival, and returns directly to the current steering grip on release. Gesture transitions run 1.5 times faster than the first prototype. The game-state horn takes priority, while steering and pedals remain independent.
 
 The current pose shares axial rotation between forearm and wrist, keeps a natural bend in the raised finger, and uses the user-confirmed thumb pose. The user confirmed the final sequence works great. See WINDOW_GESTURE.md and the validation records.
 
 The plugin watches config/gesture_pose.txt in its own directory and hot-reloads valid saves within about half a second. The version-2 file contains reach, intermediate finger-down and final held quaternions for 21 left-arm/finger bones. Invalid or incomplete edits retain the last valid pose. No rebuild or game restart is needed for pose edits. Timing logic changes still require a plugin update. See LIVE_POSE.md for format, scope and validation.
 
-Install releases/SPF_DriverAnimationDiagnostics-0.9.2-direct-return-test.dll as SPF_DriverAnimationDiagnostics.dll in the existing SPF plugin directory with ATS closed, and copy releases/gesture_pose.txt into its config directory. Preserve customized pose files when upgrading. The current body archive remains unchanged.
+Install releases/SPF_DriverAnimationDiagnostics-0.10.0-right-gesture-test.dll as SPF_DriverAnimationDiagnostics.dll in the existing SPF plugin directory with ATS closed, and copy releases/gesture_pose.txt into its config directory. Preserve customized pose files when upgrading. The current body archive remains unchanged.
+
+## Independent right-hand gesture
+
+The user-validated **0.10.0 right gesture test** plugin adds an independent F11 right-hand gesture alongside the F10 left-hand gesture. SPF actions Gestures.RightHandBird and Gestures.LeftWindowBird can be rebound. Both hands have finger-down arrival and direct steering return, with independent live config/right_gesture_pose.txt and config/gesture_pose.txt files. Side-specific validation prevents either file from targeting the other arm.
+
+The final gesture targets are three inches left for the left hand and three inches right for the right hand, measured from their previous centered targets. The user confirmed both look good, and both live reloads were recorded. Include both release pose files when installing this plugin. The DLL's original fallback poses are centered; the live files carry the validated offsets. See RIGHT_GESTURE.md and the validation records.

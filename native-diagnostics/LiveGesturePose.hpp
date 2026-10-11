@@ -6,10 +6,10 @@
 #include <memory>
 #include <atomic>
 using GesturePoseTargets=std::array<WindowGestureTarget,21>;
-inline bool ParseGesturePose(const std::string& text,GesturePoseTargets& output,std::string& error) {
+inline bool ParseGesturePose(const std::string& text,GesturePoseTargets& output,std::string& error,const GesturePoseTargets& allowed=kWindowGestureTargets) {
  if(text.size()>65536){error="file exceeds 64 KiB";return false;}
  std::istringstream lines(text);std::string line;bool header=false;std::array<bool,21> seen{};unsigned version=0;
- auto candidate=kWindowGestureTargets;
+ auto candidate=allowed;
  while(std::getline(lines,line)) {
   if(auto pos=line.find('#');pos!=std::string::npos)line.erase(pos);
   std::istringstream row(line);std::string tag;if(!(row>>tag))continue;
@@ -33,11 +33,13 @@ inline bool ParseGesturePose(const std::string& text,GesturePoseTargets& output,
  output=candidate;return true;
 }
 class LiveGesturePose {
- std::atomic<std::shared_ptr<const GesturePoseTargets>> current{std::make_shared<const GesturePoseTargets>(kWindowGestureTargets)};
+ const GesturePoseTargets fallback;
+ std::atomic<std::shared_ptr<const GesturePoseTargets>> current;
  std::atomic<uint64_t> generation{0};
 public:
+ explicit LiveGesturePose(const GesturePoseTargets& defaults=kWindowGestureTargets):fallback(defaults),current(std::make_shared<const GesturePoseTargets>(defaults)){}
  bool Replace(const std::string& text,std::string& error) {
-  GesturePoseTargets candidate{};if(!ParseGesturePose(text,candidate,error))return false;
+  GesturePoseTargets candidate{};if(!ParseGesturePose(text,candidate,error,fallback))return false;
   current.store(std::make_shared<const GesturePoseTargets>(candidate));generation.fetch_add(1);return true;
  }
  auto Snapshot() const {return current.load();}

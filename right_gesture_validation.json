@@ -1,0 +1,50 @@
+{
+  "gesture_bones": [
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45
+  ],
+  "middle_bones": [
+    32,
+    33,
+    34
+  ],
+  "finger_down_intermediate": true,
+  "raised_final": true,
+  "wrist_target_m": [
+    -0.3066736340596929,
+    1.0292800880952386,
+    -0.30040802840006675
+  ],
+  "rightward_hand_offset_m": 0.0762,
+  "arm_lengths_preserved": true,
+  "left_arm_and_pedals_unchanged": true,
+  "default_hotkey": "F11 (configurable)",
+  "visual_test_pending": false,
+  "user_feedback": "Looks good",
+  "final_visual_validation_passed": true,
+  "left_hand_offset_left_m": 0.0762,
+  "right_hand_offset_right_m": 0.0762,
+  "runtime_left_overrides": 8084,
+  "runtime_right_overrides": 7582,
+  "runtime_pose_faults": 0,
+  "latest_plugin_version": "0.10.0-right-gesture-test"
+}

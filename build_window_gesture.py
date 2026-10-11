@@ -22,10 +22,10 @@ local_basis=world[7][:3,:3].T@np.column_stack((np.cross(up,normal),up,normal))
 out=np.array([0.,-1.,-1.]);out/=np.linalg.norm(out)
 desired_up=np.array([0.,1.,0.])-out*out[1];desired_up/=np.linalg.norm(desired_up)
 hand_rotation=np.column_stack((np.cross(desired_up,out),desired_up,out))@local_basis.T
-target=(world[7][:3,3]+world[28][:3,3])/2 + np.array([0.,.18,-.08])
+target=(world[7][:3,3]+world[28][:3,3])/2 + np.array([-.0762,.18,-.08])
 # Raise and protract the clavicle to extend naturally beyond the previous reach.
 clavicle=world[4][:3,3];old_arm_root=world[5][:3,3]
-clavicle_direction=np.array([-.08,.02,-.09]);clavicle_direction/=np.linalg.norm(clavicle_direction)
+clavicle_direction=np.array([-.10,.02,-.07]);clavicle_direction/=np.linalg.norm(clavicle_direction)
 new_arm_root=clavicle+clavicle_direction*np.linalg.norm(old_arm_root-clavicle)
 shoulder_rotation=rotation(between(old_arm_root-clavicle,new_arm_root-clavicle))@world[4][:3,:3]
 flat[4][4:8]=quaternion(world[3][:3,:3].T@shoulder_rotation,flat[4][4:8])
@@ -123,7 +123,7 @@ for i in selected:
  values=lambda pose:','.join(f'{float(v):.9f}f' for v in pose[i][4:8])
  lines.append(f' {{{i},{{{values(open_pose)}}},{{{values(intermediate)}}},{{{values(gesture)}}}}},')
 lines.append('}};');(root/'native-diagnostics/WindowGestureTargets.hpp').write_text('\n'.join(lines)+'\n')
-report={'wrist_target_m':target.tolist(),'gesture_bones':selected,'middle_finger_extended':True,'intermediate_middle_finger_down':True,'extension_after_arrival':True,'middle_finger_vertical':False,'middle_finger_slightly_curled':True,'middle_joint_curl_degrees':[15,10,8],'total_roll_degrees':math.degrees(roll),'forearm_roll_degrees':math.degrees(roll)/3,'wrist_roll_degrees':math.degrees(roll)*2/3,'rotation_split':'one third forearm, two thirds wrist','extra_upward_wrist_tilt_degrees':10,'hand_straighten_degrees':8,'additional_palm_turn_degrees':30,'index_curl_degrees':[85,80,25],'thumb_turn':'base aimed toward folded index middle segment','other_fingers_curled':True,'arm_lengths_preserved':True,'right_arm_and_pedals_unchanged':True,'alignment_visual_test_pending':True,'thumb_wrap':'all three joints fit outside folded finger capsule proxies','thumb_clearance_check':thumb_report,'thumb_tip_target_m':thumb_target.tolist(),'initial_spf_hotkey':'F10 (configurable)','target_method':'neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction'}
+report={'wrist_target_m':target.tolist(),'leftward_hand_offset_m':.0762,'gesture_bones':selected,'middle_finger_extended':True,'intermediate_middle_finger_down':True,'extension_after_arrival':True,'middle_finger_vertical':False,'middle_finger_slightly_curled':True,'middle_joint_curl_degrees':[15,10,8],'total_roll_degrees':math.degrees(roll),'forearm_roll_degrees':math.degrees(roll)/3,'wrist_roll_degrees':math.degrees(roll)*2/3,'rotation_split':'one third forearm, two thirds wrist','extra_upward_wrist_tilt_degrees':10,'hand_straighten_degrees':8,'additional_palm_turn_degrees':30,'index_curl_degrees':[85,80,25],'thumb_turn':'base aimed toward folded index middle segment','other_fingers_curled':True,'arm_lengths_preserved':True,'right_arm_and_pedals_unchanged':True,'alignment_visual_test_pending':True,'thumb_wrap':'all three joints fit outside folded finger capsule proxies','thumb_clearance_check':thumb_report,'thumb_tip_target_m':thumb_target.tolist(),'initial_spf_hotkey':'F10 (configurable)','target_method':'neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction'}
 (root/'window_gesture_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
 
 
