@@ -1,4 +1,4 @@
-# ATS Visible Driver Body â€” Mustang
+# ATS Visible First Person Driver Body
 
 Version **0.3.0 steering test**, paired with the **0.2.0 SPF steering plugin**, is confirmed working by the user in ATS 1.61.3.1 Mustang VR. The seated interior driver follows live steering and preserves the stock hand repositioning behavior. Version 0.2.4 remains the validated static seated baseline.
 
@@ -6,7 +6,7 @@ The selectable **SPF Stock Driver Body (animated prototype)** carpet accessory u
 
 ## Install
 
-With ATS closed, copy releases/ATS-VisibleDriverBody-Mustang-0.3.0-steering-test.scs into the ATS user mod directory. Install releases/SPF_DriverAnimationDiagnostics.dll in bin/win_x64/plugins/spfPlugins/SPF_DriverAnimationDiagnostics/ under the game installation and enable it in SPF’s Plugins panel. Both files are required for live steering. Existing installation uses the older filename ATS-VisibleDriverBody-Mustang-0.1.0.scs to preserve profile references; replace that file rather than enabling both archives. Enable the mod, load the Mustang and select SPF Stock Driver Body (animated prototype) under carpet accessories. Restore the original carpet to remove it.
+With ATS closed, copy releases/ATS-VisibleDriverBody-Mustang-0.3.0-steering-test.scs into the ATS user mod directory. Install releases/SPF_DriverAnimationDiagnostics.dll in bin/win_x64/plugins/spfPlugins/SPF_DriverAnimationDiagnostics/ under the game installation and enable it in SPFï¿½s Plugins panel. Both files are required for live steering. Existing installation uses the older filename ATS-VisibleDriverBody-Mustang-0.1.0.scs to preserve profile references; replace that file rather than enabling both archives. Enable the mod, load the Mustang and select SPF Stock Driver Body (animated prototype) under carpet accessories. Restore the original carpet to remove it.
 
 ## Source and validation
 
@@ -24,7 +24,7 @@ The main visibility defect was the generated PMA header: data offsets start at b
 
 Python with NumPy is needed for rig analysis. The existing workspace provides extracted Ford assets at ../extracted-ford and stock-reference/driver.pmg plus ford_mustang_67_ani.pma for diagnostics. These game/reference files, downloaded SCS conversion tools and Blender reference checkout are excluded from Git. SCS Conversion Tools 2.21 converts the original fallback source in tools/base/model/spf_driver_body. Run build_stock_variant.py afterward to regenerate the private stock avatar and locator-only mount; run test_stock_animation.py to check the clip. This checkpoint includes the exact verified package and generated model outputs, rather than depending on an untested rebuild.
 
-No external reference mod is installed by these scripts. The repo has no remote configured at this checkpoint.
+No external reference mod is installed by these scripts. The project is hosted in the private GitHub repository scegielski/ATS-Visible-First-Person-Driver-Body.
 
 ## Live steering validation
 
