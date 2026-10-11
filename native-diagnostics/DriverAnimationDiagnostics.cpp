@@ -41,6 +41,8 @@ DurationQuery durationQuery=nullptr;
 FrameQuery frameQuery=nullptr;
 std::atomic<uint64_t> steeringOverrides{0},steeringFaults{0};
 std::atomic<float> lastPose{0};
+std::atomic<float> userThrottle{0},lastThrottle{0};
+std::atomic<uint64_t> throttleOverrides{0};
 std::atomic<uint64_t> driverCalls{0}, advanceCalls{0}, rejected{0};
 std::atomic<float> userSteering{0}, effectiveSteering{0};
 std::atomic<uint64_t> telemetryTick{0};
@@ -98,6 +100,7 @@ void Controls(const SPF_Controls* data,void*) {
  if(!data) return;
  userSteering.store(data->userInput.steering,std::memory_order_relaxed);
  effectiveSteering.store(data->effectiveInput.steering,std::memory_order_relaxed);
+ userThrottle.store(data->userInput.throttle,std::memory_order_relaxed);
  telemetryTick.store(GetTickCount64(),std::memory_order_relaxed);
 }
 void Reset() {
@@ -132,10 +135,10 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.2.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.3.0");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
- api->Info_SetDescriptionLiteral(h,"Experimental live steering for the private Mustang interior body.");
+ api->Info_SetDescriptionLiteral(h,"Live steering and experimental accelerator foot pose for the private Mustang interior body.");
  api->Policy_SetAllowUserConfig(h,true);
  api->Policy_AddConfigurableSystem(h,"logging");
  api->Defaults_SetLogging(h,"info",true);
@@ -171,7 +174,7 @@ void Activated(const SPF_Core_API* api) {
   core->telemetry->Tel_RegisterForControls(context,Controls,nullptr);
  }
  enabled.store(true);
- Log(SPF_LOG_INFO,"STEERING: hooks requested; only the private interior model with the 47-frame, 1.916667-second clip may be overridden. Runtime pose validation pending.");
+ Log(SPF_LOG_INFO,"STEERING: hooks requested for private interior model; supports verified steering clip and experimental 1551-frame steering/throttle clip. Foot pose validation pending.");
 }
 void Update() {
  if(!enabled.load()) return;
@@ -194,9 +197,6 @@ void Update() {
    static_cast<unsigned long long>(telTick?tick-telTick:0),static_cast<unsigned long long>(tick-sample.tick),
    static_cast<unsigned long long>(worldGeneration.load()));
   Log(SPF_LOG_INFO,text);
-  std::snprintf(text,sizeof(text),"STEERING overrides=%llu faults=%llu normalized=%.6f",
-   static_cast<unsigned long long>(steeringOverrides.load()),static_cast<unsigned long long>(steeringFaults.load()),lastPose.load());
-  Log(SPF_LOG_INFO,text);
  }
  for(const auto& model:models) if(model.model && tick-model.tick<=750) {
   std::snprintf(text,sizeof(text),"MODEL_SAMPLE model=%p path=%s index=%u requested=%.6f calls=%llu age_ms=%llu",
@@ -207,6 +207,10 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"STEERING overrides=%llu faults=%llu normalized=%.6f THROTTLE overrides=%llu input=%.6f start_frame=%u",
+   static_cast<unsigned long long>(steeringOverrides.load()),static_cast<unsigned long long>(steeringFaults.load()),lastPose.load(),
+   static_cast<unsigned long long>(throttleOverrides.load()),lastThrottle.load(),ThrottleStartFrame(lastThrottle.load()));
+  Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"HEALTH driver_calls=%llu matched_advance_calls=%llu rejected_samples=%llu ledger_dropped=%llu",
    static_cast<unsigned long long>(driverCalls.load()),static_cast<unsigned long long>(advanceCalls.load()),
    static_cast<unsigned long long>(rejected.load()),static_cast<unsigned long long>(copy.dropped));
@@ -245,14 +249,20 @@ void ApplyInteriorSteering(uintptr_t model,uint32_t index,float* replacement) no
  applying=true;
  __try {
   const float duration=durationQuery(model,index);
-  if(!IsSteeringClip(duration,frameQuery(model,index))) {applying=false;return;}
+  const uint32_t frames=frameQuery(model,index);
+  const bool hasThrottle=IsThrottleClip(duration,frames);
+  if(!hasThrottle && !IsSteeringClip(duration,frames)) {applying=false;return;}
   const uint64_t now=GetTickCount64(),tick=telemetryTick.load();
   const float input=effectiveSteering.load();
-  const float fraction=(tick && now-tick<=250 && std::isfinite(input)) ? SteeringFraction(input) : 0.f;
-  resetAnimation(model,index,0);
+  const bool fresh=tick && now-tick<=250;
+  const float fraction=(fresh && std::isfinite(input)) ? SteeringFraction(input) : 0.f;
+  const float gas=userThrottle.load();
+  const float throttle=(fresh && std::isfinite(gas)) ? std::clamp(gas,0.f,1.f) : 0.f;
+  resetAnimation(model,index,hasThrottle ? ThrottleStartFrame(throttle) : 0);
   enableAnimation(model,index,true);
-  *replacement=duration*fraction;
+  *replacement=(hasThrottle ? 1.9166667f : duration)*fraction;
   lastPose.store(fraction);steeringOverrides.fetch_add(1);
+  if(hasThrottle) {lastThrottle.store(throttle);throttleOverrides.fetch_add(1);}
  } __except(EXCEPTION_EXECUTE_HANDLER) {steeringFaults.fetch_add(1);}
  applying=false;
 }

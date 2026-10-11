@@ -1,0 +1,11 @@
+{
+  "user_confirmed_foot_test": true,
+  "observed_throttle_overrides": 4414,
+  "observed_faults": 0,
+  "observed_throttle_min": 0.0,
+  "observed_throttle_max": 1.0,
+  "steering_tracks_preserved_offline": true,
+  "plugin_version": "0.3.0",
+  "archive_version": "0.4.0 throttle test",
+  "world_reload_regression_verified": false
+}

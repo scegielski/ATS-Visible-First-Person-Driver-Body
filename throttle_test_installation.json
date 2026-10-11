@@ -1,0 +1,10 @@
+{
+  "plugin_version": "0.3.0",
+  "archive_version": "0.4.0 throttle test",
+  "plugin_sha256": "8f7661e444c37816c818baa212bbe24297dfa6a87a95204b6d9b600e2556c043",
+  "archive_sha256": "fb8531ad37524b70c442d52b730062952e3a82a0184573ec925e10543925b744",
+  "installed_bytes_verified": true,
+  "duration_header_verified": true,
+  "foot_runtime_validated": true,
+  "validation_evidence": "live_throttle_validation.json"
+}

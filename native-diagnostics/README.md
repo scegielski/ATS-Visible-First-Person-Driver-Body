@@ -1,5 +1,9 @@
 # Driver animation diagnostics
 
+## Experimental throttle version: 0.3.0
+
+Paired with the 0.4.0 throttle-test archive, this version also selects a right-ankle pose from raw accelerator input, independent of steering. The expanded clip has 1551 frames (33 throttle blocks of 47 steering frames); the clip guard recognizes its 64.583333-second duration. Missing/stale pedal input releases the ankle. The verified 47-frame steering clip remains supported. See THROTTLE_INTEGRATION.md for validation, testing and rollback details. The user confirmed the first VR foot test works; runtime override logs report no caught faults. See live_throttle_validation.json.
+
 ## Current version: 0.2.0 live steering test
 
 The sections below describe the earlier observation-only versions. Version 0.2.0 adds a targeted pose override for `/model/spf_stock_driver/driver.pmd` only when its clip has 47 frames and a duration of 1.916667 seconds. Use it with the 0.3.0 steering-test archive. It resets/enables that animation and replaces advancement with the stock steering-derived position. Missing/stale telemetry selects neutral. The executable hash/signature guards remain. Tests cover both unchanged forwarding and float replacement while preserving remaining arguments and returns. First-person visual steering validation is still pending.

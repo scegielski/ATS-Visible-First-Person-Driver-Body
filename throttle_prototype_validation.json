@@ -1,0 +1,13 @@
+{
+  "frames": 1551,
+  "steering_frames_per_level": 47,
+  "throttle_levels": 33,
+  "ankle_degrees": 12,
+  "bone_modified": 57,
+  "toe_height_delta_m": -0.028957885790679427,
+  "arm_tracks_preserved_all_levels": true,
+  "other_tracks_preserved": true,
+  "duration_seconds": 64.58333333333333,
+  "runtime_validated": true,
+  "validation_evidence": "live_throttle_validation.json"
+}
