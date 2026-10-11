@@ -50,8 +50,12 @@ Install releases/SPF_DriverAnimationDiagnostics-0.7.2-game-horn-test.dll as SPF_
 
 The latest installed input update is the **0.7.2 game horn test** plugin. It reads the player's validated game horn state, so all ATS horn bindings drive the same gesture without an SPF-specific keybind. Both bindings were correlated with the field, and the user confirmed the secondary-binding animation works. See game_horn_discovery.json for validation and guards.
 
-## Middle-finger gesture
+## Middle-finger gesture and live pose editing
 
-The installed **0.8.6 forearm gesture test** plugin adds a held middle-finger gesture above the steering wheel. Default F10 can be reassigned through SPF's existing Gestures.LeftWindowBird action. Release returns to the current steering grip, and the game-state horn takes priority. Steering and pedals continue independently. The hand reaches higher and farther forward, forms the gesture during the reach, and aims the raised finger vertically. The user confirmed the position and finger pose, but reported excessive forearm twisting at the elbow. This checkpoint retains that pose before distributing rotation between forearm and wrist. See WINDOW_GESTURE.md and window_gesture_validation.json.
+The installed and user-validated **0.9.2 direct return test** plugin adds a held middle-finger gesture above the steering wheel. Default F10 can be reassigned through SPF's existing Gestures.LeftWindowBird action. The hand reaches with the middle finger down, raises it after arrival, and returns directly to the current steering grip on release. Gesture transitions run 1.5 times faster than the first prototype. The game-state horn takes priority, while steering and pedals remain independent.
 
-The user-confirmed gesture checkpoint is now **0.8.8 refined gesture test**, sharing axial rotation between forearm and wrist, adding a small upward wrist tilt and preserving the hand target and vertical raised finger. Further fingertip and thumb-contact refinements are being tested separately.
+The current pose shares axial rotation between forearm and wrist, keeps a natural bend in the raised finger, and uses the user-confirmed thumb pose. The user confirmed the final sequence works great. See WINDOW_GESTURE.md and the validation records.
+
+The plugin watches config/gesture_pose.txt in its own directory and hot-reloads valid saves within about half a second. The version-2 file contains reach, intermediate finger-down and final held quaternions for 21 left-arm/finger bones. Invalid or incomplete edits retain the last valid pose. No rebuild or game restart is needed for pose edits. Timing logic changes still require a plugin update. See LIVE_POSE.md for format, scope and validation.
+
+Install releases/SPF_DriverAnimationDiagnostics-0.9.2-direct-return-test.dll as SPF_DriverAnimationDiagnostics.dll in the existing SPF plugin directory with ATS closed, and copy releases/gesture_pose.txt into its config directory. Preserve customized pose files when upgrading. The current body archive remains unchanged.

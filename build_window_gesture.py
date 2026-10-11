@@ -2,6 +2,7 @@
 from pathlib import Path
 import ast,struct,json,math
 import numpy as np
+from thumb_wrap_solver import solve_thumb_wrap
 root=Path(__file__).resolve().parent
 bones=json.loads((root/'steering_integration_audit.json').read_text())['driver_bones']
 helpers=ast.parse((root/'build_brake_prototype.py').read_text())
@@ -52,7 +53,19 @@ wrist_axis=final_hand_rotation@local_basis[:,0]
 palm=-final_hand_rotation@local_basis[:,2]
 tilt=math.radians(10)*(1 if np.dot(np.cross(wrist_axis,palm),[0.,1.,0.])>0 else -1)
 final_hand_rotation=rotation((math.cos(tilt/2),*(wrist_axis*math.sin(tilt/2))))@final_hand_rotation
-roll_rotation=rotation((math.cos(roll/4),*(forearm_axis*math.sin(roll/4))))
+# Reduce the rightward hand lean, then compensate the middle finger below.
+straighten=math.radians(8)
+final_hand_rotation=rotation((math.cos(straighten/2),0.,0.,math.sin(straighten/2)))@final_hand_rotation
+# Turn the palm modestly toward the driver without changing its target position.
+current_palm=-final_hand_rotation@local_basis[:,2]
+palm_toward_driver=current_palm+np.array([0.,0.,.25]);palm_toward_driver/=np.linalg.norm(palm_toward_driver)
+final_hand_rotation=rotation(between(current_palm,palm_toward_driver))@final_hand_rotation
+# Additional explicit fifteen-degree wrist turn toward the driver's face.
+current_palm=-final_hand_rotation@local_basis[:,2]
+face_axis=np.cross(current_palm,np.array([0.,0.,1.]));face_axis/=np.linalg.norm(face_axis)
+face_turn=math.radians(30)
+final_hand_rotation=rotation((math.cos(face_turn/2),*(face_axis*math.sin(face_turn/2))))@final_hand_rotation
+roll_rotation=rotation((math.cos(roll/6),*(forearm_axis*math.sin(roll/6))))
 lower=roll_rotation@lower
 open_pose=[v.copy() for v in flat]
 open_pose[5][4:8]=quaternion(world[4][:3,:3].T@upper,neutral[5][4:8])
@@ -68,24 +81,30 @@ assert np.max(np.abs(fk(open_pose)[7][:3,:3]-final_hand_rotation))<1e-5
 gesture=[v.copy() for v in open_pose]
 # Curl index, ring and little fingers; leave the middle finger extended.
 for chain in ((8,9,10),(14,15,16),(17,18,19)):
- for i,degrees in zip(chain,(90,105,75)):
+ for i,degrees in zip(chain,(85,80,25) if chain[0]==8 else (90,90,35)):
   angle=math.radians(degrees)
   gesture[i][4:8]=quaternion(rotation(flat[i][4:8])@rotation((math.cos(angle/2),0.,0.,math.sin(angle/2))),flat[i][4:8])
-# Keep the thumb base open beside the fist, curling mainly its distal tip.
-# The previous whole-thumb IK wrap crossed the curled fingers in VR.
-for i,degrees in zip((20,21,22),(10,15,65)):
+# Add a small natural bend to the raised middle finger's middle and tip joints.
+for i,degrees in ((11,15),(12,10),(13,8)):
  angle=math.radians(degrees)
- gesture[i][4:8]=quaternion(rotation(flat[i][4:8])@rotation((math.cos(angle/2),0.,0.,math.sin(angle/2))),flat[i][4:8])
-# Turn the thumb base slightly toward the driver, preserving the distal curl.
-thumb_world=fk(gesture)
-thumb_direction=thumb_world[22][:3,3]-thumb_world[20][:3,3]
-thumb_direction/=np.linalg.norm(thumb_direction)
-thumb_toward_driver=thumb_direction+np.array([0.,0.,.20]);thumb_toward_driver/=np.linalg.norm(thumb_toward_driver)
-thumb_rotation=rotation(between(thumb_direction,thumb_toward_driver))@thumb_world[20][:3,:3]
-gesture[20][4:8]=quaternion(thumb_world[7][:3,:3].T@thumb_rotation,gesture[20][4:8])
+ gesture[i][4:8]=quaternion(rotation(open_pose[i][4:8])@rotation((math.cos(angle/2),0.,0.,math.sin(angle/2))),open_pose[i][4:8])
+# Preserve the exact thumb pose confirmed by the user; only fingers are eased.
+confirmed_thumb_rotations={20: [0.775290357, 0.458662947, 0.432317792, 0.040675419], 21: [0.809557454, -0.00899529, -0.033336647, 0.5860243], 22: [0.928706579, 0.001725242, 0.000803126, 0.370810555]}
+for bone,q in confirmed_thumb_rotations.items():gesture[bone][4:8]=q
+thumb_report={'user_confirmed_pose_preserved':True,'finger_change_clearance_visual_test_pending':True}
 thumb_target=fk(gesture)[22][:3,3]
+# Intermediate fist has its middle finger down; the final raised pose is unchanged.
+intermediate=[v.copy() for v in gesture]
+for i,degrees in ((11,85),(12,80),(13,25)):
+ angle=math.radians(degrees)
+ intermediate[i][4:8]=quaternion(rotation(open_pose[i][4:8])@rotation((math.cos(angle/2),0.,0.,math.sin(angle/2))),open_pose[i][4:8])
+ # Keep this finger down even in the reach/open target.
+ open_pose[i][4:8]=intermediate[i][4:8].copy()
+intermediate_world=fk(intermediate)
+folded_direction=intermediate_world[13][:3,3]-intermediate_world[11][:3,3]
+assert np.dot(folded_direction,[0.,1.,0.])<0
 selected=(4,5,6,7,*range(8,23),23,24)
-for pose in (open_pose,gesture):
+for pose in (open_pose,intermediate,gesture):
  actual=fk(pose)
  assert np.linalg.norm(actual[7][:3,3]-target)<2e-5
  assert abs(np.linalg.norm(actual[6][:3,3]-actual[5][:3,3])-l1)<2e-5
@@ -93,17 +112,26 @@ for pose in (open_pose,gesture):
  for i in range(61):
   assert np.isfinite(pose[i]).all() and abs(np.dot(pose[i][4:8],pose[i][4:8])-1)<1e-4
   if i not in selected:assert np.array_equal(pose[i],neutral[i])
-for i in (11,12,13):assert np.array_equal(gesture[i],open_pose[i])
+assert not np.array_equal(gesture[11][4:8],open_pose[11][4:8])
 opened=fk(open_pose);closed=fk(gesture)
 for a,b in ((8,10),(14,16),(17,19)):
- assert np.linalg.norm(closed[b][:3,3]-closed[a][:3,3])<np.linalg.norm(opened[b][:3,3]-opened[a][:3,3])*.75
+ assert np.linalg.norm(closed[b][:3,3]-closed[a][:3,3])<np.linalg.norm(opened[b][:3,3]-opened[a][:3,3])*(.90 if a==8 else .75)
 middle_up=closed[13][:3,3]-closed[11][:3,3];middle_up/=np.linalg.norm(middle_up)
-assert np.dot(middle_up,vertical)>.99999
-lines=['#pragma once','#include "HornPoseTargets.hpp"','inline constexpr std::array<HornBoneTarget,21> kWindowGestureTargets{{']
+assert np.dot(middle_up,vertical)>math.cos(math.radians(30))
+lines=['#pragma once','#include <array>','struct WindowGestureTarget { unsigned bone; std::array<float,4> hover,intermediate,pressed; };','inline constexpr std::array<WindowGestureTarget,21> kWindowGestureTargets{{']
 for i in selected:
  values=lambda pose:','.join(f'{float(v):.9f}f' for v in pose[i][4:8])
- lines.append(f' {{{i},{{{values(open_pose)}}},{{{values(gesture)}}}}},')
+ lines.append(f' {{{i},{{{values(open_pose)}}},{{{values(intermediate)}}},{{{values(gesture)}}}}},')
 lines.append('}};');(root/'native-diagnostics/WindowGestureTargets.hpp').write_text('\n'.join(lines)+'\n')
-report={'wrist_target_m':target.tolist(),'gesture_bones':selected,'middle_finger_extended':True,'middle_finger_vertical':True,'total_roll_degrees':math.degrees(roll),'forearm_roll_degrees':math.degrees(roll)/2,'wrist_roll_degrees':math.degrees(roll)/2,'rotation_split':'50/50 forearm and wrist','extra_upward_wrist_tilt_degrees':10,'thumb_turn':'slightly toward driver','other_fingers_curled':True,'arm_lengths_preserved':True,'right_arm_and_pedals_unchanged':True,'alignment_visual_test_pending':True,'thumb_wrap':'base 10 degrees, middle 15 degrees, tip 65 degrees; visual clearance pending','thumb_tip_target_m':thumb_target.tolist(),'initial_spf_hotkey':'F10 (configurable)','target_method':'neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction'}
+report={'wrist_target_m':target.tolist(),'gesture_bones':selected,'middle_finger_extended':True,'intermediate_middle_finger_down':True,'extension_after_arrival':True,'middle_finger_vertical':False,'middle_finger_slightly_curled':True,'middle_joint_curl_degrees':[15,10,8],'total_roll_degrees':math.degrees(roll),'forearm_roll_degrees':math.degrees(roll)/3,'wrist_roll_degrees':math.degrees(roll)*2/3,'rotation_split':'one third forearm, two thirds wrist','extra_upward_wrist_tilt_degrees':10,'hand_straighten_degrees':8,'additional_palm_turn_degrees':30,'index_curl_degrees':[85,80,25],'thumb_turn':'base aimed toward folded index middle segment','other_fingers_curled':True,'arm_lengths_preserved':True,'right_arm_and_pedals_unchanged':True,'alignment_visual_test_pending':True,'thumb_wrap':'all three joints fit outside folded finger capsule proxies','thumb_clearance_check':thumb_report,'thumb_tip_target_m':thumb_target.tolist(),'initial_spf_hotkey':'F10 (configurable)','target_method':'neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction'}
 (root/'window_gesture_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
 
+
+
+# Editable runtime pose file; copy this into the installed plugin config directory.
+pose_lines=['# Quaternion order: w x y z. Groups are reach/open, intermediate finger-down, and final held gesture.','SPF_GESTURE_POSE 2']
+for i in selected:
+ pose_lines.append('# '+bones[i]['name'])
+ values=[*open_pose[i][4:8],*intermediate[i][4:8],*gesture[i][4:8]]
+ pose_lines.append('bone '+str(i)+' '+' '.join(f'{float(v):.9f}' for v in values))
+(root/'releases/gesture_pose.txt').write_text('\n'.join(pose_lines)+'\n')

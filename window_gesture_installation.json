@@ -1,12 +1,12 @@
 {
-  "plugin_version": "0.8.8-refined-gesture-test",
+  "plugin_version": "0.9.2-direct-return-test",
   "installed": true,
-  "sha256": "c63b0315e075602307d24e586d24270cfc6e5eab5484a8192b26bb3293f3b632",
+  "sha256": "823cee80e4e8d728c1bdd7d9f1c562597b8e437220cf62644ef143964962647b",
   "spf_action": "Gestures.LeftWindowBird",
   "default_binding": "F10",
   "activation": "hold; release returns to current steering grip",
   "horn_priority": true,
-  "previous_plugin_backup": "backups/horn-bone-observer/SPF_DriverAnimationDiagnostics-0.8.7-split-gesture.dll",
+  "previous_plugin_backup": "backups/horn-bone-observer/SPF_DriverAnimationDiagnostics-0.8.11-palm-clearance.dll",
   "archive_changed": false,
   "tests_passed": true,
   "visual_test_pending": false,
@@ -22,18 +22,40 @@
   "palm_orientation": "45 degree upward tilt toward driver",
   "finger_curl_degrees": [
     90,
-    105,
-    75
+    90,
+    35
   ],
-  "formation": "simultaneous with reach; 0.30 second formation, 0.45 second reach",
+  "formation": "concurrent: 0.20 second formation alongside 0.30 second reach",
   "shoulder_protraction": true,
   "wrist_local_rotation_unchanged": false,
-  "middle_finger_vertical": true,
+  "middle_finger_vertical": false,
   "user_confirmed_with_elbow_twist_issue": true,
-  "rotation_split": "50/50 forearm and wrist",
+  "rotation_split": "one third forearm, two thirds wrist",
   "final_hand_orientation_preserved": false,
   "extra_upward_wrist_tilt_degrees": 10,
-  "thumb_turn": "slightly toward driver",
-  "user_feedback": "Looks good; requested slightly less fingertip curl and thumb contact nearer middle finger segments",
-  "user_confirmed": true
+  "thumb_turn": "all three joints fit around outside of folded fingers",
+  "user_feedback": "Yeah, that works great",
+  "user_confirmed": true,
+  "transition_speed_multiplier": 1.5,
+  "confirmed_thumb_rotations_unchanged": true,
+  "index_curl_degrees": [
+    85,
+    80,
+    25
+  ],
+  "hand_straighten_degrees": 8,
+  "live_pose_file": "config/gesture_pose.txt",
+  "last_pose_update": "runtime file edit; no plugin rebuild or restart",
+  "final_visual_validation_passed": true,
+  "runtime_gesture_overrides": 1405,
+  "runtime_pose_faults": 0,
+  "final_plugin_version": "0.9.2-direct-return-test",
+  "pose_file_sha256": "abab74aa378fcf6fb25ffddcb3dd6e9e7e81ba800d2653fb4d6ebb13c78811be",
+  "live_pose_format_version": 2,
+  "middle_joint_curl_degrees": [
+    15,
+    10,
+    8
+  ],
+  "exit": "direct blend to current steering grip"
 }

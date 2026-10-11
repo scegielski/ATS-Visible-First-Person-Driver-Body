@@ -5,6 +5,8 @@
 #include "HornPose.hpp"
 #include "GameHorn.hpp"
 #include "WindowGesture.hpp"
+#include "LiveGesturePose.hpp"
+#include <iomanip>
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -47,6 +49,41 @@ static uintptr_t BoneOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays
  Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone original arguments unchanged");return 123456;
 }
 int main() {
+ auto encode=[](const GesturePoseTargets& pose){std::ostringstream text;text<<"SPF_GESTURE_POSE 1\n"<<std::setprecision(9);for(const auto& bone:pose){text<<"bone "<<bone.bone;for(float v:bone.hover)text<<" "<<v;for(float v:bone.pressed)text<<" "<<v;text<<"\n";}return text.str();};
+ auto encodeV2=[](const GesturePoseTargets& pose){std::ostringstream text;text<<"SPF_GESTURE_POSE 2\n"<<std::setprecision(9);for(const auto& bone:pose){text<<"bone "<<bone.bone;for(float v:bone.hover)text<<" "<<v;for(float v:bone.intermediate)text<<" "<<v;for(float v:bone.pressed)text<<" "<<v;text<<"\n";}return text.str();};
+ WindowGestureMotion staged;
+ bool intermediateReached=false;
+ for(int tick=0;tick<80;++tick){const bool arrived=staged.reach>=1;staged.Step(true,.01f);if(!arrived)Check(staged.extend==0,"middle finger cannot rise before hand arrives");if(staged.reach==1 && staged.extend==0)intermediateReached=true;}
+ Check(intermediateReached && staged.extend==1,"distinct finger-down arrival before extension");
+ staged.Step(false,.01f);Check(staged.reach<1 && staged.press==1 && staged.extend==1,"release starts arm return immediately without open-hand exit keyframe");
+ for(int tick=0;tick<40;++tick)staged.Step(false,.01f);
+ Check(staged.reach==0 && staged.press==0 && staged.extend==0,"direct release ends at steering grip");
+ WindowGestureMotion brief;brief.Step(true,.05f);brief.Step(false,.05f);Check(brief.extend==0,"short tap never raises middle finger before arrival");
+ LiveGesturePose stagedFile;std::string stagedError;auto stagedTargets=kWindowGestureTargets;
+ stagedTargets[1].intermediate={0,1,0,0};stagedTargets[1].pressed={1,0,0,0};
+ Check(stagedFile.Replace(encodeV2(stagedTargets),stagedError),"three-keyframe live pose accepted");
+ auto stagedSnapshot=stagedFile.Snapshot();
+ auto stagedRotations=std::array<std::array<float,4>,61>{};for(auto& q:stagedRotations)q={1,0,0,0};
+ WindowGestureMotion atArrival;atArrival.reach=atArrival.press=1;
+ BlendWindowGesture(stagedRotations,atArrival,*stagedSnapshot);Check(std::abs(stagedRotations[5][1])>.99999f,"intermediate joint pose sampled at arrival");
+ atArrival.extend=1;BlendWindowGesture(stagedRotations,atArrival,*stagedSnapshot);Check(stagedRotations[5]==std::array<float,4>{1,0,0,0},"final keyframe sampled after extension");
+ Check(!stagedFile.Replace("SPF_GESTURE_POSE 2\nbone 4 1 0 0 0 1 0 0 0\n",stagedError) && stagedFile.Snapshot()==stagedSnapshot,"incomplete third-keyframe write keeps valid pose");
+ LiveGesturePose livePose;std::string poseError;
+ const auto initial=livePose.Snapshot();auto editable=kWindowGestureTargets;editable[1].pressed={1,0,0,0};
+ const auto validText=encode(editable);
+ Check(livePose.Replace(validText,poseError) && livePose.Generation()==1,"valid file publishes new pose");
+ auto accepted=livePose.Snapshot();Check((*accepted)[1].pressed==std::array<float,4>{1,0,0,0},"file joint rotation reaches snapshot");
+ Check(initial->at(1).pressed==kWindowGestureTargets[1].pressed,"existing snapshot remains immutable after reload");
+ Check(!livePose.Replace("SPF_GESTURE_POSE 1\nbone 4 1 0 0 0 1 0 0 0\n",poseError) && livePose.Snapshot()==accepted,"partial write keeps last valid pose");
+ Check(!livePose.Replace(validText+"bone 4 1 0 0 0 1 0 0 0\n",poseError),"duplicate bone rejected");
+ auto bad=editable;bad[1].pressed={0,0,0,0};Check(!livePose.Replace(encode(bad),poseError),"zero quaternion rejected");
+ bad=editable;bad[1].bone=25;Check(!livePose.Replace(encode(bad),poseError),"file cannot target right arm");
+ bad=editable;bad[1].pressed={1.05f,0,0,0};Check(livePose.Replace(encode(bad),poseError) && livePose.Snapshot()->at(1).pressed[0]==1,"small quaternion drift normalized");
+ Check(!livePose.Replace(std::string(65537,'x'),poseError),"oversized pose file rejected");
+ GesturePoseTargets parsed{};Check(ParseGesturePose(validText+"# comments allowed\n",parsed,poseError),"pose comments supported");
+ auto liveRotations=std::array<std::array<float,4>,61>{};for(auto& q:liveRotations)q={1,0,0,0};WindowGestureMotion fullLive;fullLive.reach=fullLive.press=1;
+ BlendWindowGesture(liveRotations,fullLive,*accepted);Check(liveRotations[5]==std::array<float,4>{1,0,0,0},"hot reloaded targets drive live gesture blend");
+
  LeftArmGestures gestures;
  gestures.Step(false,true,.01f);Check(gestures.window.reach>0 && gestures.window.reach<1 && gestures.window.press>0,"gesture forms while hand is moving");
  for(int i=0;i<100;++i)gestures.Step(false,true,.01f);

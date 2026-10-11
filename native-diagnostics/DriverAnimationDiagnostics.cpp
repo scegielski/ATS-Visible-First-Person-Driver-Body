@@ -11,6 +11,9 @@
 #include "PedalMotion.hpp"
 #include "HornPose.hpp"
 #include "WindowGesture.hpp"
+#include "LiveGesturePose.hpp"
+#include <filesystem>
+#include <fstream>
 #include <SPF_KeyBinds_API.h>
 #include <atomic>
 #include <mutex>
@@ -38,6 +41,7 @@ std::atomic<uint64_t> boneSamples{0},hornOverrides{0},hornFaults{0};
 std::atomic<uint64_t> hornTick{0};
 std::atomic<bool> gameHornValid{false};
 SPF_KeyBinds_Handle* gestureKeys=nullptr;
+LiveGesturePose liveGesturePose;
 std::atomic<bool> windowGestureHeld{false};
 std::atomic<uint64_t> windowGestureTick{0},windowGestureOverrides{0};
 const SPF_Core_API* core=nullptr;
@@ -158,7 +162,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.8.8");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.9.2");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn gesture and configurable left-window middle-finger gesture.");
@@ -205,8 +209,35 @@ void Activated(const SPF_Core_API* api) {
  enabled.store(true);
  Log(SPF_LOG_INFO,"PEDALS: hooks requested for private interior model; supports prior steering/pedal clips and independent clutch clip. New brake alignment and clutch visual validation pending.");
 }
+void PollGesturePoseFile() {
+ static std::filesystem::path path;
+ static uint64_t lastPoll=0,lastStamp=0;static bool attempted=false;
+ const auto now=GetTickCount64();if(now-lastPoll<500)return;lastPoll=now;
+ if(path.empty()) {
+  HMODULE module=nullptr;wchar_t modulePath[32768]{};
+  if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollGesturePoseFile),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
+  path=std::filesystem::path(modulePath).parent_path()/L"config"/L"gesture_pose.txt";
+ }
+ WIN32_FILE_ATTRIBUTE_DATA info{};
+ if(!GetFileAttributesExW(path.c_str(),GetFileExInfoStandard,&info))return;
+ const uint64_t stamp=(static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime)<<32)|info.ftLastWriteTime.dwLowDateTime;
+ if(attempted && stamp==lastStamp)return;
+ attempted=true;lastStamp=stamp;
+ if(info.nFileSizeHigh || info.nFileSizeLow>65536){Log(SPF_LOG_WARN,"POSE_RELOAD rejected: file too large; last valid pose retained.");return;}
+ std::ifstream file(path,std::ios::binary);if(!file)return;
+ std::string content(info.nFileSizeLow,'\0');file.read(content.data(),static_cast<std::streamsize>(content.size()));
+ if(!file && !content.empty()){Log(SPF_LOG_WARN,"POSE_RELOAD rejected: incomplete read; last valid pose retained.");return;}
+ std::string error;char text[256];
+ if(liveGesturePose.Replace(content,error))std::snprintf(text,sizeof(text),"POSE_RELOAD accepted generation=%llu joints=21",static_cast<unsigned long long>(liveGesturePose.Generation()));
+ else std::snprintf(text,sizeof(text),"POSE_RELOAD rejected: %s; last valid pose retained.",error.c_str());
+ Log(SPF_LOG_INFO,text);
+}
+void BlendLiveWindowGesture(std::array<std::array<float,4>,61>& rotations,const WindowGestureMotion& motion) {
+ const auto pose=liveGesturePose.Snapshot();BlendWindowGesture(rotations,motion,*pose);
+}
 void Update() {
  if(!enabled.load()) return;
+ PollGesturePoseFile();
  bool held=false;
  const bool valid=ReadPlayerHorn(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,held);
  gameHornValid.store(valid);hornHeld.store(valid && held);hornTick.store(valid?GetTickCount64():0);
@@ -297,7 +328,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
   for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
   BlendHornPose(rotations,gestures.horn);
-  BlendWindowGesture(rotations,gestures.window);
+  BlendLiveWindowGesture(rotations,gestures.window);
   __try {
    for(const auto& target:kHornTargets)std::memcpy(reinterpret_cast<void*>(pointers[2]+target.bone*16),rotations[target.bone].data(),16);
    if(gestures.horn.reach>0)hornOverrides.fetch_add(1);

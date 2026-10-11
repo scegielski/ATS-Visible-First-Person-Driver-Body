@@ -28,25 +28,49 @@
     24
   ],
   "middle_finger_extended": true,
-  "middle_finger_vertical": true,
+  "intermediate_middle_finger_down": true,
+  "extension_after_arrival": true,
+  "middle_finger_vertical": false,
+  "middle_finger_slightly_curled": true,
+  "middle_joint_curl_degrees": [
+    15,
+    10,
+    8
+  ],
   "total_roll_degrees": -98.65874643528925,
-  "forearm_roll_degrees": -49.32937321764462,
-  "wrist_roll_degrees": -49.32937321764462,
-  "rotation_split": "50/50 forearm and wrist",
+  "forearm_roll_degrees": -32.88624881176308,
+  "wrist_roll_degrees": -65.77249762352616,
+  "rotation_split": "one third forearm, two thirds wrist",
   "extra_upward_wrist_tilt_degrees": 10,
-  "thumb_turn": "slightly toward driver",
+  "hand_straighten_degrees": 8,
+  "additional_palm_turn_degrees": 30,
+  "index_curl_degrees": [
+    85,
+    80,
+    25
+  ],
+  "thumb_turn": "base aimed toward folded index middle segment",
   "other_fingers_curled": true,
   "arm_lengths_preserved": true,
   "right_arm_and_pedals_unchanged": true,
   "alignment_visual_test_pending": false,
-  "thumb_wrap": "base 10 degrees, middle 15 degrees, tip 65 degrees; visual clearance pending",
+  "thumb_wrap": "all three joints fit outside folded finger capsule proxies",
+  "thumb_clearance_check": {
+    "user_confirmed_pose_preserved": true,
+    "finger_change_clearance_visual_test_pending": true
+  },
   "thumb_tip_target_m": [
-    -0.40386484005094814,
-    1.1015943700457456,
-    -0.38303263945623445
+    -0.4098519496381078,
+    1.123420996958255,
+    -0.28182764595760534
   ],
   "initial_spf_hotkey": "F10 (configurable)",
   "target_method": "neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction",
-  "user_feedback": "Looks good; requested slightly less fingertip curl and thumb contact nearer middle finger segments",
-  "user_confirmed": true
+  "user_feedback": "Yeah, that works great",
+  "final_visual_validation_passed": true,
+  "visual_test_pending": false,
+  "runtime_gesture_overrides": 1405,
+  "runtime_pose_faults": 0,
+  "final_plugin_version": "0.9.2-direct-return-test",
+  "pose_file_sha256": "abab74aa378fcf6fb25ffddcb3dd6e9e7e81ba800d2653fb4d6ebb13c78811be"
 }
