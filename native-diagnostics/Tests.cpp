@@ -1,12 +1,16 @@
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
 #include "PedalMotion.hpp"
+#include "HornMotion.hpp"
+#include "HornPose.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gAdvanceOriginal=nullptr;
+void* gBoneOriginal=nullptr;
+uintptr_t BoneObserveStub(uintptr_t,uintptr_t,uintptr_t,uintptr_t,uint32_t);
 uintptr_t DriverObserveStub(uintptr_t);
 uintptr_t AdvanceObserveStub(uintptr_t,uint32_t,float,uint64_t,uint64_t);
 }
@@ -33,7 +37,38 @@ static uintptr_t AdvanceOriginal(uintptr_t model,uint32_t index,float requested,
  Check(fourth==0x11223344 && fifth==0x55667788,"original register and stack arguments");
  return 0x987654;
 }
+extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) noexcept {
+ Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone observer register and stack forwarding");
+}
+static uintptr_t BoneOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) {
+ Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone original arguments unchanged");return 123456;
+}
 int main() {
+ std::array<std::array<float,4>,61> original{};
+ for(auto& q:original)q={1,0,0,0};
+ auto pose=original;BlendHornPose(pose,{});Check(pose==original,"released horn leaves every bone byte exact");
+ HornMotion full;full.reach=1;full.press=1;BlendHornPose(pose,full);
+ for(unsigned bone=0;bone<61;++bone){
+  bool selected=false;for(const auto& target:kHornTargets)if(target.bone==bone)selected=true;
+  if(!selected)Check(pose[bone]==original[bone],"horn leaves right hand pedals and torso byte exact");
+  float norm=0;for(float v:pose[bone])norm+=v*v;Check(std::abs(norm-1)<.00001f,"horn rotations remain normalized");
+ }
+ HornMotion halfway;halfway.reach=.5f;
+ auto current=original;current[5]={0,1,0,0};auto latest=current;
+ BlendHornPose(original,halfway);BlendHornPose(latest,halfway);
+ Check(original[5]!=latest[5],"horn return blends against current steering grip");
+ Check(HornSlerp({1,0,0,0},{-1,0,0,0},.5f)==std::array<float,4>{1,0,0,0},"horn shortest arc handles antipodal quaternions");
+ HornMotion horn;
+ for(int i=0;i<24;++i) {horn.Step(true,.01f);Check(horn.press==0,"horn reaches before pressing");}
+ for(int i=0;i<30;++i)horn.Step(true,.01f);
+ Check(horn.reach==1 && horn.press==1,"held horn finishes reach and press");
+ horn.Step(false,.01f);Check(horn.reach==1 && horn.press<1,"horn lifts before withdrawal");
+ for(int i=0;i<40;++i)horn.Step(false,.01f);
+ Check(horn.reach==0 && horn.press==0,"horn release fully returns to live grip");
+ horn.Step(true,.01f);horn.Step(false,.01f);Check(horn.reach==0 && horn.press==0,"short horn tap reverses reach");
+ horn.Step(true,std::numeric_limits<float>::quiet_NaN());Check(horn.reach==0,"invalid time does not advance horn");
+ gBoneOriginal=reinterpret_cast<void*>(BoneOriginal);
+ Check(BoneObserveStub(11,22,33,44,61)==123456,"bone observer preserves return");
  gDriverOriginal=reinterpret_cast<void*>(DriverOriginal);
  gAdvanceOriginal=reinterpret_cast<void*>(AdvanceOriginal);
  Check(DriverObserveStub(0x12345678)==0xabcdef,"driver return value");

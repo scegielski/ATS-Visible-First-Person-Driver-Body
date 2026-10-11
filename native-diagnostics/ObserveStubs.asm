@@ -2,6 +2,8 @@ EXTERN gDriverOriginal:QWORD
 EXTERN gAdvanceOriginal:QWORD
 EXTERN CaptureDriver:PROC
 EXTERN CaptureAdvance:PROC
+EXTERN gBoneOriginal:QWORD
+EXTERN CaptureBone:PROC
 .code
 SAVE_STATE MACRO
  pushfq
@@ -55,4 +57,12 @@ AdvanceObserveStub PROC FRAME
  RESTORE_STATE
  jmp qword ptr [gAdvanceOriginal]
 AdvanceObserveStub ENDP
+BoneObserveStub PROC FRAME
+ SAVE_STATE
+ mov eax, [rsp+0f0h] ; original fifth argument: bone count
+ mov [rsp+20h], eax
+ call CaptureBone
+ RESTORE_STATE
+ jmp qword ptr [gBoneOriginal]
+BoneObserveStub ENDP
 END

@@ -5,9 +5,11 @@
 #include <SPF_Logger_API.h>
 #include <SPF_Telemetry_API.h>
 #include <SPF_TelemetryData.h>
+#include <SPF_KeyBinds_API.h>
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
 #include "PedalMotion.hpp"
+#include "HornPose.hpp"
 #include <atomic>
 #include <mutex>
 #include <cstdio>
@@ -17,6 +19,8 @@
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gAdvanceOriginal=nullptr;
+void* gBoneOriginal=nullptr;
+void BoneObserveStub();
 void DriverObserveStub();
 void AdvanceObserveStub();
 }
@@ -25,6 +29,12 @@ constexpr char kName[]="SPF_DriverAnimationDiagnostics";
 constexpr char kHash[]="5d3b4e343154de6b25dd366b6048c5bc5c452a4daa50bc38b33fd2e571d54257";
 constexpr char kDriverPattern[]="40 53 48 83 EC 50 48 83 79 08 00 48 8B D9 0F 84 43 01 00 00 83 79 10 FF 0F 84 39 01 00 00 80 79";
 constexpr char kAdvancePattern[]="48 8B C4 55 41 57 48 81 EC 88 00 00 00 48 8B E9 44 8B FA 48 81 C1 08 02 00 00 0F 29 70 C8 0F 28";
+constexpr char kBonePattern[]="48 8B C4 48 89 68 18 56 57 41 54 41 55 41 57 48 81 EC 00 02 00 00 8B AC 24 50 02 00 00 45 33 ED";
+SPF_Hook_Handle* boneHook=nullptr;
+SPF_KeyBinds_Handle* hornKeys=nullptr;
+std::atomic<bool> hornHeld{false};
+std::atomic<uint64_t> boneSamples{0},hornOverrides{0},hornFaults{0};
+std::atomic<uint64_t> hornTick{0};
 const SPF_Core_API* core=nullptr;
 const SPF_Load_API* load=nullptr;
 SPF_Logger_Handle* logger=nullptr;
@@ -143,13 +153,15 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.5.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.6.6");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
- api->Info_SetDescriptionLiteral(h,"Live steering, right gas/brake motion and independent left clutch ankle press for the private Mustang interior body.");
+ api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals and left-hand horn reach/press/return for the private Mustang interior body.");
  api->Policy_SetAllowUserConfig(h,true);
  api->Policy_AddConfigurableSystem(h,"logging");
  api->Defaults_SetLogging(h,"info",true);
+ api->Policy_AddConfigurableSystem(h,"keybinds");
+ api->Defaults_AddKeybind(h,"Controls","HornKeyboard","keyboard","KEY_H","never");
 }
 void OnLoad(const SPF_Load_API* api) {
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
@@ -167,6 +179,7 @@ void Activated(const SPF_Core_API* api) {
     hooks->Hook_FindPattern(kAdvancePattern)!=base+0x15deed0) {
   Log(SPF_LOG_ERROR,"DIAG: expected unique entry signatures absent; no hooks registered.");return;
  }
+ if(hooks->Hook_FindPattern(kBonePattern)!=base+0x15dfbf0) {Log(SPF_LOG_ERROR,"HORN: bone entry signature mismatch; diagnostic disabled.");return;}
  expectedReturn=base+0x9e1d92;
  resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15de620);
  enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15decc0);
@@ -174,7 +187,9 @@ void Activated(const SPF_Core_API* api) {
  frameQuery=reinterpret_cast<FrameQuery>(base+0x359f20);
  driverHook=hooks->Hook_Register(kName,"DriverUpdate","Observe driver update",reinterpret_cast<void*>(DriverObserveStub),&gDriverOriginal,kDriverPattern,true);
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
- if(!driverHook || !advanceHook) {
+ boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
+ if(core->keybinds) hornKeys=core->keybinds->Kbind_GetContext(kName);
+ if(!driverHook || !advanceHook || !boneHook) {
   Log(SPF_LOG_ERROR,"DIAG: incomplete hook registration; observers remain inactive.");return;
  }
  if(core->telemetry) {
@@ -186,9 +201,10 @@ void Activated(const SPF_Core_API* api) {
 }
 void Update() {
  if(!enabled.load()) return;
+ if(hornKeys) {hornHeld.store(core->keybinds->Kbind_GetActionValue(hornKeys,"Controls.HornKeyboard")>.5f);hornTick.store(GetTickCount64());}
  static bool installed=false;
- if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook)) {
-  installed=true; Log(SPF_LOG_INFO,"DIAG: both hooks installed; awaiting driver update and sample evidence.");
+ if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook) && core->hooks->Hook_IsInstalled(boneHook)) {
+  installed=true; Log(SPF_LOG_INFO,"HORN: three hooks installed; private left-arm horn prototype enabled; keyboard H mirrors horn without consuming input.");
  }
  static uint64_t last=0;
  const uint64_t tick=GetTickCount64(); if(tick-last<250) return; last=tick;
@@ -215,6 +231,7 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"HORN overrides=%llu faults=%llu held=%d",static_cast<unsigned long long>(hornOverrides.load()),static_cast<unsigned long long>(hornFaults.load()),hornHeld.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"CLUTCH overrides=%llu input=%.6f ankle=%.6f",
    static_cast<unsigned long long>(clutchOverrides.load()),lastClutch.load(),lastClutchPress.load());
   Log(SPF_LOG_INFO,text);
@@ -235,6 +252,43 @@ void Update() {
  }
 }
 void Unload() { enabled.store(false); Reset(); }
+}
+// Blend only private left-arm rotations before the original hierarchy assembly.
+// The current steering pose is freshly computed by the engine on every call.
+extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) noexcept {
+ if(!enabled.load() || count!=61 || bounds<0x1e0)return;
+ const uintptr_t model=bounds-0x1e0;char path[192]{};
+ if(!ReadModelPath(model,path) || std::strcmp(path,"/model/spf_stock_driver/driver.pmd"))return;
+ uintptr_t expected=0,pointers[4]{};
+ if(!SafeRead(model+0x1c0,&expected,8) || output!=expected || !SafeRead(arrays,pointers,sizeof(pointers)))return;
+ float arm[4]{},hand[4]{},handPosition[3]{};
+ if(!SafeRead(pointers[2]+5*16,arm,sizeof(arm)) || !SafeRead(pointers[2]+7*16,hand,sizeof(hand)) || !SafeRead(pointers[3]+7*12,handPosition,sizeof(handPosition)))return;
+ for(float value:arm)if(!std::isfinite(value))return;
+ for(float value:hand)if(!std::isfinite(value))return;
+ static thread_local HornMotion motion;
+ static thread_local uintptr_t priorModel=0;
+ static thread_local uint64_t priorGeneration=0,priorTick=0;
+ const uint64_t now=GetTickCount64(),generation=worldGeneration.load();
+ if(priorModel!=model || priorGeneration!=generation){motion={};priorTick=now;priorModel=model;priorGeneration=generation;}
+ const float dt=std::clamp(static_cast<float>(now-priorTick)/1000.f,0.f,.05f);priorTick=now;
+ const auto inputTick=hornTick.load(),telTick=telemetryTick.load();
+ const bool held=hornHeld.load() && inputTick && now-inputTick<=250 && telTick && now-telTick<=250;
+ motion.Step(held,dt);
+ if(motion.reach>0 && !hornFaults.load()) {
+  std::array<std::array<float,4>,61> rotations{};
+  if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
+  for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
+  BlendHornPose(rotations,motion);
+  __try {
+   for(const auto& target:kHornTargets)std::memcpy(reinterpret_cast<void*>(pointers[2]+target.bone*16),rotations[target.bone].data(),16);
+   hornOverrides.fetch_add(1);
+  } __except(EXCEPTION_EXECUTE_HANDLER){hornFaults.fetch_add(1);}
+ }
+ const auto sample=boneSamples.fetch_add(1)+1;
+ if(sample<=3 || sample%120==0) {
+  char text[512];std::snprintf(text,sizeof(text),"HORN_BONE sample=%llu count=%u held=%d arm_quat=%.6f,%.6f,%.6f,%.6f hand_quat=%.6f,%.6f,%.6f,%.6f hand_local=%.6f,%.6f,%.6f bones=%p",
+   static_cast<unsigned long long>(sample),count,hornHeld.load()?1:0,arm[0],arm[1],arm[2],arm[3],hand[0],hand[1],hand[2],hand[3],handPosition[0],handPosition[1],handPosition[2],reinterpret_cast<void*>(bones));Log(SPF_LOG_INFO,text);
+ }
 }
 extern "C" void CaptureDriver(uintptr_t controller) noexcept {
  currentDriver={}; currentGeneration=worldGeneration.load();

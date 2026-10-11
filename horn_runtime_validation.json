@@ -1,0 +1,26 @@
+{
+  "private_bone_samples_logged": 82,
+  "horn_held_samples_logged": 2,
+  "source_rotation_interpolation_max_distance": 0.000896992,
+  "keyboard_horn_held_and_released_observed": true,
+  "pose_arrays": [
+    "pre_rotation_quaternion",
+    "scale",
+    "rotation_quaternion",
+    "local_position"
+  ],
+  "new_hook_forwarding_tests_passed": true,
+  "gesture_sequence_tests_passed": true,
+  "right_arm_pedals_torso_unchanged_tests_passed": true,
+  "visual_horn_alignment_validated": true,
+  "first_gesture_user_feedback": "Looks pretty good; requested two centimeters lower and flatter open hand",
+  "first_gesture_runtime_overrides": 4434,
+  "first_gesture_runtime_faults": 0,
+  "flat_pose_user_feedback": "Pose looks good, but hand orientation is wrong; screenshot shows retained steering wrist angle",
+  "orientation_user_feedback": "Much closer, almost perfect; requested another 3-4 cm down and 2-3 cm forward",
+  "alignment_user_feedback": "Hand intersects horn pad; requested less depth and 2-3 cm right",
+  "final_plugin_version": "0.6.6-horn-clearance-test",
+  "final_user_feedback": "Okay, it's good",
+  "final_runtime_overrides": 2092,
+  "final_runtime_faults": 0
+}

@@ -1,0 +1,22 @@
+{
+  "plugin_version": "0.6.6-horn-clearance-test",
+  "installed": true,
+  "sha256": "dfd1c04da57ead466dcdc2e90c9351fe0ec35dd06323580b17ae730fcddf5874",
+  "archive_replaced": false,
+  "installed_archive": "0.6.0 clutch test (16 cm brake reach)",
+  "latest_14_cm_archive_still_pending": true,
+  "keyboard_horn_key": "H",
+  "visual_test_pending": false,
+  "previous_plugin_backup": "backups/horn-bone-observer/SPF_DriverAnimationDiagnostics-0.6.5-horn-alignment.dll",
+  "vertical_adjustment_m": -0.095,
+  "open_fingers": true,
+  "palm_orientation": "parallel to wheel plane estimated from stock steering wrists, fingers up",
+  "forward_adjustment_m": 0.0,
+  "additional_vertical_adjustment_m": 0.0,
+  "built": true,
+  "left_adjustment_m": 0.005,
+  "latest_backward_adjustment_m": 0.025,
+  "latest_right_adjustment_m": 0.025,
+  "visual_horn_alignment_validated": true,
+  "user_confirmed": true
+}

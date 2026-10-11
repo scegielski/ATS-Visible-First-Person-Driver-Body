@@ -1,0 +1,51 @@
+{
+  "gesture_bones": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "wheel_center_estimate_m": [
+    -0.3878736340596929,
+    0.7542800880952387,
+    -0.22040802840006674
+  ],
+  "palm_press_distance_m": 0.012,
+  "vertical_adjustment_m": -0.095,
+  "left_adjustment_m": 0.005,
+  "forward_adjustment_m": 0.0,
+  "latest_backward_adjustment_m": 0.025,
+  "latest_right_adjustment_m": 0.025,
+  "additional_vertical_adjustment_m": 0.0,
+  "palm_normal_estimate": [
+    -0.04540495074189539,
+    0.41639285053731084,
+    0.908050320450105
+  ],
+  "palm_parallel_to_wheel_plane": true,
+  "fingers_point_up_in_wheel_plane": true,
+  "finger_pose": "open bind-pose rotations, blended from current grip during reach",
+  "arm_lengths_preserved": true,
+  "other_bones_unchanged": true,
+  "runtime_pose_layout_validated": true,
+  "visual_horn_alignment_validated": true,
+  "center_method": "midpoint of neutral wrists lowered 9.5 cm total, moved 0.5 cm left, original depth restored following VR feedback",
+  "user_confirmed": true
+}

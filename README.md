@@ -39,3 +39,11 @@ See THROTTLE_INTEGRATION.md and live_throttle_validation.json. build_pedal_proto
 ## Brake, clutch and final alignment
 
 See BRAKE_INTEGRATION.md, PEDAL_ALIGNMENT.md, CLUTCH_INTEGRATION.md and live_pedals_validation.json. build_brake_prototype.py authors the current right-pedal poses and static left-leg shift; build_clutch_prototype.py adds independent clutch levels and produces the final combined archive. Tests cover pedal sequencing, priority, independent clutch selection, bounds, invalid input and argument/return preservation. Offline pose checks verify unchanged steering/gas tracks, leg lengths, target positions, downward ankle motion, PMA metadata and archive round trips. The combined animation uses about 120 MB uncompressed; the archive is about 52 MB. The final two-centimetre rightward brake adjustment remains awaiting a visual check.
+
+## Left-hand horn animation
+
+The installed and user-validated horn plugin is **0.6.6 horn clearance test**. Hold H to release the left grip, reach with an open palm, press the horn and return to the current steering grip. The right arm continues steering and the independent pedals keep playing. The keyboard binding never consumes ATS's horn input. Wheel-button activation remains pending.
+
+The builder uses two-joint IK to generate compact arm targets; the runtime plugin blends selected left-arm and finger rotations before skeleton hierarchy assembly. Final offsets from the original wrist midpoint are 9.5 cm down and 0.5 cm left, at the original depth. The palm aligns with the estimated wheel plane. The final VR alignment was confirmed good by the user. See HORN_INTEGRATION.md and the horn validation records.
+
+Install releases/SPF_DriverAnimationDiagnostics-0.6.6-horn-clearance-test.dll as SPF_DriverAnimationDiagnostics.dll in the existing SPF plugin directory with ATS closed. The horn works with the currently installed 0.6.0 pedal archive and requires no archive expansion. The previously committed 0.6.1 archive with 14 cm brake reach remains built but not installed or visually validated.

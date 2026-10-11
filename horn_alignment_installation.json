@@ -1,0 +1,16 @@
+{
+  "plugin_version": "0.6.6-horn-clearance-test",
+  "built": true,
+  "installed": true,
+  "sha256": "dfd1c04da57ead466dcdc2e90c9351fe0ec35dd06323580b17ae730fcddf5874",
+  "vertical_adjustment_m": -0.095,
+  "left_adjustment_m": 0.005,
+  "forward_adjustment_m": 0.0,
+  "additional_vertical_adjustment_m": 0.0,
+  "visual_test_pending": false,
+  "previous_plugin_backup": "backups/horn-bone-observer/SPF_DriverAnimationDiagnostics-0.6.5-horn-alignment.dll",
+  "latest_backward_adjustment_m": 0.025,
+  "latest_right_adjustment_m": 0.025,
+  "visual_horn_alignment_validated": true,
+  "user_confirmed": true
+}
