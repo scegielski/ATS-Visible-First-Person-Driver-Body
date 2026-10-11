@@ -1,0 +1,804 @@
+{
+  "driver_bones": [
+    {
+      "index": 0,
+      "name": "hips",
+      "parent": 255
+    },
+    {
+      "index": 1,
+      "name": "spine",
+      "parent": 0
+    },
+    {
+      "index": 2,
+      "name": "spine1",
+      "parent": 1
+    },
+    {
+      "index": 3,
+      "name": "spine2",
+      "parent": 2
+    },
+    {
+      "index": 4,
+      "name": "lfshould",
+      "parent": 3
+    },
+    {
+      "index": 5,
+      "name": "lfarm",
+      "parent": 4
+    },
+    {
+      "index": 6,
+      "name": "lfforarm",
+      "parent": 5
+    },
+    {
+      "index": 7,
+      "name": "lfhand",
+      "parent": 6
+    },
+    {
+      "index": 8,
+      "name": "index_01_l",
+      "parent": 7
+    },
+    {
+      "index": 9,
+      "name": "index_02_l",
+      "parent": 8
+    },
+    {
+      "index": 10,
+      "name": "index_03_l",
+      "parent": 9
+    },
+    {
+      "index": 11,
+      "name": "middle_01_l",
+      "parent": 7
+    },
+    {
+      "index": 12,
+      "name": "middle_02_l",
+      "parent": 11
+    },
+    {
+      "index": 13,
+      "name": "middle_03_l",
+      "parent": 12
+    },
+    {
+      "index": 14,
+      "name": "pinky_01_l",
+      "parent": 7
+    },
+    {
+      "index": 15,
+      "name": "pinky_02_l",
+      "parent": 14
+    },
+    {
+      "index": 16,
+      "name": "pinky_03_l",
+      "parent": 15
+    },
+    {
+      "index": 17,
+      "name": "ring_01_l",
+      "parent": 7
+    },
+    {
+      "index": 18,
+      "name": "ring_02_l",
+      "parent": 17
+    },
+    {
+      "index": 19,
+      "name": "ring_03_l",
+      "parent": 18
+    },
+    {
+      "index": 20,
+      "name": "thumb_01_l",
+      "parent": 7
+    },
+    {
+      "index": 21,
+      "name": "thumb_02_l",
+      "parent": 20
+    },
+    {
+      "index": 22,
+      "name": "thumb_03_l",
+      "parent": 21
+    },
+    {
+      "index": 23,
+      "name": "lfforarmtw",
+      "parent": 6
+    },
+    {
+      "index": 24,
+      "name": "lfarmtw",
+      "parent": 5
+    },
+    {
+      "index": 25,
+      "name": "rgshould",
+      "parent": 3
+    },
+    {
+      "index": 26,
+      "name": "rgarm",
+      "parent": 25
+    },
+    {
+      "index": 27,
+      "name": "rgforarm",
+      "parent": 26
+    },
+    {
+      "index": 28,
+      "name": "rghand",
+      "parent": 27
+    },
+    {
+      "index": 29,
+      "name": "index_01_r",
+      "parent": 28
+    },
+    {
+      "index": 30,
+      "name": "index_02_r",
+      "parent": 29
+    },
+    {
+      "index": 31,
+      "name": "index_03_r",
+      "parent": 30
+    },
+    {
+      "index": 32,
+      "name": "middle_01_r",
+      "parent": 28
+    },
+    {
+      "index": 33,
+      "name": "middle_02_r",
+      "parent": 32
+    },
+    {
+      "index": 34,
+      "name": "middle_03_r",
+      "parent": 33
+    },
+    {
+      "index": 35,
+      "name": "pinky_01_r",
+      "parent": 28
+    },
+    {
+      "index": 36,
+      "name": "pinky_02_r",
+      "parent": 35
+    },
+    {
+      "index": 37,
+      "name": "pinky_03_r",
+      "parent": 36
+    },
+    {
+      "index": 38,
+      "name": "ring_01_r",
+      "parent": 28
+    },
+    {
+      "index": 39,
+      "name": "ring_02_r",
+      "parent": 38
+    },
+    {
+      "index": 40,
+      "name": "ring_03_r",
+      "parent": 39
+    },
+    {
+      "index": 41,
+      "name": "thumb_01_r",
+      "parent": 28
+    },
+    {
+      "index": 42,
+      "name": "thumb_02_r",
+      "parent": 41
+    },
+    {
+      "index": 43,
+      "name": "thumb_03_r",
+      "parent": 42
+    },
+    {
+      "index": 44,
+      "name": "rgforarmtw",
+      "parent": 27
+    },
+    {
+      "index": 45,
+      "name": "rgarmtw",
+      "parent": 26
+    },
+    {
+      "index": 46,
+      "name": "neck",
+      "parent": 3
+    },
+    {
+      "index": 47,
+      "name": "head",
+      "parent": 46
+    },
+    {
+      "index": 48,
+      "name": "lfupleg",
+      "parent": 0
+    },
+    {
+      "index": 49,
+      "name": "lfleg",
+      "parent": 48
+    },
+    {
+      "index": 50,
+      "name": "lflegtw",
+      "parent": 49
+    },
+    {
+      "index": 51,
+      "name": "lffoot",
+      "parent": 49
+    },
+    {
+      "index": 52,
+      "name": "lftoe",
+      "parent": 51
+    },
+    {
+      "index": 53,
+      "name": "lfuplegtw",
+      "parent": 48
+    },
+    {
+      "index": 54,
+      "name": "rgupleg",
+      "parent": 0
+    },
+    {
+      "index": 55,
+      "name": "rgleg",
+      "parent": 54
+    },
+    {
+      "index": 56,
+      "name": "rglegtw",
+      "parent": 55
+    },
+    {
+      "index": 57,
+      "name": "rgfoot",
+      "parent": 55
+    },
+    {
+      "index": 58,
+      "name": "rgtoe",
+      "parent": 57
+    },
+    {
+      "index": 59,
+      "name": "rguplegtw",
+      "parent": 54
+    },
+    {
+      "index": 60,
+      "name": "seatbelt",
+      "parent": 0
+    }
+  ],
+  "interior_bones": [
+    {
+      "index": 0,
+      "name": "__root__",
+      "parent": 255
+    },
+    {
+      "index": 1,
+      "name": "l_wnd",
+      "parent": 0
+    },
+    {
+      "index": 2,
+      "name": "r_wnd",
+      "parent": 0
+    },
+    {
+      "index": 3,
+      "name": "st_l_wndm",
+      "parent": 0
+    },
+    {
+      "index": 4,
+      "name": "st_r_wndm",
+      "parent": 0
+    },
+    {
+      "index": 5,
+      "name": "g_rpm",
+      "parent": 0
+    },
+    {
+      "index": 6,
+      "name": "g_speed",
+      "parent": 0
+    },
+    {
+      "index": 7,
+      "name": "st_hbrake",
+      "parent": 0
+    },
+    {
+      "index": 8,
+      "name": "st_hghbm",
+      "parent": 0
+    },
+    {
+      "index": 9,
+      "name": "st_wiper",
+      "parent": 0
+    },
+    {
+      "index": 10,
+      "name": "st_lights",
+      "parent": 0
+    },
+    {
+      "index": 11,
+      "name": "st_autotr_1",
+      "parent": 0
+    },
+    {
+      "index": 12,
+      "name": "st_autotr_2",
+      "parent": 11
+    },
+    {
+      "index": 13,
+      "name": "st_autotr_3",
+      "parent": 12
+    },
+    {
+      "index": 14,
+      "name": "st_autotr_7",
+      "parent": 13
+    },
+    {
+      "index": 15,
+      "name": "st_autotr_4",
+      "parent": 11
+    },
+    {
+      "index": 16,
+      "name": "st_autotr_5",
+      "parent": 11
+    },
+    {
+      "index": 17,
+      "name": "st_autotr_6",
+      "parent": 11
+    },
+    {
+      "index": 18,
+      "name": "i_lghthigh",
+      "parent": 0
+    },
+    {
+      "index": 19,
+      "name": "i_pbrake",
+      "parent": 0
+    },
+    {
+      "index": 20,
+      "name": "i_left",
+      "parent": 0
+    },
+    {
+      "index": 21,
+      "name": "i_right",
+      "parent": 0
+    },
+    {
+      "index": 22,
+      "name": "i_generic",
+      "parent": 0
+    },
+    {
+      "index": 23,
+      "name": "st_engstrt_1",
+      "parent": 0
+    },
+    {
+      "index": 24,
+      "name": "st_main",
+      "parent": 0
+    },
+    {
+      "index": 25,
+      "name": "st_head",
+      "parent": 24
+    },
+    {
+      "index": 26,
+      "name": "steering_w",
+      "parent": 25
+    },
+    {
+      "index": 27,
+      "name": "st_flasher",
+      "parent": 25
+    },
+    {
+      "index": 28,
+      "name": "st_blinker",
+      "parent": 25
+    },
+    {
+      "index": 29,
+      "name": "g_odo_d5",
+      "parent": 0
+    },
+    {
+      "index": 30,
+      "name": "g_odo_d4",
+      "parent": 0
+    },
+    {
+      "index": 31,
+      "name": "g_odo_d3",
+      "parent": 0
+    },
+    {
+      "index": 32,
+      "name": "g_odo_d2",
+      "parent": 0
+    },
+    {
+      "index": 33,
+      "name": "g_odo_d1",
+      "parent": 0
+    },
+    {
+      "index": 34,
+      "name": "g_trip_d0",
+      "parent": 0
+    },
+    {
+      "index": 35,
+      "name": "g_trip_d1",
+      "parent": 0
+    },
+    {
+      "index": 36,
+      "name": "g_trip_d2",
+      "parent": 0
+    },
+    {
+      "index": 37,
+      "name": "g_trip_d3",
+      "parent": 0
+    },
+    {
+      "index": 38,
+      "name": "wiper_l",
+      "parent": 0
+    },
+    {
+      "index": 39,
+      "name": "wiper_l_tip",
+      "parent": 38
+    },
+    {
+      "index": 40,
+      "name": "wiper_r",
+      "parent": 0
+    },
+    {
+      "index": 41,
+      "name": "wiper_r_tip",
+      "parent": 40
+    },
+    {
+      "index": 42,
+      "name": "g_fuel",
+      "parent": 0
+    },
+    {
+      "index": 43,
+      "name": "g_oilprsr",
+      "parent": 0
+    },
+    {
+      "index": 44,
+      "name": "g_wtrtmp",
+      "parent": 0
+    },
+    {
+      "index": 45,
+      "name": "st_engstrt_2",
+      "parent": 0
+    }
+  ],
+  "original_driver_frames": 47,
+  "moving_driver_tracks": [
+    {
+      "index": 4,
+      "name": "lfshould",
+      "max_local_component_delta": 0.37826237082481384
+    },
+    {
+      "index": 5,
+      "name": "lfarm",
+      "max_local_component_delta": 0.3759539723396301
+    },
+    {
+      "index": 6,
+      "name": "lfforarm",
+      "max_local_component_delta": 0.3826834261417389
+    },
+    {
+      "index": 7,
+      "name": "lfhand",
+      "max_local_component_delta": 1.6078447103500366
+    },
+    {
+      "index": 8,
+      "name": "index_01_l",
+      "max_local_component_delta": 0.3212401419878006
+    },
+    {
+      "index": 9,
+      "name": "index_02_l",
+      "max_local_component_delta": 0.6350809931755066
+    },
+    {
+      "index": 10,
+      "name": "index_03_l",
+      "max_local_component_delta": 0.17834146320819855
+    },
+    {
+      "index": 11,
+      "name": "middle_01_l",
+      "max_local_component_delta": 0.38111889362335205
+    },
+    {
+      "index": 12,
+      "name": "middle_02_l",
+      "max_local_component_delta": 0.36386068537831306
+    },
+    {
+      "index": 13,
+      "name": "middle_03_l",
+      "max_local_component_delta": 0.12796486914157867
+    },
+    {
+      "index": 14,
+      "name": "pinky_01_l",
+      "max_local_component_delta": 0.32431167364120483
+    },
+    {
+      "index": 15,
+      "name": "pinky_02_l",
+      "max_local_component_delta": 0.33165983855724335
+    },
+    {
+      "index": 16,
+      "name": "pinky_03_l",
+      "max_local_component_delta": 0.15015648305416107
+    },
+    {
+      "index": 17,
+      "name": "ring_01_l",
+      "max_local_component_delta": 0.3224739730358124
+    },
+    {
+      "index": 18,
+      "name": "ring_02_l",
+      "max_local_component_delta": 0.33189281821250916
+    },
+    {
+      "index": 19,
+      "name": "ring_03_l",
+      "max_local_component_delta": 0.6614575088024139
+    },
+    {
+      "index": 20,
+      "name": "thumb_01_l",
+      "max_local_component_delta": 0.24519004300236702
+    },
+    {
+      "index": 21,
+      "name": "thumb_02_l",
+      "max_local_component_delta": 0.17430808395147324
+    },
+    {
+      "index": 23,
+      "name": "lfforarmtw",
+      "max_local_component_delta": 0.33720460906624794
+    },
+    {
+      "index": 24,
+      "name": "lfarmtw",
+      "max_local_component_delta": 0.3826834261417389
+    },
+    {
+      "index": 25,
+      "name": "rgshould",
+      "max_local_component_delta": 1.3945178985595703
+    },
+    {
+      "index": 26,
+      "name": "rgarm",
+      "max_local_component_delta": 1.391158103942871
+    },
+    {
+      "index": 27,
+      "name": "rgforarm",
+      "max_local_component_delta": 0.45461981277912855
+    },
+    {
+      "index": 28,
+      "name": "rghand",
+      "max_local_component_delta": 1.7543829679489136
+    },
+    {
+      "index": 29,
+      "name": "index_01_r",
+      "max_local_component_delta": 0.3826722502708435
+    },
+    {
+      "index": 30,
+      "name": "index_02_r",
+      "max_local_component_delta": 0.29990099370479584
+    },
+    {
+      "index": 31,
+      "name": "index_03_r",
+      "max_local_component_delta": 0.09134727716445923
+    },
+    {
+      "index": 32,
+      "name": "middle_01_r",
+      "max_local_component_delta": 0.3278072476387024
+    },
+    {
+      "index": 33,
+      "name": "middle_02_r",
+      "max_local_component_delta": 0.2997380495071411
+    },
+    {
+      "index": 34,
+      "name": "middle_03_r",
+      "max_local_component_delta": 0.1128293126821518
+    },
+    {
+      "index": 35,
+      "name": "pinky_01_r",
+      "max_local_component_delta": 0.2932967245578766
+    },
+    {
+      "index": 36,
+      "name": "pinky_02_r",
+      "max_local_component_delta": 0.29963891208171844
+    },
+    {
+      "index": 37,
+      "name": "pinky_03_r",
+      "max_local_component_delta": 0.10465824604034424
+    },
+    {
+      "index": 38,
+      "name": "ring_01_r",
+      "max_local_component_delta": 0.2911842465400696
+    },
+    {
+      "index": 39,
+      "name": "ring_02_r",
+      "max_local_component_delta": 0.6500842869281769
+    },
+    {
+      "index": 40,
+      "name": "ring_03_r",
+      "max_local_component_delta": 0.2632175385951996
+    },
+    {
+      "index": 41,
+      "name": "thumb_01_r",
+      "max_local_component_delta": 0.38224950432777405
+    },
+    {
+      "index": 42,
+      "name": "thumb_02_r",
+      "max_local_component_delta": 0.6113983243703842
+    },
+    {
+      "index": 44,
+      "name": "rgforarmtw",
+      "max_local_component_delta": 0.12815339490771294
+    },
+    {
+      "index": 45,
+      "name": "rgarmtw",
+      "max_local_component_delta": 0.20310712605714798
+    },
+    {
+      "index": 46,
+      "name": "neck",
+      "max_local_component_delta": 0.41765210032463074
+    },
+    {
+      "index": 47,
+      "name": "head",
+      "max_local_component_delta": 0.09507334232330322
+    },
+    {
+      "index": 48,
+      "name": "lfupleg",
+      "max_local_component_delta": 0.4939527064561844
+    },
+    {
+      "index": 51,
+      "name": "lffoot",
+      "max_local_component_delta": 0.16364984214305878
+    },
+    {
+      "index": 52,
+      "name": "lftoe",
+      "max_local_component_delta": 0.0647224485874176
+    },
+    {
+      "index": 54,
+      "name": "rgupleg",
+      "max_local_component_delta": 0.37917771108914167
+    },
+    {
+      "index": 55,
+      "name": "rgleg",
+      "max_local_component_delta": 0.15922751277685165
+    },
+    {
+      "index": 56,
+      "name": "rglegtw",
+      "max_local_component_delta": 0.04632040858268738
+    },
+    {
+      "index": 57,
+      "name": "rgfoot",
+      "max_local_component_delta": 0.17810246720910072
+    },
+    {
+      "index": 58,
+      "name": "rgtoe",
+      "max_local_component_delta": 0.04750633239746094
+    },
+    {
+      "index": 59,
+      "name": "rguplegtw",
+      "max_local_component_delta": 0.18530191387981176
+    }
+  ],
+  "mustang_has_wheel_anim": false,
+  "release_sha256": "db8d2f9d53b0a61900bbdc466290f4b972b4769c674d476ad435861a45d5b317",
+  "installed_sha256": "db8d2f9d53b0a61900bbdc466290f4b972b4769c674d476ad435861a45d5b317",
+  "runtime_steering_verified": false,
+  "note": "Track variation is animation data evidence, not proof of steering-input synchronization."
+}

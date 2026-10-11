@@ -1,0 +1,9 @@
+{
+  "observed_paths": [
+    "/asset/character/human/driver/man/driver.pmd",
+    "/model/spf_stock_driver/driver.pmd"
+  ],
+  "same_advancement_routine": true,
+  "identity_runtime_validated": true,
+  "interior_steering_runtime_validated": false
+}

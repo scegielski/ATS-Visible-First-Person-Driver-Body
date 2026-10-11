@@ -11,3 +11,7 @@ This is an integrated animated-interior architecture: the stock truck definition
 Our prototype instead uses an independent 61-bone stock driver and vehicle animated_hookup mounted from the carpet accessory. It preserves the driver rig and uses an engine-played neutral seated clip. Version 0.2.1 corrects vehicle hookup registration to unit/hookup/vehicle and uses accessory_addon_int_data, matching the already-installed animated passenger accessory. The older mod does not reveal another missing dependency or registration fix in 0.2.1. Test 0.2.1 before changing that architecture again.
 
 For future actual wheel synchronization, the older mod suggests merging the independent stock driver rig into the Mustang animated interior rig (currently 46 bones), remapping all existing animation indices, and adding driver tracks to steering-wheel/column animations. That is a separate implementation step; copying old truck models or animations would not produce a Mustang-compatible result. No live steering or pedal animation is claimed by our current hold-pose prototype.
+
+## October 11 steering compatibility correction
+
+The proposed wheel-animation integration above relied on a pre-1.42 control. Official SCS documentation marks wheel_anim obsolete since 1.42, and the current Mustang definitions omit it. Rig merging alone is therefore insufficient to drive arms on ATS 1.61. See STEERING_INTEGRATION.md for the current evidence and unresolved input bridge.

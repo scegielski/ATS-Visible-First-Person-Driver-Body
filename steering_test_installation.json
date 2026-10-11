@@ -1,0 +1,9 @@
+{
+  "plugin_version": "0.2.0",
+  "archive_version": "0.3.0 steering test",
+  "plugin_sha256": "bb377f5695e51c66c4448c2a7f8d2f5e21711f574117cbef42d7a994c0bb0938",
+  "archive_sha256": "c8a9c8dc6a63f6972c24218eb83b9ef41b1cce36665c632d1a3e8f72a25401d5",
+  "installed_bytes_verified": true,
+  "runtime_pose_validated": true,
+  "validation_evidence": "live_steering_validation.json"
+}

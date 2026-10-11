@@ -1,0 +1,12 @@
+{
+  "user_confirmed_first_person_live_steering": true,
+  "user_confirmed_hand_repositioning": true,
+  "user_alignment_feedback": "great",
+  "observed_overrides": 5104,
+  "observed_faults": 0,
+  "normalized_position_min": 0.0,
+  "normalized_position_max": 1.0,
+  "plugin_version": "0.2.0",
+  "archive_version": "0.3.0 steering test",
+  "world_reload_regression_verified": false
+}

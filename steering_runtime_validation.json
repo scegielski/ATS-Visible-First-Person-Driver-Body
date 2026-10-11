@@ -1,0 +1,19 @@
+{
+  "hooks_installed": true,
+  "logged_samples": 133,
+  "fresh_samples": 96,
+  "controller_model_pairs": 1,
+  "duration_values": [
+    1.916667
+  ],
+  "observed_steering_range": [
+    -1.0,
+    1.0
+  ],
+  "fresh_sweep_mapping_error_median": 0.006545999999999941,
+  "fresh_sweep_mapping_error_max": 0.034999,
+  "logged_matching_call_count": 1214,
+  "interior_driver_steering_implemented": false,
+  "runtime_override_tested": false,
+  "interpretation": "One observed actor is consistent with player steering; normalized sample encoding is piecewise, with zero at center and a wrap at the positive side. Logged telemetry and sample are asynchronous."
+}
