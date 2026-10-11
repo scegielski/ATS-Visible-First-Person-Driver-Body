@@ -53,3 +53,5 @@ The latest installed input update is the **0.7.2 game horn test** plugin. It rea
 ## Middle-finger gesture
 
 The installed **0.8.6 forearm gesture test** plugin adds a held middle-finger gesture above the steering wheel. Default F10 can be reassigned through SPF's existing Gestures.LeftWindowBird action. Release returns to the current steering grip, and the game-state horn takes priority. Steering and pedals continue independently. The hand reaches higher and farther forward, forms the gesture during the reach, and aims the raised finger vertically. The user confirmed the position and finger pose, but reported excessive forearm twisting at the elbow. This checkpoint retains that pose before distributing rotation between forearm and wrist. See WINDOW_GESTURE.md and window_gesture_validation.json.
+
+The user-confirmed gesture checkpoint is now **0.8.8 refined gesture test**, sharing axial rotation between forearm and wrist, adding a small upward wrist tilt and preserving the hand target and vertical raised finger. Further fingertip and thumb-contact refinements are being tested separately.

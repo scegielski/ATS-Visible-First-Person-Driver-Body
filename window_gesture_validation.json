@@ -29,22 +29,24 @@
   ],
   "middle_finger_extended": true,
   "middle_finger_vertical": true,
-  "forearm_roll_degrees": -98.65874643528925,
-  "wrist_local_rotation_unchanged": true,
+  "total_roll_degrees": -98.65874643528925,
+  "forearm_roll_degrees": -49.32937321764462,
+  "wrist_roll_degrees": -49.32937321764462,
+  "rotation_split": "50/50 forearm and wrist",
+  "extra_upward_wrist_tilt_degrees": 10,
+  "thumb_turn": "slightly toward driver",
   "other_fingers_curled": true,
   "arm_lengths_preserved": true,
   "right_arm_and_pedals_unchanged": true,
   "alignment_visual_test_pending": false,
   "thumb_wrap": "base 10 degrees, middle 15 degrees, tip 65 degrees; visual clearance pending",
   "thumb_tip_target_m": [
-    -0.40271641597128477,
-    1.1059193234197218,
-    -0.37824416000033145
+    -0.40386484005094814,
+    1.1015943700457456,
+    -0.38303263945623445
   ],
   "initial_spf_hotkey": "F10 (configurable)",
   "target_method": "neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction",
-  "user_position_and_finger_pose_confirmed": true,
-  "known_visual_issue": "Full forearm roll causes elbow twisting; requested equal split between forearm and wrist",
-  "runtime_overrides": 4429,
-  "checkpoint_plugin_version": "0.8.6-forearm-gesture-test"
+  "user_feedback": "Looks good; requested slightly less fingertip curl and thumb contact nearer middle finger segments",
+  "user_confirmed": true
 }

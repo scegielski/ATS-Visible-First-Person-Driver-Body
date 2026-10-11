@@ -1,12 +1,12 @@
 {
-  "plugin_version": "0.8.6-forearm-gesture-test",
+  "plugin_version": "0.8.8-refined-gesture-test",
   "installed": true,
-  "sha256": "ba64fa2d15023e1523afa5e87db43223a83889034cbbf5bc11b1198342181004",
+  "sha256": "c63b0315e075602307d24e586d24270cfc6e5eab5484a8192b26bb3293f3b632",
   "spf_action": "Gestures.LeftWindowBird",
   "default_binding": "F10",
   "activation": "hold; release returns to current steering grip",
   "horn_priority": true,
-  "previous_plugin_backup": "backups/horn-bone-observer/SPF_DriverAnimationDiagnostics-0.8.5-extended-gesture.dll",
+  "previous_plugin_backup": "backups/horn-bone-observer/SPF_DriverAnimationDiagnostics-0.8.7-split-gesture.dll",
   "archive_changed": false,
   "tests_passed": true,
   "visual_test_pending": false,
@@ -21,13 +21,19 @@
   },
   "palm_orientation": "45 degree upward tilt toward driver",
   "finger_curl_degrees": [
-    95,
-    115,
-    85
+    90,
+    105,
+    75
   ],
   "formation": "simultaneous with reach; 0.30 second formation, 0.45 second reach",
   "shoulder_protraction": true,
-  "wrist_local_rotation_unchanged": true,
+  "wrist_local_rotation_unchanged": false,
   "middle_finger_vertical": true,
-  "user_confirmed_with_elbow_twist_issue": true
+  "user_confirmed_with_elbow_twist_issue": true,
+  "rotation_split": "50/50 forearm and wrist",
+  "final_hand_orientation_preserved": false,
+  "extra_upward_wrist_tilt_degrees": 10,
+  "thumb_turn": "slightly toward driver",
+  "user_feedback": "Looks good; requested slightly less fingertip curl and thumb contact nearer middle finger segments",
+  "user_confirmed": true
 }

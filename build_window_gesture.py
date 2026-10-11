@@ -38,30 +38,37 @@ bend=elbow-shoulder-direction*np.dot(elbow-shoulder,direction);bend/=np.linalg.n
 next_elbow=shoulder+direction*along+bend*math.sqrt(l1*l1-along*along)
 upper=rotation(between(elbow-shoulder,next_elbow-shoulder))@world[5][:3,:3]
 lower=rotation(between(wrist-elbow,target-next_elbow))@world[6][:3,:3]
-# Roll the forearm about its own axis, keeping the wrist at its stock local angle.
+# Share axial orientation equally between forearm and wrist.
 forearm_axis=target-next_elbow;forearm_axis/=np.linalg.norm(forearm_axis)
 current_normal=lower@rotation(neutral[7][4:8])@local_basis[:,2]
 projected_current=current_normal-forearm_axis*np.dot(current_normal,forearm_axis)
 projected_desired=out-forearm_axis*np.dot(out,forearm_axis)
 projected_current/=np.linalg.norm(projected_current);projected_desired/=np.linalg.norm(projected_desired)
 roll=math.atan2(np.dot(forearm_axis,np.cross(projected_current,projected_desired)),np.dot(projected_current,projected_desired))
-roll_rotation=rotation((math.cos(roll/2),*(forearm_axis*math.sin(roll/2))))
+full_rotation=rotation((math.cos(roll/2),*(forearm_axis*math.sin(roll/2))))
+final_hand_rotation=full_rotation@lower@rotation(neutral[7][4:8])
+# Add a small upward wrist tilt while retaining the reduced forearm roll.
+wrist_axis=final_hand_rotation@local_basis[:,0]
+palm=-final_hand_rotation@local_basis[:,2]
+tilt=math.radians(10)*(1 if np.dot(np.cross(wrist_axis,palm),[0.,1.,0.])>0 else -1)
+final_hand_rotation=rotation((math.cos(tilt/2),*(wrist_axis*math.sin(tilt/2))))@final_hand_rotation
+roll_rotation=rotation((math.cos(roll/4),*(forearm_axis*math.sin(roll/4))))
 lower=roll_rotation@lower
 open_pose=[v.copy() for v in flat]
 open_pose[5][4:8]=quaternion(world[4][:3,:3].T@upper,neutral[5][4:8])
 open_pose[6][4:8]=quaternion(upper.T@lower,neutral[6][4:8])
-open_pose[7][4:8]=neutral[7][4:8].copy()
+open_pose[7][4:8]=quaternion(lower.T@final_hand_rotation,neutral[7][4:8])
 # Aim the straight middle finger vertically through its base joint, not the wrist.
 open_world=fk(open_pose)
 current_middle=open_world[13][:3,3]-open_world[11][:3,3]
 vertical=np.array([0.,1.,0.])
 middle_rotation=rotation(between(current_middle,vertical))@open_world[11][:3,:3]
 open_pose[11][4:8]=quaternion(open_world[7][:3,:3].T@middle_rotation,open_pose[11][4:8])
-assert np.array_equal(open_pose[7][4:8],neutral[7][4:8])
+assert np.max(np.abs(fk(open_pose)[7][:3,:3]-final_hand_rotation))<1e-5
 gesture=[v.copy() for v in open_pose]
 # Curl index, ring and little fingers; leave the middle finger extended.
 for chain in ((8,9,10),(14,15,16),(17,18,19)):
- for i,degrees in zip(chain,(95,115,85)):
+ for i,degrees in zip(chain,(90,105,75)):
   angle=math.radians(degrees)
   gesture[i][4:8]=quaternion(rotation(flat[i][4:8])@rotation((math.cos(angle/2),0.,0.,math.sin(angle/2))),flat[i][4:8])
 # Keep the thumb base open beside the fist, curling mainly its distal tip.
@@ -69,6 +76,13 @@ for chain in ((8,9,10),(14,15,16),(17,18,19)):
 for i,degrees in zip((20,21,22),(10,15,65)):
  angle=math.radians(degrees)
  gesture[i][4:8]=quaternion(rotation(flat[i][4:8])@rotation((math.cos(angle/2),0.,0.,math.sin(angle/2))),flat[i][4:8])
+# Turn the thumb base slightly toward the driver, preserving the distal curl.
+thumb_world=fk(gesture)
+thumb_direction=thumb_world[22][:3,3]-thumb_world[20][:3,3]
+thumb_direction/=np.linalg.norm(thumb_direction)
+thumb_toward_driver=thumb_direction+np.array([0.,0.,.20]);thumb_toward_driver/=np.linalg.norm(thumb_toward_driver)
+thumb_rotation=rotation(between(thumb_direction,thumb_toward_driver))@thumb_world[20][:3,:3]
+gesture[20][4:8]=quaternion(thumb_world[7][:3,:3].T@thumb_rotation,gesture[20][4:8])
 thumb_target=fk(gesture)[22][:3,3]
 selected=(4,5,6,7,*range(8,23),23,24)
 for pose in (open_pose,gesture):
@@ -90,6 +104,6 @@ for i in selected:
  values=lambda pose:','.join(f'{float(v):.9f}f' for v in pose[i][4:8])
  lines.append(f' {{{i},{{{values(open_pose)}}},{{{values(gesture)}}}}},')
 lines.append('}};');(root/'native-diagnostics/WindowGestureTargets.hpp').write_text('\n'.join(lines)+'\n')
-report={'wrist_target_m':target.tolist(),'gesture_bones':selected,'middle_finger_extended':True,'middle_finger_vertical':True,'forearm_roll_degrees':math.degrees(roll),'wrist_local_rotation_unchanged':True,'other_fingers_curled':True,'arm_lengths_preserved':True,'right_arm_and_pedals_unchanged':True,'alignment_visual_test_pending':True,'thumb_wrap':'base 10 degrees, middle 15 degrees, tip 65 degrees; visual clearance pending','thumb_tip_target_m':thumb_target.tolist(),'initial_spf_hotkey':'F10 (configurable)','target_method':'neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction'}
+report={'wrist_target_m':target.tolist(),'gesture_bones':selected,'middle_finger_extended':True,'middle_finger_vertical':True,'total_roll_degrees':math.degrees(roll),'forearm_roll_degrees':math.degrees(roll)/2,'wrist_roll_degrees':math.degrees(roll)/2,'rotation_split':'50/50 forearm and wrist','extra_upward_wrist_tilt_degrees':10,'thumb_turn':'slightly toward driver','other_fingers_curled':True,'arm_lengths_preserved':True,'right_arm_and_pedals_unchanged':True,'alignment_visual_test_pending':True,'thumb_wrap':'base 10 degrees, middle 15 degrees, tip 65 degrees; visual clearance pending','thumb_tip_target_m':thumb_target.tolist(),'initial_spf_hotkey':'F10 (configurable)','target_method':'neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction'}
 (root/'window_gesture_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
 
