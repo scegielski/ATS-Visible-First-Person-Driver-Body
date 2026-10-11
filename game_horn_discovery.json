@@ -1,0 +1,56 @@
+{
+  "version": "0.7.2-game-horn-test",
+  "installed": true,
+  "animation_input_unchanged": false,
+  "engine_horn_query": "owner + 0x31b0 -> vehicle + 0x1d38 -> byte + 0xf0",
+  "runtime_state_candidates": [
+    "player_actor_owner_chain",
+    "player_actor_direct",
+    "game_session_owner_chain",
+    "game_session_direct"
+  ],
+  "runtime_validated": true,
+  "tests_passed": true,
+  "next_check": "press H, release, press secondary horn binding, release; compare diagnostic state",
+  "first_runtime_result": "All actor/controller candidates unreadable; no validated game horn state",
+  "corrected_candidate_root": "g_Game at executable RVA 0x36b8db0, corroborated by SPF session and viewport finders",
+  "owner_chain": [
+    "g_Game at RVA 0x36b8db0",
+    "game+0xaa0",
+    "owner+0x31b0",
+    "vehicle+0x1d38",
+    "horn+0xf0"
+  ],
+  "query_owner_guard": "vtable+0x1b8 == base+0x4d9c90",
+  "binding_correlation": [
+    {
+      "seconds": 0.0,
+      "held": 0
+    },
+    {
+      "seconds": 9.24,
+      "held": 1
+    },
+    {
+      "seconds": 12.27,
+      "held": 0
+    },
+    {
+      "seconds": 13.94,
+      "held": 1
+    },
+    {
+      "seconds": 17.72,
+      "held": 0
+    }
+  ],
+  "both_primary_and_secondary_bindings_observed": true,
+  "separate_spf_keybind_removed": true,
+  "final_animation_check_pending": false,
+  "sha256": "05a70cab057e22d7d0a5d6fadd3acc26d82ac76d852bd4763ee0428a71d38a63",
+  "secondary_binding_animation_user_confirmed": true,
+  "user_feedback": "Okay, that works",
+  "runtime_horn_overrides": 2718,
+  "runtime_horn_faults": 0,
+  "game_horn_held_seen": true
+}

@@ -25,3 +25,17 @@ Version 0.6.6 addresses clipping shown in the user screenshot. Interpreted corre
 ## Final validation
 
 The user confirmed the final 0.6.6 pose is good in VR and authorized committing it. The corrected hand clearance, open palm and wrist orientation are visually validated. The latest runtime log recorded 2092 horn overrides and 0 caught horn faults. Keyboard H is the validated input; wheel-button support remains pending.
+
+## Game horn input discovery
+
+The user requested using the game horn trigger to include secondary bindings. SPF controls telemetry does not expose horn. Static tracing located the game query_variable("horn") branch and its held-state read through owner+0x31b0, vehicle+0x1d38, then byte+0xf0. The initially found vehicle_horn_control class appears related to tooling and is not used as the gameplay signal. A 0.7.0 observation plugin reads bounded candidates from the SPF player actor and local controller, without changing the validated H-driven gesture. The correct root and held/released behavior must be correlated in game before switching animation input. The plugin was built, tested and installed with the previous working plugin backed up.
+
+The first game-input runtime check yielded unreadable actor/controller candidates. The 0.7.1 observer corrects the root to g_Game, identified independently by SPF session and viewport finders at executable RVA 0x36b8db0. The actor candidates remain observation-only for comparison. No game-state candidate has yet been validated or used to drive animation. Installed with ATS closed and relaunched for another binding correlation test.
+
+## Shared game horn signal
+
+Live read-only inspection identified the true query owner through g_Game+0xaa0. The verified chain is game global RVA 0x36b8db0 -> owner at game+0xaa0 -> vehicle at owner+0x31b0 -> horn object at vehicle+0x1d38 -> held byte at horn+0xf0. The owner virtual query slot at vtable+0x1b8 must equal executable base+0x4d9c90. A direct live watch captured both secondary and H press/release pairs.
+
+The 0.7.2 plugin uses this game state instead of a separate SPF keybind. Missing data, wrong owner and invalid Boolean release the gesture. The existing executable fingerprint guard applies. Tests cover the complete guarded pointer chain, pressed/released state and rejection behavior, alongside the gesture regressions. Installed after ATS closed; final secondary-binding animation check is pending.
+
+The user confirmed that the secondary binding now animates the hand correctly and authorized committing the game-state input update. The final runtime recorded 2718 horn pose overrides and 0 caught horn faults. Primary and secondary bindings use the same game horn signal; no SPF-specific hotkey is read.

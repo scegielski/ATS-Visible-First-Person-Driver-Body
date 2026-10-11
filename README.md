@@ -42,8 +42,10 @@ See BRAKE_INTEGRATION.md, PEDAL_ALIGNMENT.md, CLUTCH_INTEGRATION.md and live_ped
 
 ## Left-hand horn animation
 
-The installed and user-validated horn plugin is **0.6.6 horn clearance test**. Hold H to release the left grip, reach with an open palm, press the horn and return to the current steering grip. The right arm continues steering and the independent pedals keep playing. The keyboard binding never consumes ATS's horn input. Wheel-button activation remains pending.
+The installed and user-validated horn plugin is **0.7.2 game horn test**. Use any ATS horn binding to release the left grip, reach with an open palm, press the horn and return to the current steering grip. The right arm continues steering and the independent pedals keep playing. The plugin reads ATS's own horn state; no separate SPF binding is needed. The user's secondary binding is confirmed working.
 
 The builder uses two-joint IK to generate compact arm targets; the runtime plugin blends selected left-arm and finger rotations before skeleton hierarchy assembly. Final offsets from the original wrist midpoint are 9.5 cm down and 0.5 cm left, at the original depth. The palm aligns with the estimated wheel plane. The final VR alignment was confirmed good by the user. See HORN_INTEGRATION.md and the horn validation records.
 
-Install releases/SPF_DriverAnimationDiagnostics-0.6.6-horn-clearance-test.dll as SPF_DriverAnimationDiagnostics.dll in the existing SPF plugin directory with ATS closed. The horn works with the currently installed 0.6.0 pedal archive and requires no archive expansion. The previously committed 0.6.1 archive with 14 cm brake reach remains built but not installed or visually validated.
+Install releases/SPF_DriverAnimationDiagnostics-0.7.2-game-horn-test.dll as SPF_DriverAnimationDiagnostics.dll in the existing SPF plugin directory with ATS closed. The horn works with the currently installed 0.6.0 pedal archive and requires no archive expansion. The previously committed 0.6.1 archive with 14 cm brake reach remains built but not installed or visually validated.
+
+The latest installed input update is the **0.7.2 game horn test** plugin. It reads the player's validated game horn state, so all ATS horn bindings drive the same gesture without an SPF-specific keybind. Both bindings were correlated with the field, and the user confirmed the secondary-binding animation works. See game_horn_discovery.json for validation and guards.

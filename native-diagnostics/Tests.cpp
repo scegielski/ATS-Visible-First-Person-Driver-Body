@@ -3,6 +3,8 @@
 #include "PedalMotion.hpp"
 #include "HornMotion.hpp"
 #include "HornPose.hpp"
+#include "GameHorn.hpp"
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -44,6 +46,27 @@ static uintptr_t BoneOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays
  Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone original arguments unchanged");return 123456;
 }
 int main() {
+ constexpr uintptr_t base=0x140000000,game=0x200000000,owner=0x300000000,vt=0x142252050,vehicle=0x400000000,hornState=0x500000000;
+ unsigned char heldByte=0;bool wrongOwner=false,missingHorn=false;
+ auto reader=[&](uintptr_t address,void* output,size_t size) noexcept {
+  uintptr_t value=0;
+  if(address==hornState+0xf0 && size==1){std::memcpy(output,&heldByte,1);return true;}
+  if(size!=8)return false;
+  if(address==base+0x36b8db0)value=game;
+  else if(address==game+0xaa0)value=owner;
+  else if(address==owner)value=vt;
+  else if(address==vt+0x1b8)value=base+(wrongOwner?0x1234:0x4d9c90);
+  else if(address==owner+0x31b0)value=vehicle;
+  else if(address==vehicle+0x1d38)value=missingHorn?0:hornState;
+  else return false;
+  std::memcpy(output,&value,8);return true;
+ };
+ bool held=true;Check(ReadPlayerHorn(base,reader,held) && !held,"game horn released state");
+ heldByte=1;Check(ReadPlayerHorn(base,reader,held) && held,"game horn held state independent of physical bindings");
+ wrongOwner=true;Check(!ReadPlayerHorn(base,reader,held) && !held,"reject wrong query owner and release pose");wrongOwner=false;
+ missingHorn=true;Check(!ReadPlayerHorn(base,reader,held) && !held,"missing vehicle horn releases pose");missingHorn=false;
+ heldByte=2;Check(!ReadPlayerHorn(base,reader,held) && !held,"reject non-boolean horn data");
+
  std::array<std::array<float,4>,61> original{};
  for(auto& q:original)q={1,0,0,0};
  auto pose=original;BlendHornPose(pose,{});Check(pose==original,"released horn leaves every bone byte exact");

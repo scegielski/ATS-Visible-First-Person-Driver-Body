@@ -5,7 +5,7 @@
 #include <SPF_Logger_API.h>
 #include <SPF_Telemetry_API.h>
 #include <SPF_TelemetryData.h>
-#include <SPF_KeyBinds_API.h>
+#include "GameHorn.hpp"
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
 #include "PedalMotion.hpp"
@@ -31,10 +31,10 @@ constexpr char kDriverPattern[]="40 53 48 83 EC 50 48 83 79 08 00 48 8B D9 0F 84
 constexpr char kAdvancePattern[]="48 8B C4 55 41 57 48 81 EC 88 00 00 00 48 8B E9 44 8B FA 48 81 C1 08 02 00 00 0F 29 70 C8 0F 28";
 constexpr char kBonePattern[]="48 8B C4 48 89 68 18 56 57 41 54 41 55 41 57 48 81 EC 00 02 00 00 8B AC 24 50 02 00 00 45 33 ED";
 SPF_Hook_Handle* boneHook=nullptr;
-SPF_KeyBinds_Handle* hornKeys=nullptr;
 std::atomic<bool> hornHeld{false};
 std::atomic<uint64_t> boneSamples{0},hornOverrides{0},hornFaults{0};
 std::atomic<uint64_t> hornTick{0};
+std::atomic<bool> gameHornValid{false};
 const SPF_Core_API* core=nullptr;
 const SPF_Load_API* load=nullptr;
 SPF_Logger_Handle* logger=nullptr;
@@ -124,7 +124,7 @@ void Controls(const SPF_Controls* data,void*) {
 void Reset() {
  worldGeneration.fetch_add(1);
  std::lock_guard lock(sampleMutex); ledger={}; modelObservations={};inspectedModels={};inspectedCount=0;
- telemetryTick.store(0);
+ telemetryTick.store(0);hornTick.store(0);hornHeld.store(false);gameHornValid.store(false);
 }
 bool HashExecutable(char (&hex)[65]) {
     wchar_t path[32768];
@@ -153,15 +153,14 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.6.6");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.7.2");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals and left-hand horn reach/press/return for the private Mustang interior body.");
  api->Policy_SetAllowUserConfig(h,true);
  api->Policy_AddConfigurableSystem(h,"logging");
  api->Defaults_SetLogging(h,"info",true);
- api->Policy_AddConfigurableSystem(h,"keybinds");
- api->Defaults_AddKeybind(h,"Controls","HornKeyboard","keyboard","KEY_H","never");
+
 }
 void OnLoad(const SPF_Load_API* api) {
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
@@ -188,7 +187,6 @@ void Activated(const SPF_Core_API* api) {
  driverHook=hooks->Hook_Register(kName,"DriverUpdate","Observe driver update",reinterpret_cast<void*>(DriverObserveStub),&gDriverOriginal,kDriverPattern,true);
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
  boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
- if(core->keybinds) hornKeys=core->keybinds->Kbind_GetContext(kName);
  if(!driverHook || !advanceHook || !boneHook) {
   Log(SPF_LOG_ERROR,"DIAG: incomplete hook registration; observers remain inactive.");return;
  }
@@ -201,16 +199,24 @@ void Activated(const SPF_Core_API* api) {
 }
 void Update() {
  if(!enabled.load()) return;
- if(hornKeys) {hornHeld.store(core->keybinds->Kbind_GetActionValue(hornKeys,"Controls.HornKeyboard")>.5f);hornTick.store(GetTickCount64());}
+ bool held=false;
+ const bool valid=ReadPlayerHorn(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,held);
+ gameHornValid.store(valid);hornHeld.store(valid && held);hornTick.store(valid?GetTickCount64():0);
  static bool installed=false;
  if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook) && core->hooks->Hook_IsInstalled(boneHook)) {
-  installed=true; Log(SPF_LOG_INFO,"HORN: three hooks installed; private left-arm horn prototype enabled; keyboard H mirrors horn without consuming input.");
+  installed=true; Log(SPF_LOG_INFO,"HORN: three hooks installed; private left-arm horn prototype enabled; validated game horn state drives the gesture through all ATS bindings.");
  }
  static uint64_t last=0;
  const uint64_t tick=GetTickCount64(); if(tick-last<250) return; last=tick;
  SampleLedger copy;std::array<ModelObservation,16> models;size_t inspectedSnapshot=0;
  {std::lock_guard lock(sampleMutex);copy=ledger;models=modelObservations;inspectedSnapshot=inspectedCount;}
  char text[512];
+ static uint64_t lastGameHornLog=0;static int lastGameHornState=-1;
+ const int gameState=gameHornValid.load()?(hornHeld.load()?1:0):-1;
+ if(gameState!=lastGameHornState || tick-lastGameHornLog>=2000) {
+  lastGameHornState=gameState;lastGameHornLog=tick;
+  std::snprintf(text,sizeof(text),"GAME_HORN valid=%d held=%d",gameHornValid.load()?1:0,hornHeld.load()?1:0);Log(SPF_LOG_INFO,text);
+ }
  const auto telTick=telemetryTick.load();
  for(const auto& sample:copy.slots) {
   if(!sample.controller || tick-sample.tick>750) continue;
