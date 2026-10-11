@@ -1,0 +1,33 @@
+{
+  "plugin_version": "0.8.6-forearm-gesture-test",
+  "installed": true,
+  "sha256": "ba64fa2d15023e1523afa5e87db43223a83889034cbbf5bc11b1198342181004",
+  "spf_action": "Gestures.LeftWindowBird",
+  "default_binding": "F10",
+  "activation": "hold; release returns to current steering grip",
+  "horn_priority": true,
+  "previous_plugin_backup": "backups/horn-bone-observer/SPF_DriverAnimationDiagnostics-0.8.5-extended-gesture.dll",
+  "archive_changed": false,
+  "tests_passed": true,
+  "visual_test_pending": false,
+  "game_left_closed": false,
+  "target_location": "in front of and above steering wheel",
+  "thumb_pose": "reduced base/middle curl; mainly distal thumb curl",
+  "initial_gesture_user_feedback": "Pretty good; requested wheel location and thumb outside fingers",
+  "palm_facing_driver": true,
+  "target_adjustment_from_previous_m": {
+    "forward": 0.08,
+    "up": 0.04
+  },
+  "palm_orientation": "45 degree upward tilt toward driver",
+  "finger_curl_degrees": [
+    95,
+    115,
+    85
+  ],
+  "formation": "simultaneous with reach; 0.30 second formation, 0.45 second reach",
+  "shoulder_protraction": true,
+  "wrist_local_rotation_unchanged": true,
+  "middle_finger_vertical": true,
+  "user_confirmed_with_elbow_twist_issue": true
+}

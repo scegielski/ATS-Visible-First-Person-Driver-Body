@@ -49,3 +49,7 @@ The builder uses two-joint IK to generate compact arm targets; the runtime plugi
 Install releases/SPF_DriverAnimationDiagnostics-0.7.2-game-horn-test.dll as SPF_DriverAnimationDiagnostics.dll in the existing SPF plugin directory with ATS closed. The horn works with the currently installed 0.6.0 pedal archive and requires no archive expansion. The previously committed 0.6.1 archive with 14 cm brake reach remains built but not installed or visually validated.
 
 The latest installed input update is the **0.7.2 game horn test** plugin. It reads the player's validated game horn state, so all ATS horn bindings drive the same gesture without an SPF-specific keybind. Both bindings were correlated with the field, and the user confirmed the secondary-binding animation works. See game_horn_discovery.json for validation and guards.
+
+## Middle-finger gesture
+
+The installed **0.8.6 forearm gesture test** plugin adds a held middle-finger gesture above the steering wheel. Default F10 can be reassigned through SPF's existing Gestures.LeftWindowBird action. Release returns to the current steering grip, and the game-state horn takes priority. Steering and pedals continue independently. The hand reaches higher and farther forward, forms the gesture during the reach, and aims the raised finger vertically. The user confirmed the position and finger pose, but reported excessive forearm twisting at the elbow. This checkpoint retains that pose before distributing rotation between forearm and wrist. See WINDOW_GESTURE.md and window_gesture_validation.json.

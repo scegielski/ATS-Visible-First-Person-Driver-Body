@@ -1,0 +1,50 @@
+{
+  "wrist_target_m": [
+    -0.3828736340596929,
+    1.0292800880952386,
+    -0.30040802840006675
+  ],
+  "gesture_bones": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "middle_finger_extended": true,
+  "middle_finger_vertical": true,
+  "forearm_roll_degrees": -98.65874643528925,
+  "wrist_local_rotation_unchanged": true,
+  "other_fingers_curled": true,
+  "arm_lengths_preserved": true,
+  "right_arm_and_pedals_unchanged": true,
+  "alignment_visual_test_pending": false,
+  "thumb_wrap": "base 10 degrees, middle 15 degrees, tip 65 degrees; visual clearance pending",
+  "thumb_tip_target_m": [
+    -0.40271641597128477,
+    1.1059193234197218,
+    -0.37824416000033145
+  ],
+  "initial_spf_hotkey": "F10 (configurable)",
+  "target_method": "neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction",
+  "user_position_and_finger_pose_confirmed": true,
+  "known_visual_issue": "Full forearm roll causes elbow twisting; requested equal split between forearm and wrist",
+  "runtime_overrides": 4429,
+  "checkpoint_plugin_version": "0.8.6-forearm-gesture-test"
+}

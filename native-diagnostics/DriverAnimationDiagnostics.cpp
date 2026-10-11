@@ -10,6 +10,8 @@
 #include "SteeringPose.hpp"
 #include "PedalMotion.hpp"
 #include "HornPose.hpp"
+#include "WindowGesture.hpp"
+#include <SPF_KeyBinds_API.h>
 #include <atomic>
 #include <mutex>
 #include <cstdio>
@@ -35,6 +37,9 @@ std::atomic<bool> hornHeld{false};
 std::atomic<uint64_t> boneSamples{0},hornOverrides{0},hornFaults{0};
 std::atomic<uint64_t> hornTick{0};
 std::atomic<bool> gameHornValid{false};
+SPF_KeyBinds_Handle* gestureKeys=nullptr;
+std::atomic<bool> windowGestureHeld{false};
+std::atomic<uint64_t> windowGestureTick{0},windowGestureOverrides{0};
 const SPF_Core_API* core=nullptr;
 const SPF_Load_API* load=nullptr;
 SPF_Logger_Handle* logger=nullptr;
@@ -124,7 +129,7 @@ void Controls(const SPF_Controls* data,void*) {
 void Reset() {
  worldGeneration.fetch_add(1);
  std::lock_guard lock(sampleMutex); ledger={}; modelObservations={};inspectedModels={};inspectedCount=0;
- telemetryTick.store(0);hornTick.store(0);hornHeld.store(false);gameHornValid.store(false);
+ telemetryTick.store(0);hornTick.store(0);hornHeld.store(false);gameHornValid.store(false);windowGestureHeld.store(false);windowGestureTick.store(0);
 }
 bool HashExecutable(char (&hex)[65]) {
     wchar_t path[32768];
@@ -153,13 +158,15 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.7.2");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.8.6");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
- api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals and left-hand horn reach/press/return for the private Mustang interior body.");
+ api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn gesture and configurable left-window middle-finger gesture.");
  api->Policy_SetAllowUserConfig(h,true);
  api->Policy_AddConfigurableSystem(h,"logging");
  api->Defaults_SetLogging(h,"info",true);
+ api->Policy_AddConfigurableSystem(h,"keybinds");
+ api->Defaults_AddKeybind(h,"Gestures","LeftWindowBird","keyboard","KEY_F10","always");
 
 }
 void OnLoad(const SPF_Load_API* api) {
@@ -194,6 +201,7 @@ void Activated(const SPF_Core_API* api) {
   auto context=core->telemetry->Tel_GetContext(kName);
   core->telemetry->Tel_RegisterForControls(context,Controls,nullptr);
  }
+ if(core->keybinds)gestureKeys=core->keybinds->Kbind_GetContext(kName);
  enabled.store(true);
  Log(SPF_LOG_INFO,"PEDALS: hooks requested for private interior model; supports prior steering/pedal clips and independent clutch clip. New brake alignment and clutch visual validation pending.");
 }
@@ -202,6 +210,7 @@ void Update() {
  bool held=false;
  const bool valid=ReadPlayerHorn(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,held);
  gameHornValid.store(valid);hornHeld.store(valid && held);hornTick.store(valid?GetTickCount64():0);
+ if(gestureKeys){windowGestureHeld.store(core->keybinds->Kbind_GetActionValue(gestureKeys,"Gestures.LeftWindowBird")>.5f);windowGestureTick.store(GetTickCount64());}
  static bool installed=false;
  if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook) && core->hooks->Hook_IsInstalled(boneHook)) {
   installed=true; Log(SPF_LOG_INFO,"HORN: three hooks installed; private left-arm horn prototype enabled; validated game horn state drives the gesture through all ATS bindings.");
@@ -237,6 +246,7 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"WINDOW_GESTURE overrides=%llu held=%d",static_cast<unsigned long long>(windowGestureOverrides.load()),windowGestureHeld.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"HORN overrides=%llu faults=%llu held=%d",static_cast<unsigned long long>(hornOverrides.load()),static_cast<unsigned long long>(hornFaults.load()),hornHeld.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"CLUTCH overrides=%llu input=%.6f ankle=%.6f",
    static_cast<unsigned long long>(clutchOverrides.load()),lastClutch.load(),lastClutchPress.load());
@@ -271,23 +281,27 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  if(!SafeRead(pointers[2]+5*16,arm,sizeof(arm)) || !SafeRead(pointers[2]+7*16,hand,sizeof(hand)) || !SafeRead(pointers[3]+7*12,handPosition,sizeof(handPosition)))return;
  for(float value:arm)if(!std::isfinite(value))return;
  for(float value:hand)if(!std::isfinite(value))return;
- static thread_local HornMotion motion;
+ static thread_local LeftArmGestures gestures;
  static thread_local uintptr_t priorModel=0;
  static thread_local uint64_t priorGeneration=0,priorTick=0;
  const uint64_t now=GetTickCount64(),generation=worldGeneration.load();
- if(priorModel!=model || priorGeneration!=generation){motion={};priorTick=now;priorModel=model;priorGeneration=generation;}
+ if(priorModel!=model || priorGeneration!=generation){gestures={};priorTick=now;priorModel=model;priorGeneration=generation;}
  const float dt=std::clamp(static_cast<float>(now-priorTick)/1000.f,0.f,.05f);priorTick=now;
  const auto inputTick=hornTick.load(),telTick=telemetryTick.load();
  const bool held=hornHeld.load() && inputTick && now-inputTick<=250 && telTick && now-telTick<=250;
- motion.Step(held,dt);
- if(motion.reach>0 && !hornFaults.load()) {
+ const auto gestureTick=windowGestureTick.load();
+ const bool windowHeld=windowGestureHeld.load() && gestureTick && now-gestureTick<=250 && telTick && now-telTick<=250;
+ gestures.Step(held,windowHeld,dt);
+ if((gestures.horn.reach>0 || gestures.window.reach>0) && !hornFaults.load()) {
   std::array<std::array<float,4>,61> rotations{};
   if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
   for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
-  BlendHornPose(rotations,motion);
+  BlendHornPose(rotations,gestures.horn);
+  BlendWindowGesture(rotations,gestures.window);
   __try {
    for(const auto& target:kHornTargets)std::memcpy(reinterpret_cast<void*>(pointers[2]+target.bone*16),rotations[target.bone].data(),16);
-   hornOverrides.fetch_add(1);
+   if(gestures.horn.reach>0)hornOverrides.fetch_add(1);
+   if(gestures.window.reach>0)windowGestureOverrides.fetch_add(1);
   } __except(EXCEPTION_EXECUTE_HANDLER){hornFaults.fetch_add(1);}
  }
  const auto sample=boneSamples.fetch_add(1)+1;

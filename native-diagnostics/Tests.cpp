@@ -4,6 +4,7 @@
 #include "HornMotion.hpp"
 #include "HornPose.hpp"
 #include "GameHorn.hpp"
+#include "WindowGesture.hpp"
 #include <cstring>
 #include <cstdio>
 #include <cstdlib>
@@ -46,6 +47,25 @@ static uintptr_t BoneOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays
  Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone original arguments unchanged");return 123456;
 }
 int main() {
+ LeftArmGestures gestures;
+ gestures.Step(false,true,.01f);Check(gestures.window.reach>0 && gestures.window.reach<1 && gestures.window.press>0,"gesture forms while hand is moving");
+ for(int i=0;i<100;++i)gestures.Step(false,true,.01f);
+ Check(gestures.window.reach==1 && gestures.window.press==1,"held window gesture forms completely");
+ auto windowPose=std::array<std::array<float,4>,61>{};for(auto& q:windowPose)q={1,0,0,0};auto untouched=windowPose;
+ BlendWindowGesture(windowPose,gestures.window);
+ for(unsigned i=0;i<61;++i){
+  bool selected=false;for(const auto& target:kWindowGestureTargets)if(target.bone==i)selected=true;
+  if(!selected)Check(windowPose[i]==untouched[i],"window gesture preserves torso right arm and pedals");
+  float norm=0;for(float value:windowPose[i])norm+=value*value;Check(std::abs(norm-1)<.00001f,"window gesture rotation normalization");
+ }
+ for(int i=0;i<100;++i){gestures.Step(true,true,.01f);Check(!(gestures.horn.reach>0 && gestures.window.reach>0),"horn and window never compete for left arm");}
+ Check(gestures.horn.reach==1 && gestures.horn.press==1 && gestures.window.reach==0,"horn takes priority over held gesture");
+ for(int i=0;i<150;++i){gestures.Step(false,true,.01f);Check(!(gestures.horn.reach>0 && gestures.window.reach>0),"return to grip before resuming window gesture");}
+ Check(gestures.horn.reach==0 && gestures.window.press==1,"held window gesture resumes after horn");
+ for(int i=0;i<100;++i)gestures.Step(false,false,.01f);
+ Check(gestures.window.reach==0 && gestures.window.press==0,"window key release returns to live steering grip");
+ auto released=untouched;BlendWindowGesture(released,gestures.window);Check(released==untouched,"released window gesture is byte exact");
+
  constexpr uintptr_t base=0x140000000,game=0x200000000,owner=0x300000000,vt=0x142252050,vehicle=0x400000000,hornState=0x500000000;
  unsigned char heldByte=0;bool wrongOwner=false,missingHorn=false;
  auto reader=[&](uintptr_t address,void* output,size_t size) noexcept {
