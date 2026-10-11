@@ -1,0 +1,14 @@
+SiiNunit
+{
+accessory_addon_data : spfbody.ford.mustang_67.carpet
+{
+ name: "SPF Seated Driver Body (prototype)"
+ price: 1
+ unlock: 0
+ icon: "car/ford_mustang_67/accessory/carpet/standard"
+ part_type: aftermarket
+ interior_model: "/model/spf_driver_body/driver_body.pmd"
+ exterior_model: "/vehicle/car/ford_mustang_67/accessory/carpet/standard_ext.pmd"
+ variant: default
+}
+}

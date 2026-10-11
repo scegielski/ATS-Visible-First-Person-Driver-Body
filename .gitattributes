@@ -1,0 +1,13 @@
+* text=auto
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.sii text eol=lf
+*.pim text eol=lf
+*.pit text eol=lf
+*.pmd binary
+*.pmg binary
+*.pma binary
+*.dds binary
+*.tga binary
+*.scs binary

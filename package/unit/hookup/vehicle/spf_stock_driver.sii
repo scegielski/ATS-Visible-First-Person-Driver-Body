@@ -1,0 +1,7 @@
+SiiNunit
+{
+animated_hookup : spf.stock_driver {
+ model: "/model/spf_stock_driver/driver.pmd"
+ animation: "/model/spf_stock_driver/seat_hold.pma"
+}
+}

@@ -1,0 +1,10 @@
+{
+  "game_version": "1.61.3.1",
+  "target": "Ford Mustang 1967",
+  "vertices": 312,
+  "triangles": 312,
+  "material_dependencies": 4,
+  "converter_success": true,
+  "in_game_tested": false,
+  "installed_archive": "C:\\Users\\scegi\\OneDrive\\Documents\\American Truck Simulator\\mod\\ATS-VisibleDriverBody-Mustang-0.1.0.scs"
+}

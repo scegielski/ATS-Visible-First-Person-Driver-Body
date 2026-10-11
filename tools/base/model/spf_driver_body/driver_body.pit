@@ -1,0 +1,33 @@
+Header { FormatVersion: 1 Source: "SPF independent prototype generator" Type: "Trait" Name: "driver_body" }
+Global { LookCount: 1 VariantCount: 1 PartCount: 1 MaterialCount: 4 }
+Look { Name: "default"
+Material { Alias: "denim" Effect: "eut2.dif" Flags: 0 AttributeCount: 5 TextureCount: 1
+Attribute { Format: FLOAT3 Tag: "diffuse" Value: ( 1.0 1.0 1.0 ) }
+Attribute { Format: FLOAT3 Tag: "specular" Value: ( 0.0 0.0 0.0 ) }
+Attribute { Format: FLOAT Tag: "shininess" Value: ( 25.0 ) }
+Attribute { Format: FLOAT Tag: "add_ambient" Value: ( 0.0 ) }
+Attribute { Format: FLOAT Tag: "reflection" Value: ( 0.0 ) }
+Texture { Tag: "texture[0]:texture_base" Value: "/model/spf_driver_body/denim" } }
+Material { Alias: "shoe" Effect: "eut2.dif" Flags: 0 AttributeCount: 5 TextureCount: 1
+Attribute { Format: FLOAT3 Tag: "diffuse" Value: ( 1.0 1.0 1.0 ) }
+Attribute { Format: FLOAT3 Tag: "specular" Value: ( 0.0 0.0 0.0 ) }
+Attribute { Format: FLOAT Tag: "shininess" Value: ( 25.0 ) }
+Attribute { Format: FLOAT Tag: "add_ambient" Value: ( 0.0 ) }
+Attribute { Format: FLOAT Tag: "reflection" Value: ( 0.0 ) }
+Texture { Tag: "texture[0]:texture_base" Value: "/model/spf_driver_body/shoe" } }
+Material { Alias: "shirt" Effect: "eut2.dif" Flags: 0 AttributeCount: 5 TextureCount: 1
+Attribute { Format: FLOAT3 Tag: "diffuse" Value: ( 1.0 1.0 1.0 ) }
+Attribute { Format: FLOAT3 Tag: "specular" Value: ( 0.0 0.0 0.0 ) }
+Attribute { Format: FLOAT Tag: "shininess" Value: ( 25.0 ) }
+Attribute { Format: FLOAT Tag: "add_ambient" Value: ( 0.0 ) }
+Attribute { Format: FLOAT Tag: "reflection" Value: ( 0.0 ) }
+Texture { Tag: "texture[0]:texture_base" Value: "/model/spf_driver_body/shirt" } }
+Material { Alias: "skin" Effect: "eut2.dif" Flags: 0 AttributeCount: 5 TextureCount: 1
+Attribute { Format: FLOAT3 Tag: "diffuse" Value: ( 1.0 1.0 1.0 ) }
+Attribute { Format: FLOAT3 Tag: "specular" Value: ( 0.0 0.0 0.0 ) }
+Attribute { Format: FLOAT Tag: "shininess" Value: ( 25.0 ) }
+Attribute { Format: FLOAT Tag: "add_ambient" Value: ( 0.0 ) }
+Attribute { Format: FLOAT Tag: "reflection" Value: ( 0.0 ) }
+Texture { Tag: "texture[0]:texture_base" Value: "/model/spf_driver_body/skin" } }
+}
+Variant { Name: "default" Part { Name: "body" AttributeCount: 1 Attribute { Format: INT Tag: "visible" Value: ( 1 ) } } }

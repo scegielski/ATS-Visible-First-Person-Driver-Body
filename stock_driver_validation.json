@@ -1,0 +1,102 @@
+{
+  "stock_skeleton_bones": 61,
+  "stock_animation_frames": 47,
+  "seated_hold_frames": 2,
+  "removed_head_triangles_by_piece": [
+    2258,
+    46,
+    0
+  ],
+  "retained_hand_triangles_by_piece": [
+    2114,
+    0,
+    0
+  ],
+  "stock_materials_verified": [
+    "automat/20/208cc55119c27f16.mat",
+    "automat/4c/4c15e1551f8198e8.mat",
+    "automat/71/7156b89b22e709c3.mat",
+    "automat/72/72e3dc1a0464df05.mat",
+    "automat/88/88859b8c3ba45b91.mat",
+    "automat/c2/c29b079c5186f60b.mat",
+    "automat/fd/fd13e967b0dbdf19.mat"
+  ],
+  "stock_texture_objects_verified": [
+    "asset/character/human/driver/man/m_casual_02_lukas_difspec.tobj",
+    "asset/character/human/driver/man/m_casual_02_lukas_nrm.tobj",
+    "asset/character/human/driver/man/m_casual_02_nrm.tobj",
+    "asset/character/human/driver/man/m_casual_02_s01_difspec.tobj",
+    "asset/character/human/driver/man/m_casual_02_s02_difspec.tobj",
+    "asset/character/human/driver/man/m_casual_02_s03_difspec.tobj",
+    "asset/character/human/driver/man/m_casual_02_s04_difspec.tobj",
+    "asset/character/human/driver/man/m_casual_02_s05_difspec.tobj",
+    "asset/character/human/driver/man/m_seat_belt_difspec.tobj",
+    "asset/character/human/driver/man/m_seat_belt_nrm.tobj"
+  ],
+  "skeleton_preserved_byte_exact": true,
+  "animation_architecture": "animated_hookup with neutral seated hold, not rigid baked geometry",
+  "steering_synchronization": false,
+  "in_game_verified": true,
+  "neutral_pose_interior_bounds": [
+    [
+      -0.31362937532400736,
+      -0.807464642370995,
+      -1.005261416452023
+    ],
+    [
+      0.30642974155145525,
+      0.007698249181917527,
+      0.5309294158213558
+    ]
+  ],
+  "software_skinning_finite_verified": true,
+  "runtime_020": {
+    "mounted": true,
+    "selected_option_logged": true,
+    "body_visible_user_report": false,
+    "driver_load_error_logged": false
+  },
+  "correction_021": {
+    "hookup_registration_path": "unit/hookup/vehicle/spf_stock_driver.sii",
+    "accessory_class": "accessory_addon_int_data",
+    "matched_installed_animated_passenger_architecture": true
+  },
+  "runtime_021_verified": false,
+  "runtime_021": {
+    "mounted_version_logged": "0.2.1",
+    "stock_accessory_selection_logged": true,
+    "user_body_visible": false,
+    "stock_model_load_error_logged": false
+  },
+  "correction_022": {
+    "mount_geometry_pieces": 0,
+    "mount_materials": 0,
+    "mount_locators": 1,
+    "empty_bounds_match_installed_tifa_mount": true,
+    "hypothesis": "Tiny placeholder geometry bounds may cull nested actor; use locator-only mount like Tifa."
+  },
+  "runtime_022_verified": false,
+  "runtime_023_differential": {
+    "A_Tifa_on_carpet_visible": true,
+    "B_stock_on_toyseat_visible": false
+  },
+  "confirmed_clip_bug": "PMA v5 data pointers begin at byte64, not byte72; old hold clip pointed into wrong arrays.",
+  "corrected_hold_clip_header_offsets": [
+    84,
+    92,
+    153,
+    6985,
+    7009
+  ],
+  "header_declared_arrays_validated": true,
+  "runtime_024_verified": true,
+  "runtime_verification": {
+    "date": "2026-10-11",
+    "game": "ATS 1.61.3.1",
+    "vehicle": "Ford Mustang 1967",
+    "view": "VR first person",
+    "user_report": "Body visible and in the perfect position",
+    "live_steering_synchronization": false,
+    "live_pedal_synchronization": false
+  }
+}

@@ -1,0 +1,14 @@
+SiiNunit
+{
+accessory_addon_int_data : spftest_b.ford.mustang_67.toyseat {
+ name: "Diagnostic B - Stock driver on toyseat"
+ price: 1
+ unlock: 0
+ icon: "car/ford_mustang_67/accessory/carpet/standard"
+ part_type: aftermarket
+ interior_model: "/model/spf_stock_driver/diagnostic_stock_toyseat.pmd"
+ exterior_model: "/model/spf_stock_driver/diagnostic_stock_toyseat.pmd"
+ look: default
+ variant: default
+}
+}

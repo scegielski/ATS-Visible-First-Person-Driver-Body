@@ -1,0 +1,7 @@
+# Invisible animated body: 0.2.1 correction
+
+ATS game.log.txt confirms 0.2.0 was mounted and the stock-driver accessory selected repeatedly. It contains no driver-model or animation-load error. The animated passenger mod already installed at workshop item 3810525140 registers its animated_hookup at unit/hookup/vehicle/tifa_seat.sii and uses accessory_addon_int_data. Ours registered at unit/hookup/spf_stock_driver.sii and used the ordinary rigid accessory class. Version 0.2.1 matches the installed working vehicle-hookup layout and interior accessory class. Model, rig, neutral seated clip, head masking and placement are unchanged. Its effectiveness still needs an ATS test.
+
+The downloaded older driver mod was subsequently inspected successfully from the user's desktop folder. Its inner archive has malformed/protected ZIP metadata rather than password-encrypted payloads: 528 nonempty entries inflate directly without a password. The readable models merge driver arm bones into existing truck animated interior rigs; no definition or hookup replacements are included. See OLDER_MOD_COMPARISON.md. It was not installed or executed, and no content was copied into our mod.
+
+Restart ATS, load the Mustang and reselect SPF Stock Driver Body (animated prototype) in carpet accessories. Because the accessory class changed, select the original carpet first, then select the stock-driver option. The procedural fallback remains separate.

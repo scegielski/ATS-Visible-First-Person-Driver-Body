@@ -1,0 +1,34 @@
+{
+  "attachment_position": [
+    0.7947843670845032,
+    -0.7508626580238342,
+    -0.9037798643112183
+  ],
+  "attachment_quaternion_wxyz": [
+    5.053215392444312e-16,
+    0.0,
+    1.0,
+    0.0
+  ],
+  "driver_center_x": 0.0031666946597397327,
+  "seat_position_yz": [
+    -0.3497261106967926,
+    0.039942000061273575
+  ],
+  "interior_bounds": [
+    [
+      -0.2760214262062254,
+      -0.745,
+      -0.97
+    ],
+    [
+      0.28235481552570485,
+      -0.04500000000000001,
+      0.1899420000612736
+    ]
+  ],
+  "outward_winding_and_unit_normals_verified": true,
+  "original_geometry_no_external_asset_license_required": true,
+  "roundtrip_transform_verified": true,
+  "corrected_alignment_in_game_verified": false
+}

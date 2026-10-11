@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+backups/
+stock-reference/
+older-driver-reference/
+blender-tools-reference/
+conversion_tools.zip
+tools/

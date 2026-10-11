@@ -1,0 +1,15 @@
+Header { FormatVersion: 5 Source: "SPF stock driver interior mount" Type: "Model" Name: "mount" }
+Global { VertexCount: 3 TriangleCount: 1 MaterialCount: 4 PieceCount: 1 PartCount: 1 BoneCount: 0 LocatorCount: 1 Skeleton: "" }
+Material { Alias: "denim" Effect: "eut2.dif" }
+Material { Alias: "shoe" Effect: "eut2.dif" }
+Material { Alias: "shirt" Effect: "eut2.dif" }
+Material { Alias: "skin" Effect: "eut2.dif" }
+Piece { Index: 0 Material: 0 VertexCount: 3 TriangleCount: 1 StreamCount: 4
+Stream { Format: FLOAT3 Tag: "_POSITION" 0 ( 0.0 -0.05 0.0 ) 1 ( 0.0001 -0.05 0.0 ) 2 ( 0.0 -0.05 0.0001 ) }
+Stream { Format: FLOAT3 Tag: "_NORMAL" 0 ( 0.0 -1.0 0.0 ) 1 ( 0.0 -1.0 0.0 ) 2 ( 0.0 -1.0 0.0 ) }
+Stream { Format: FLOAT2 Tag: "_UV0" AliasCount: 1 Aliases: "_TEXCOORD0" 0 ( 0.5 0.5 ) 1 ( 0.5 0.5 ) 2 ( 0.5 0.5 ) }
+Stream { Format: FLOAT4 Tag: "_RGBA" 0 ( 1.0 1.0 1.0 1.0 ) 1 ( 1.0 1.0 1.0 1.0 ) 2 ( 1.0 1.0 1.0 1.0 ) }
+Triangles { 0 ( 0 1 2 ) }
+}
+Part { Name: "body" PieceCount: 1 LocatorCount: 1 Pieces: 0 Locators: 0 }
+Locator { Name: "stock_body" Hookup: "spf.stock_driver" Index: 0 Position: ( 0.4100475013256073 -0.31518298387527466 -0.7568376958370209 ) Rotation: ( 0.0 0.0 1.0 0.0 ) Scale: ( 1.0 1.0 1.0 ) }

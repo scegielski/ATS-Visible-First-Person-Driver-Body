@@ -1,0 +1,14 @@
+SiiNunit
+{
+accessory_addon_int_data : spftest_a.ford.mustang_67.carpet {
+ name: "Diagnostic A - Tifa actor on carpet"
+ price: 1
+ unlock: 0
+ icon: "car/ford_mustang_67/accessory/carpet/standard"
+ part_type: aftermarket
+ interior_model: "/model/spf_stock_driver/diagnostic_tifa_carpet.pmd"
+ exterior_model: "/model/spf_stock_driver/diagnostic_tifa_carpet.pmd"
+ look: default
+ variant: default
+}
+}

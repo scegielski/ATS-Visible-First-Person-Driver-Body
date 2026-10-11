@@ -1,0 +1,13 @@
+SiiNunit
+{
+accessory_addon_int_data : spfstock.ford.mustang_67.carpet {
+ name: "SPF Stock Driver Body (animated prototype)"
+ price: 1
+ unlock: 0
+ icon: "car/ford_mustang_67/accessory/carpet/standard"
+ part_type: aftermarket
+ interior_model: "/model/spf_stock_driver/mount.pmd"
+ exterior_model: "/vehicle/car/ford_mustang_67/accessory/carpet/standard_ext.pmd"
+ variant: default
+}
+}

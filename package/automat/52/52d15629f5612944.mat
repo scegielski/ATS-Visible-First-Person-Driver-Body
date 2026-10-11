@@ -1,0 +1,12 @@
+effect : "eut2.dif.rfx" {
+	additional_ambient : 0.000000
+	diffuse : { 1.000000 , 1.000000 , 1.000000 }
+	reflection : 0.000000
+	shininess : 25.000000
+	specular : { 0.000000 , 0.000000 , 0.000000 }
+	texture : "texture_base" {
+		source : "/model/spf_driver_body/shoe.tobj"
+		u_address : clamp
+		v_address : clamp
+	}
+}
