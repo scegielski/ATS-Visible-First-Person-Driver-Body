@@ -4,6 +4,11 @@
 #include "HornMotion.hpp"
 #include "HornPose.hpp"
 #include "GameHorn.hpp"
+#include "GameEngine.hpp"
+#include "IgnitionMotion.hpp"
+#include "IgnitionTargets.hpp"
+#include "RuntimeArmIK.hpp"
+#include <fstream>
 #include "WindowGesture.hpp"
 #include "LiveGesturePose.hpp"
 #include "RightGestureTargets.hpp"
@@ -50,6 +55,96 @@ static uintptr_t BoneOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays
  Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone original arguments unchanged");return 123456;
 }
 int main() {
+ {
+ std::ifstream source("../../stock-reference/ford_mustang_67_ani.pma",std::ios::binary);
+ Check(static_cast<bool>(source),"runtime IK stock steering fixture opens");
+ source.seekg(72);uint32_t offset=0;source.read(reinterpret_cast<char*>(&offset),4);
+ for(unsigned frame=0;frame<47;++frame){
+  DriverIK::Pose pose{};DriverIK::Positions positions{};
+  for(unsigned bone=0;bone<61;++bone){float values[14]{};source.seekg(offset+(frame*61+bone)*56);source.read(reinterpret_cast<char*>(values),56);Check(static_cast<bool>(source),"runtime IK fixture read");for(unsigned i=0;i<4;++i)pose[bone][i]=values[4+i];for(unsigned i=0;i<3;++i){positions[bone][i]=values[8+i];Check(std::abs(values[11+i]-1.f)<.001f,"stock rig uses unit scale");}}
+  for(unsigned mode=0;mode<3;++mode){
+   auto candidate=pose;if(mode==1)BlendWindowGesture(candidate,{1,1,1},kRightGestureTargets);if(mode==2)BlendWindowGesture(candidate,{1,1,1},kIgnitionTargets);
+   auto before=DriverIK::FK(candidate,positions);float error;
+   Check(DriverIK::InsetRightElbow(candidate,positions,.04f,error),"right elbow inset solves steering gesture and ignition");
+   auto after=DriverIK::FK(candidate,positions);
+   Check(after.p[27][0]<=before.p[27][0]+.001f && DriverIK::Length(DriverIK::Sub(after.p[28],before.p[28]))<.001f,"right elbow moves left with hand target retained");
+  }
+  for(unsigned mode=0;mode<3;++mode){
+   auto candidate=pose;
+   if(mode==1)BlendHornPose(candidate,{1,1});
+   if(mode==2)BlendWindowGesture(candidate,{1,1,1},kWindowGestureTargets);
+   auto before=DriverIK::FK(candidate,positions);float error;
+   Check(DriverIK::InsetLeftElbow(candidate,positions,.04f,error),"left elbow inset solves steering horn and gesture");
+   auto after=DriverIK::FK(candidate,positions);
+   Check(after.p[6][0]>=before.p[6][0]-.001f && DriverIK::Length(DriverIK::Sub(after.p[7],before.p[7]))<.001f,"left elbow moves inward with hand target retained");
+  }
+  for(unsigned turnStep=0;turnStep<=10;++turnStep){
+   auto unturned=pose,turning=pose;BlendWindowGesture(unturned,{1,1,0},kIgnitionTargets);BlendWindowGesture(turning,{1,1,turnStep/10.f},kIgnitionTargets);
+   auto base=DriverIK::FK(unturned,positions),before=DriverIK::FK(turning,positions);auto offset=DriverIK::Sub(base.p[43],before.p[43]);float degrees,error;
+   Check(DriverIK::LeanAndCompensate(turning,positions,1,degrees,error,.1524f,offset),"thumb pivot IK solves throughout key turn");
+   auto after=DriverIK::FK(turning,positions);
+   Check(DriverIK::Length(DriverIK::Sub(after.p[43],DriverIK::Add(base.p[43],{0,0,-.1524f})))<.001f,"thumb pivot stays fixed throughout rotation");
+   Check(DriverIK::Length(DriverIK::Sub(after.p[7],base.p[7]))<.001f,"thumb pivot preserves opposite steering grip");
+  }
+  for(unsigned ignitionStep=0;ignitionStep<=10;++ignitionStep){
+   auto keyPose=pose;WindowGestureMotion motion{ignitionStep/10.f,1.f,.5f};BlendWindowGesture(keyPose,motion,kIgnitionTargets);
+   auto before=DriverIK::FK(keyPose,positions);float degrees,error;
+   Check(DriverIK::LeanAndCompensate(keyPose,positions,motion.reach,degrees,error,.1524f),"runtime IK solves ignition with live steering hand");
+   auto after=DriverIK::FK(keyPose,positions);
+   for(unsigned hand:{7u,28u}){
+    Check(DriverIK::Length(DriverIK::Sub(after.p[hand],DriverIK::Add(before.p[hand],hand==28?DriverIK::V{0,0,-.1524f*motion.reach}:DriverIK::V{0,0,0})))<.001f,"ignition IK retains left grip and extends right key target");
+    float dot=0;for(unsigned c=0;c<4;++c)dot+=after.q[hand][c]*before.q[hand][c];Check(std::abs(dot)>.9999f,"runtime IK retains grip orientation");
+   }
+  }
+  for(unsigned step=0;step<=10;++step){
+   auto candidate=pose;auto before=DriverIK::FK(candidate,positions);float degrees=0,error=0;
+   Check(DriverIK::LeanAndCompensate(candidate,positions,step/10.f,degrees,error),"runtime IK solves full steering range throughout lean");
+   auto after=DriverIK::FK(candidate,positions);
+   Check(DriverIK::Length(DriverIK::Sub(after.p[7],before.p[7]))<.001f && DriverIK::Length(DriverIK::Sub(after.p[28],before.p[28]))<.001f,"both wrist targets preserved");
+   for(unsigned i=0;i<61;++i)if(i!=1 && i!=2 && i!=3 && i!=5 && i!=6 && i!=7 && i!=26 && i!=27 && i!=28)Check(candidate[i]==pose[i],"IK leaves hips fingers legs and other rotations unchanged");
+  }
+ }
+ auto pose=kDriverReferenceRotations;auto badPositions=kDriverLocalPositions;badPositions[7][0]=std::numeric_limits<float>::quiet_NaN();float degrees,error;
+ Check(!DriverIK::LeanAndCompensate(pose,badPositions,1,degrees,error) && pose==kDriverReferenceRotations,"invalid runtime IK input leaves pose unchanged");
+ auto before=pose;Check(!DriverIK::Solve(pose,kDriverLocalPositions,5,6,7,{100,100,100},{1,0,0,0},{0,1,0}) && pose==before,"unreachable IK target fails without mutation");
+ }
+
+ {
+ IgnitionMotion key;key.Start();
+ for(int i=0;i<40;++i){key.Step(true,true,.01f);Check(key.turn==0,"ignition turns only after reaching key");}
+ for(int i=0;i<40;++i)key.Step(true,true,.01f);
+ Check(key.reach==1 && key.turn==1,"ignition reaches and turns");
+ for(int i=0;i<100;++i)key.Step(false,true,.01f);
+ Check(key.reach==0 && key.turn==0 && !key.active,"ignition returns after starting ends");
+ key.Start();for(int i=0;i<200;++i)key.Step(false,true,.01f);
+ Check(key.reach==0 && !key.active,"short starting pulse completes and returns");
+ key.Start();for(int i=0;i<700;++i)key.Step(true,true,.01f);
+ Check(key.reach==0 && !key.active,"stuck starting signal has bounded animation");
+ key.Start();key.Step(true,true,.01f);for(int i=0;i<100;++i)key.Step(false,false,.01f);
+ Check(key.reach==0,"missing engine data returns to wheel");
+ }
+
+ {
+ constexpr uintptr_t b=0x100000,g=0x200000,o=0x300000,v=0x400000,t=0x500000;
+ uint32_t engine=0;bool badOwner=false,missing=false;
+ auto readEngine=[&](uintptr_t a,void* out,size_t n){
+  uintptr_t value=0;
+  if(a==b+0x36b8db0)value=g;
+  else if(a==g+0xaa0)value=o;
+  else if(a==o)value=t;
+  else if(a==t+0x1b8)value=badOwner?0:b+0x4d9c90;
+  else if(a==o+0x31b0)value=missing?0:v;
+  else if(a==v+0x1b8 && n==4){std::memcpy(out,&engine,4);return true;}
+  else return false;
+  if(n!=8)return false;std::memcpy(out,&value,8);return true;
+ };
+ PlayerEngineState state{};
+ for(engine=0;engine<=3;++engine)Check(ReadPlayerEngine(b,readEngine,state) && static_cast<uint32_t>(state)==engine,"engine query maps off/start/run/stop");
+ Check(!ReadPlayerEngine(b,readEngine,state),"invalid engine enum rejected");engine=1;
+ badOwner=true;Check(!ReadPlayerEngine(b,readEngine,state),"engine wrong owner rejected");badOwner=false;
+ missing=true;Check(!ReadPlayerEngine(b,readEngine,state),"engine missing vehicle rejected");
+ }
+
  auto encode=[](const GesturePoseTargets& pose){std::ostringstream text;text<<"SPF_GESTURE_POSE 1\n"<<std::setprecision(9);for(const auto& bone:pose){text<<"bone "<<bone.bone;for(float v:bone.hover)text<<" "<<v;for(float v:bone.pressed)text<<" "<<v;text<<"\n";}return text.str();};
  auto encodeV2=[](const GesturePoseTargets& pose){std::ostringstream text;text<<"SPF_GESTURE_POSE 2\n"<<std::setprecision(9);for(const auto& bone:pose){text<<"bone "<<bone.bone;for(float v:bone.hover)text<<" "<<v;for(float v:bone.intermediate)text<<" "<<v;for(float v:bone.pressed)text<<" "<<v;text<<"\n";}return text.str();};
  WindowGestureMotion staged;

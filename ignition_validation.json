@@ -1,0 +1,46 @@
+{
+  "engine_signal_runtime_validated": true,
+  "captured_states": [
+    0,
+    1,
+    2,
+    3,
+    0
+  ],
+  "wrist_target_m": [
+    -0.1830957151248151,
+    0.6442162928295586,
+    -0.3565225781547328
+  ],
+  "leftward_adjustment_m": 0.0254,
+  "relative_drop_m": 0.2016,
+  "relative_forward_m": 0.13247567593053677,
+  "requested_additional_forward_m": 0.3048,
+  "actual_additional_forward_m": 0.11747567593053676,
+  "reach_limited": true,
+  "wrist_turn_degrees": -70,
+  "arm_lengths_preserved": true,
+  "other_bones_unchanged": true,
+  "reach_waypoint_m": [
+    -0.1703957151248151,
+    0.7750162928295586,
+    -0.29028474018946443
+  ],
+  "thumb_pivot_runtime": true,
+  "visual_test_pending": false,
+  "plugin_version": "0.11.5",
+  "user_visual_validation_passed": true,
+  "user_feedback": "Looks good",
+  "runtime_ignition_events": 2,
+  "runtime_ignition_updates": 308,
+  "runtime_ik_rejected": 0,
+  "runtime_left_elbow_updates": 5427,
+  "runtime_right_elbow_updates": 5427,
+  "runtime_elbow_rejected": 0,
+  "runtime_pose_faults": 0,
+  "left_elbow_guide_inset_m": 0.06,
+  "right_elbow_guide_inset_m": 0.04,
+  "runtime_additional_forward_m": 0.1524,
+  "reach_waypoint": true,
+  "installed_files_verified": true
+}

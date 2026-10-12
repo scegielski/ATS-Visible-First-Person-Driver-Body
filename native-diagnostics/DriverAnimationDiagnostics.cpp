@@ -6,6 +6,10 @@
 #include <SPF_Telemetry_API.h>
 #include <SPF_TelemetryData.h>
 #include "GameHorn.hpp"
+#include "GameEngine.hpp"
+#include "IgnitionMotion.hpp"
+#include "IgnitionTargets.hpp"
+#include "RuntimeArmIK.hpp"
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
 #include "PedalMotion.hpp"
@@ -44,6 +48,15 @@ std::atomic<bool> gameHornValid{false};
 SPF_KeyBinds_Handle* gestureKeys=nullptr;
 LiveGesturePose liveGesturePose;
 LiveGesturePose liveRightGesturePose{kRightGestureTargets};
+LiveGesturePose liveIgnitionPose{kIgnitionTargets};
+std::atomic<uint64_t> engineTick{0},engineStartSequence{0},ignitionOverrides{0};
+std::atomic<bool> engineStarting{false};
+std::atomic<uint64_t> runtimeIKUpdates{0},runtimeIKRejected{0};
+std::atomic<float> runtimeIKDegrees{0},runtimeIKError{0};
+std::atomic<float> leftElbowInset{.06f},rightElbowInset{.04f};
+std::atomic<uint64_t> rightElbowUpdates{0},rightElbowRejected{0};
+std::atomic<uint64_t> leftElbowUpdates{0},leftElbowRejected{0};
+int priorEngineSample=-1;
 std::atomic<bool> rightGestureHeld{false};
 std::atomic<uint64_t> rightGestureTick{0},rightGestureOverrides{0};
 std::atomic<bool> windowGestureHeld{false};
@@ -135,7 +148,7 @@ void Controls(const SPF_Controls* data,void*) {
  telemetryTick.store(GetTickCount64(),std::memory_order_relaxed);
 }
 void Reset() {
- worldGeneration.fetch_add(1);
+ worldGeneration.fetch_add(1);engineTick.store(0);engineStarting.store(false);priorEngineSample=-1;
  std::lock_guard lock(sampleMutex); ledger={}; modelObservations={};inspectedModels={};inspectedCount=0;
  telemetryTick.store(0);hornTick.store(0);hornHeld.store(false);gameHornValid.store(false);windowGestureHeld.store(false);windowGestureTick.store(0);rightGestureHeld.store(false);rightGestureTick.store(0);
 }
@@ -166,7 +179,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.10.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.11.5");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -237,10 +250,31 @@ void PollOneGestureFile(const wchar_t* filename,const char* hand,LiveGesturePose
  else std::snprintf(text,sizeof(text),"POSE_RELOAD hand=%s rejected: %s; last valid pose retained.",hand,error.c_str());
  Log(SPF_LOG_INFO,text);
 }
+void PollLeftElbowInset() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t modulePath[32768]{};
+ if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollLeftElbowInset),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
+ auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"left_elbow_inset.txt";
+ std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
+ std::ifstream file(path);float value;std::string extra;
+ if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>.15f)return;
+ if(value!=leftElbowInset.load()){leftElbowInset.store(value);char text[128];std::snprintf(text,sizeof(text),"ELBOW_RELOAD accepted inset_m=%.4f",value);Log(SPF_LOG_INFO,text);}
+}
+void PollRightElbowInset() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t modulePath[32768]{};
+ if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollRightElbowInset),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
+ auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"right_elbow_inset.txt";
+ std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
+ std::ifstream file(path);float value;std::string extra;
+ if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>.15f)return;
+ if(value!=rightElbowInset.load()){rightElbowInset.store(value);char text[128];std::snprintf(text,sizeof(text),"RIGHT_ELBOW_RELOAD accepted inset_m=%.4f",value);Log(SPF_LOG_INFO,text);}
+}
 void PollGesturePoseFile() {
- static PoseFileWatch left,right;
+ static PoseFileWatch left,right,ignition;
  PollOneGestureFile(L"gesture_pose.txt","left",liveGesturePose,left);
  PollOneGestureFile(L"right_gesture_pose.txt","right",liveRightGesturePose,right);
+ PollOneGestureFile(L"ignition_pose.txt","ignition",liveIgnitionPose,ignition);
 }
 void BlendLiveWindowGesture(std::array<std::array<float,4>,61>& rotations,const WindowGestureMotion& motion) {
  const auto pose=liveGesturePose.Snapshot();BlendWindowGesture(rotations,motion,*pose);
@@ -248,9 +282,16 @@ void BlendLiveWindowGesture(std::array<std::array<float,4>,61>& rotations,const 
 void BlendLiveRightGesture(std::array<std::array<float,4>,61>& rotations,const WindowGestureMotion& motion) {
  const auto pose=liveRightGesturePose.Snapshot();BlendWindowGesture(rotations,motion,*pose);
 }
+void BlendLiveIgnition(std::array<std::array<float,4>,61>& rotations,std::array<std::array<float,4>,61>& unturned,const IgnitionMotion& motion) { const auto pose=liveIgnitionPose.Snapshot();unturned=rotations;auto reach=motion.Pose();reach.extend=0;BlendWindowGesture(unturned,reach,*pose);BlendWindowGesture(rotations,motion.Pose(),*pose); }
 void Update() {
  if(!enabled.load()) return;
- PollGesturePoseFile();
+ PollGesturePoseFile();PollLeftElbowInset();PollRightElbowInset();
+ PlayerEngineState engineState{};
+ const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
+ if(engineValid){const int value=static_cast<int>(engineState);if(priorEngineSample>=0 && priorEngineSample!=1 && value==1)engineStartSequence.fetch_add(1);priorEngineSample=value;}else priorEngineSample=-1;
+ engineStarting.store(engineValid && engineState==PlayerEngineState::Starting);engineTick.store(engineValid?GetTickCount64():0);
+ static int priorEngine=-2;const int engineValue=engineValid?static_cast<int>(engineState):-1;
+ if(engineValue!=priorEngine){char message[128];std::snprintf(message,sizeof(message),"ENGINE_STATE valid=%d state=%d (0=off 1=starting 2=running 3=stopping)",engineValid?1:0,engineValue);Log(SPF_LOG_INFO,message);priorEngine=engineValue;}
  bool held=false;
  const bool valid=ReadPlayerHorn(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,held);
  gameHornValid.store(valid);hornHeld.store(valid && held);hornTick.store(valid?GetTickCount64():0);
@@ -290,6 +331,10 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"RIGHT_ELBOW updates=%llu rejected=%llu guide_inset_m=%.4f",static_cast<unsigned long long>(rightElbowUpdates.load()),static_cast<unsigned long long>(rightElbowRejected.load()),rightElbowInset.load());Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"LEFT_ELBOW updates=%llu rejected=%llu guide_inset_m=%.4f",static_cast<unsigned long long>(leftElbowUpdates.load()),static_cast<unsigned long long>(leftElbowRejected.load()),leftElbowInset.load());Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"RUNTIME_IK updates=%llu rejected=%llu lean_degrees=%.4f hand_error_m=%.6f",static_cast<unsigned long long>(runtimeIKUpdates.load()),static_cast<unsigned long long>(runtimeIKRejected.load()),runtimeIKDegrees.load(),runtimeIKError.load());Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"IGNITION events=%llu overrides=%llu starting=%d",static_cast<unsigned long long>(engineStartSequence.load()),static_cast<unsigned long long>(ignitionOverrides.load()),engineStarting.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"RIGHT_GESTURE overrides=%llu held=%d",static_cast<unsigned long long>(rightGestureOverrides.load()),rightGestureHeld.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"WINDOW_GESTURE overrides=%llu held=%d",static_cast<unsigned long long>(windowGestureOverrides.load()),windowGestureHeld.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"HORN overrides=%llu faults=%llu held=%d",static_cast<unsigned long long>(hornOverrides.load()),static_cast<unsigned long long>(hornFaults.load()),hornHeld.load()?1:0);Log(SPF_LOG_INFO,text);
@@ -328,10 +373,11 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  for(float value:hand)if(!std::isfinite(value))return;
  static thread_local LeftArmGestures gestures;
  static thread_local WindowGestureMotion rightMotion;
+ static thread_local IgnitionMotion ignition;static thread_local uint64_t seenEngineStart=0;
  static thread_local uintptr_t priorModel=0;
  static thread_local uint64_t priorGeneration=0,priorTick=0;
  const uint64_t now=GetTickCount64(),generation=worldGeneration.load();
- if(priorModel!=model || priorGeneration!=generation){gestures={};rightMotion={};priorTick=now;priorModel=model;priorGeneration=generation;}
+ if(priorModel!=model || priorGeneration!=generation){gestures={};rightMotion={};ignition={};seenEngineStart=engineStartSequence.load();priorTick=now;priorModel=model;priorGeneration=generation;}
  const float dt=std::clamp(static_cast<float>(now-priorTick)/1000.f,0.f,.05f);priorTick=now;
  const auto inputTick=hornTick.load(),telTick=telemetryTick.load();
  const bool held=hornHeld.load() && inputTick && now-inputTick<=250 && telTick && now-telTick<=250;
@@ -340,19 +386,66 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  gestures.Step(held,windowHeld,dt);
  const auto rightTick=rightGestureTick.load();
  const bool rightHeld=rightGestureHeld.load() && rightTick && now-rightTick<=250 && telTick && now-telTick<=250;
- rightMotion.Step(rightHeld,dt);
- const bool leftActive=gestures.horn.reach>0 || gestures.window.reach>0,rightActive=rightMotion.reach>0;
- if((leftActive || rightActive) && !hornFaults.load()) {
+ const auto engTick=engineTick.load(),engSequence=engineStartSequence.load();
+ const bool engineFresh=engTick && now-engTick<=250 && telTick && now-telTick<=250;
+ const bool pendingStart=engSequence!=seenEngineStart;
+ rightMotion.Step(rightHeld && !pendingStart && ignition.reach==0 && !ignition.active,dt);
+ if(pendingStart && rightMotion.reach==0){seenEngineStart=engSequence;if(engineFresh)ignition.Start();}
+ ignition.Step(engineStarting.load(),engineFresh,dt);
+ const bool leftActive=gestures.horn.reach>0 || gestures.window.reach>0,rightActive=rightMotion.reach>0 || ignition.reach>0;
+ const bool elbowFresh=telTick && now-telTick<=250;
+ const bool elbowActive=leftElbowInset.load()>0 && elbowFresh,rightElbowActive=rightElbowInset.load()>0 && elbowFresh;
+ if((leftActive || rightActive || elbowActive || rightElbowActive) && !hornFaults.load()) {
   std::array<std::array<float,4>,61> rotations{};
   if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
   for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
   BlendHornPose(rotations,gestures.horn);
   BlendLiveWindowGesture(rotations,gestures.window);
   BlendLiveRightGesture(rotations,rightMotion);
+  DriverIK::Pose unturned{};
+  if(ignition.reach>0)BlendLiveIgnition(rotations,unturned,ignition);
+  bool torsoApplied=false;
+  if(ignition.reach>0){
+   DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};
+   float degrees=0,error=0;bool unitScale=true;
+   if(!SafeRead(pointers[1],scales.data(),sizeof(scales)))unitScale=false;
+   if(unitScale)for(const auto& scale:scales)for(float value:scale)if(!std::isfinite(value) || std::abs(value-1.f)>.001f)unitScale=false;
+   const float lean=ignition.reach*ignition.reach*(3-2*ignition.reach);
+   bool solved=false;
+   if(unitScale && SafeRead(pointers[3],positions.data(),sizeof(positions))){
+    auto basePose=DriverIK::FK(unturned,positions),turnPose=DriverIK::FK(rotations,positions);
+    auto pivotOffset=DriverIK::Sub(basePose.p[43],turnPose.p[43]);
+    solved=DriverIK::LeanAndCompensate(rotations,positions,lean,degrees,error,.1524f,pivotOffset);
+   }
+   if(solved){
+    torsoApplied=degrees>0;runtimeIKUpdates.fetch_add(1);runtimeIKDegrees.store(degrees);runtimeIKError.store(error);
+   }else{runtimeIKRejected.fetch_add(1);runtimeIKDegrees.store(0);}
+  }
+  bool elbowApplied=false;
+  if(elbowActive){
+   DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};bool valid=true;float error=0;
+   if(!SafeRead(pointers[1],scales.data(),sizeof(scales)))valid=false;
+   if(valid)for(const auto& scale:scales)for(float value:scale)if(!std::isfinite(value) || std::abs(value-1.f)>.001f)valid=false;
+   if(valid && SafeRead(pointers[3],positions.data(),sizeof(positions)) && DriverIK::InsetLeftElbow(rotations,positions,leftElbowInset.load(),error)){elbowApplied=true;leftElbowUpdates.fetch_add(1);}else leftElbowRejected.fetch_add(1);
+  }
+  bool rightElbowApplied=false;
+  if(rightElbowActive){
+   DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};bool valid=true;float error=0;
+   if(!SafeRead(pointers[1],scales.data(),sizeof(scales)))valid=false;
+   if(valid)for(const auto& scale:scales)for(float value:scale)if(!std::isfinite(value) || std::abs(value-1.f)>.001f)valid=false;
+   if(valid && SafeRead(pointers[3],positions.data(),sizeof(positions)) && DriverIK::InsetRightElbow(rotations,positions,rightElbowInset.load(),error)){rightElbowApplied=true;rightElbowUpdates.fetch_add(1);}else rightElbowRejected.fetch_add(1);
+  }
   __try {
+   if(rightElbowApplied)for(unsigned bone: {26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if(elbowApplied)for(unsigned bone: {5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if(torsoApplied){
+    for(unsigned bone=1;bone<=3;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+    for(unsigned bone: {5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   }
    if(leftActive)for(const auto& target:kHornTargets)std::memcpy(reinterpret_cast<void*>(pointers[2]+target.bone*16),rotations[target.bone].data(),16);
    if(rightActive)for(const auto& target:kRightGestureTargets)std::memcpy(reinterpret_cast<void*>(pointers[2]+target.bone*16),rotations[target.bone].data(),16);
-   if(rightActive)rightGestureOverrides.fetch_add(1);
+   if(rightMotion.reach>0)rightGestureOverrides.fetch_add(1);
+   if(ignition.reach>0)ignitionOverrides.fetch_add(1);
    if(gestures.horn.reach>0)hornOverrides.fetch_add(1);
    if(gestures.window.reach>0)windowGestureOverrides.fetch_add(1);
   } __except(EXCEPTION_EXECUTE_HANDLER){hornFaults.fetch_add(1);}
