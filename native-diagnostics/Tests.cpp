@@ -8,6 +8,8 @@
 #include "IgnitionMotion.hpp"
 #include "IgnitionTargets.hpp"
 #include "RuntimeArmIK.hpp"
+#include "SignalMotion.hpp"
+#include "SignalTargets.hpp"
 #include <fstream>
 #include "WindowGesture.hpp"
 #include "LiveGesturePose.hpp"
@@ -56,6 +58,22 @@ static uintptr_t BoneOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays
 }
 int main() {
  {
+ SignalSelection input;Check(input.Sample(true,false,false)==0,"loaded active signal does not replay");
+ Check(input.Sample(false,false,false)==0,"signal off does not act as new turn");
+ Check(input.Sample(true,false,false)==1,"left selection triggers once");
+ for(int i=0;i<100;++i)Check(input.Sample(true,false,false)==0,"selected signal does not repeat with flashing time");
+ Check(input.Sample(false,true,false)==2,"switch to right triggers right gesture");
+ Check(input.Sample(true,true,true)==0 && input.Sample(true,false,true)==0,"hazards suppress stalk movement");
+ Check(input.Sample(true,false,false)==0,"leaving hazards establishes baseline without new gesture");
+ input.Reset();Check(input.Sample(false,false,false)==0 && input.Sample(false,true,false)==2,"world reset safely rearms");
+ SignalMotion motion;motion.Start(1);
+ for(int i=0;i<20;++i){motion.Step(true,false,.01f);Check(motion.press==0 && motion.Pose().extend==0,"stalk movement begins only after reach");}
+ for(int i=0;i<100;++i)motion.Step(true,false,.01f);
+ Check(motion.phase==SignalMotion::Idle && motion.reach==0,"signal gesture returns while indicator remains selected");
+ motion.Start(2);motion.Step(true,false,.05f);motion.Step(false,false,.05f);for(int i=0;i<50;++i)motion.Step(false,false,.01f);Check(motion.reach==0,"stale signal input releases hand");
+ }
+
+ {
  std::ifstream source("../../stock-reference/ford_mustang_67_ani.pma",std::ios::binary);
  Check(static_cast<bool>(source),"runtime IK stock steering fixture opens");
  source.seekg(72);uint32_t offset=0;source.read(reinterpret_cast<char*>(&offset),4);
@@ -77,6 +95,12 @@ int main() {
    Check(DriverIK::InsetLeftElbow(candidate,positions,.04f,error),"left elbow inset solves steering horn and gesture");
    auto after=DriverIK::FK(candidate,positions);
    Check(after.p[6][0]>=before.p[6][0]-.001f && DriverIK::Length(DriverIK::Sub(after.p[7],before.p[7]))<.001f,"left elbow moves inward with hand target retained");
+  }
+  for(unsigned side=0;side<2;++side){
+   auto candidate=pose;BlendWindowGesture(candidate,{1,1,1},side==0?kSignalLeftTargets:kSignalRightTargets);auto before=DriverIK::FK(candidate,positions);float error;
+   Check(DriverIK::InsetLeftElbow(candidate,positions,.06f,error),"signal pose supports inward elbow correction");
+   auto after=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(after.p[7],before.p[7]))<.001f,"signal elbow retains stalk target");
+   for(unsigned i=25;i<61;++i)Check(candidate[i]==pose[i],"signal leaves right arm and pedals unchanged");
   }
   for(unsigned turnStep=0;turnStep<=10;++turnStep){
    auto unturned=pose,turning=pose;BlendWindowGesture(unturned,{1,1,0},kIgnitionTargets);BlendWindowGesture(turning,{1,1,turnStep/10.f},kIgnitionTargets);

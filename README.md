@@ -1,6 +1,6 @@
 # ATS Visible First Person Driver Body
 
-Current validated plugin: **0.11.5**, with ignition reach/key-turn, torso lean, per-frame arm IK, thumb pivot and independent live elbow controls. The user confirmed the final version in VR. Install `releases/SPF_DriverAnimationDiagnostics-0.11.5-both-elbows-test.dll` under the existing plugin DLL name, plus `ignition_pose.txt`, `left_elbow_inset.txt` and `right_elbow_inset.txt` in its config folder. Preserve the existing left/right gesture pose files. See [IGNITION.md](IGNITION.md) and [LEFT_ELBOW.md](LEFT_ELBOW.md).
+Current plugin: **0.12.1**, with ignition reach/key-turn, torso lean, per-frame arm IK, thumb pivot and independent live elbow controls. The user confirmed the final version in VR. Install `releases/SPF_DriverAnimationDiagnostics-0.12.1-signal-waypoint-test.dll` under the existing plugin DLL name, plus `ignition_pose.txt`, `left_elbow_inset.txt` and `right_elbow_inset.txt` in its config folder. Preserve the existing left/right gesture pose files. The plugin also animates left/right turn-signal selection with the left hand. Install `signal_left_pose.txt` and `signal_right_pose.txt` alongside the other config files. See [IGNITION.md](IGNITION.md), [LEFT_ELBOW.md](LEFT_ELBOW.md), and [TURN_SIGNALS.md](TURN_SIGNALS.md).
 
 The installed body archive remains the previously tested 0.6.0; the following archive notes describe the separate, uninstalled 0.6.1 alignment checkpoint.
 
@@ -10,7 +10,7 @@ The selectable **SPF Stock Driver Body (animated prototype)** carpet accessory u
 
 ## Install
 
-With ATS closed, copy releases/ATS-VisibleDriverBody-Mustang-0.6.1-pedal-alignment-test.scs into the ATS user mod directory. Install releases/SPF_DriverAnimationDiagnostics-0.11.5-both-elbows-test.dll, renamed SPF_DriverAnimationDiagnostics.dll, in bin/win_x64/plugins/spfPlugins/SPF_DriverAnimationDiagnostics/ under the game installation and enable it in SPF�s Plugins panel. Both files are required for steering and all pedal animations. Existing installation uses the older filename ATS-VisibleDriverBody-Mustang-0.1.0.scs to preserve profile references; replace that file rather than enabling both archives. Enable the mod, load the Mustang and select SPF Stock Driver Body (animated prototype) under carpet accessories. Restore the original carpet to remove it.
+With ATS closed, copy releases/ATS-VisibleDriverBody-Mustang-0.6.1-pedal-alignment-test.scs into the ATS user mod directory. Install releases/SPF_DriverAnimationDiagnostics-0.12.1-signal-waypoint-test.dll, renamed SPF_DriverAnimationDiagnostics.dll, in bin/win_x64/plugins/spfPlugins/SPF_DriverAnimationDiagnostics/ under the game installation and enable it in SPF�s Plugins panel. Both files are required for steering and all pedal animations. Existing installation uses the older filename ATS-VisibleDriverBody-Mustang-0.1.0.scs to preserve profile references; replace that file rather than enabling both archives. Enable the mod, load the Mustang and select SPF Stock Driver Body (animated prototype) under carpet accessories. Restore the original carpet to remove it.
 
 ## Source and validation
 

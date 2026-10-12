@@ -1,0 +1,67 @@
+{
+  "stalk_wrist_target_m": [
+    -0.6334515529945707,
+    0.8019438833609188,
+    -0.26756915457593744
+  ],
+  "leftward_adjustment_m": 0.0254,
+  "forward_adjustment_m": 0.0508,
+  "downward_adjustment_m": 0.0508,
+  "finger_pose": "index and middle pinch with thumb",
+  "pinch_fit": {
+    "8": {
+      "angles_degrees": [
+        -30.0,
+        78.0,
+        22.0,
+        13.0
+      ],
+      "thumb_tip_gap_m": 0.01841596390354585,
+      "target_error_m": 0.025919996901305906
+    },
+    "11": {
+      "angles_degrees": [
+        -30.0,
+        77.0,
+        33.0,
+        16.0
+      ],
+      "thumb_tip_gap_m": 0.03522318488075498,
+      "target_error_m": 0.02783004897772722
+    },
+    "thumb": {
+      "adjustment_degrees": [
+        -17.0,
+        0.0,
+        0.0,
+        20.0,
+        6.0
+      ],
+      "index_gap_m": 0.013807887051800367,
+      "middle_gap_m": 0.01923462287272906,
+      "mesh_contact_visual_test_pending": true
+    }
+  },
+  "stroke_m": 0.025,
+  "left_direction": "down",
+  "right_direction": "up",
+  "arm_lengths_preserved": true,
+  "right_arm_and_pedals_unchanged": true,
+  "approach_waypoint_m": [
+    -0.6207515529945706,
+    0.8423438833609188,
+    -0.24216915457593743
+  ],
+  "approved_finger_pose_retained": true,
+  "midway_hand_open_blend": 0.25,
+  "visual_test_pending": true,
+  "plugin_version": "0.12.1",
+  "runtime_both_directions_validated": true,
+  "runtime_events": 17,
+  "runtime_updates": 1048,
+  "runtime_pose_faults": 0,
+  "installed_files_verified": true,
+  "user_approved_finger_pose": true,
+  "user_requested_commit_after_waypoint_test": true,
+  "final_waypoint_visual_feedback_not_explicitly_recorded": true
+}
