@@ -1,0 +1,9 @@
+# ATS-bound head calibration and editable ranges
+
+Validated release: 0.16.7. Calibration follows ATS's headreset action rather than a separate SPF hotkey. The static action registration and input handler combine keyboard, wheel and semantic bindings. An observer at RVA 0x428872 records the native action edge without consuming or changing it. It waits for a fresh, tracked headset sample captured after the request, applies calibration once, and expires after two seconds without usable tracking. Pending requests clear with world reset. The old F8 action is no longer registered or polled; stored user binding settings are retained.
+
+Runtime logs captured one native action and one subsequent calibration, approximately twenty-two milliseconds later. This validates the action path for the tested binding; it does not independently test every possible physical binding. Regression checks cover unchanged registers/edge, post-request sample ordering, invalid tracking, single application and timeout.
+
+The latest calibrated live limits are 0.70 metres forward, 0.60 metres symmetrically sideways and 40 degrees of spine lean. Their loader now accepts any finite, non-negative numeric values, with no arbitrary upper cap; zero is accepted to disable an axis/angle allowance. Negative and non-finite values and malformed files retain the last valid settings. Changes apply live within about half a second.
+
+Physical arm reach and finite-pose checks remain. The IK solver reduces unreachable leans transactionally while keeping the hands at their current targets. A large configured range therefore does not guarantee equal visible displacement. Tests cover large accepted settings, negative/non-finite rejection and large forward/side requests throughout the stock steering range. The user approved the overall tracking result and requested commit and push; head_tracking_validation.json records the final session results.

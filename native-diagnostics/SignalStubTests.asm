@@ -1,3 +1,4 @@
+EXTERN NativeRecenterObserveStub:PROC
 EXTERN HeadObserveStub:PROC
 EXTERN SignalLeftRequestStub:PROC
 EXTERN SignalRightRequestStub:PROC
@@ -52,4 +53,20 @@ HeadTestContinuation PROC
  pop rbp
  ret
 HeadTestContinuation ENDP
+RecenterTestEntry PROC FRAME
+ push r12
+ .pushreg r12
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov r12, rcx
+ mov rcx, rdx
+ jmp NativeRecenterObserveStub
+RecenterTestEntry ENDP
+RecenterTestContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop r12
+ ret
+RecenterTestContinuation ENDP
 END

@@ -8,7 +8,7 @@ inline bool ParseHeadTrackingLimits(const std::string& text,HeadTrackingLimits& 
  if(text.size()>256)return false;std::istringstream input(text);std::string key;HeadTrackingLimits candidate;
  if(!(input>>key>>candidate.forward) || key!="forward_m" || !(input>>key>>candidate.degrees) || key!="max_lean_degrees")return false;
  if(input>>key){if(key!="lateral_m" || !(input>>candidate.lateral) || (input>>key))return false;}
- if(!std::isfinite(candidate.forward) || !std::isfinite(candidate.degrees) || !std::isfinite(candidate.lateral) || candidate.forward<.05f || candidate.forward>.4f || candidate.degrees<5 || candidate.degrees>35 || candidate.lateral<.05f || candidate.lateral>.35f)return false;
+ if(!std::isfinite(candidate.forward) || !std::isfinite(candidate.degrees) || !std::isfinite(candidate.lateral) || candidate.forward<0 || candidate.degrees<0 || candidate.lateral<0)return false;
  limits=candidate;return true;
 }
 struct HeadTorsoDrive {DriverIK::V delta{};DriverIK::Q headRotation{1,0,0,0};float yaw=0;uint64_t tick=0;};
@@ -17,7 +17,7 @@ struct SeatedHeadCalibration {
  ObservedHead baseline{};uint64_t generation=0;HeadTorsoDrive filtered{};
  void Reset(){baseline={};filtered={};}
  bool Step(const ObservedHead& pose,uint64_t world,uint64_t now,bool fresh,bool recenter,float dt,float gain,float forwardLimit=.15f,float lateralLimit=.12f,bool allowCalibration=true) {
-  if(!std::isfinite(gain) || gain<0 || gain>1 || !std::isfinite(forwardLimit) || forwardLimit<.05f || forwardLimit>.4f || !std::isfinite(lateralLimit) || lateralLimit<.05f || lateralLimit>.35f)return false;
+  if(!std::isfinite(gain) || gain<0 || gain>1 || !std::isfinite(forwardLimit) || forwardLimit<0 || !std::isfinite(lateralLimit) || lateralLimit<0)return false;
   bool calibrated=false;
   if(fresh && (!baseline.space || baseline.space!=pose.space || generation!=world || recenter)){
    if(allowCalibration || recenter){baseline=pose;generation=world;filtered={};calibrated=true;}
@@ -61,7 +61,7 @@ inline bool ApplyTrackedHead(Pose& pose,const Positions& positions,Q relative,Q 
  pose=candidate;return true;
 }
 inline bool TrackHeadTorso(Pose& pose,const Positions& positions,V delta,float yaw,float& applied,float& error,float maxLeanDegrees=14.f){
- applied=error=0;if(!std::isfinite(maxLeanDegrees) || maxLeanDegrees<5 || maxLeanDegrees>35)return false;for(float x:delta)if(!std::isfinite(x) || std::abs(x)>.5f)return false;if(!std::isfinite(yaw) || std::abs(yaw)>.5f)return false;
+ applied=error=0;if(!std::isfinite(maxLeanDegrees) || maxLeanDegrees<0)return false;for(float x:delta)if(!std::isfinite(x))return false;if(!std::isfinite(yaw) || std::abs(yaw)>.5f)return false;
  for(const auto& p:positions)for(float x:p)if(!std::isfinite(x) || std::abs(x)>10)return false;
  if(Length(delta)<1e-5f && std::abs(yaw)<1e-5f)return true;
  const auto original=pose;const auto before=FK(original,positions);

@@ -20,6 +20,7 @@
 #include "SignalTiming.hpp"
 #include "HeadTracking.hpp"
 #include "HeadTorso.hpp"
+#include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
@@ -40,6 +41,7 @@
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
+void* gRecenterOriginal=nullptr;void NativeRecenterObserveStub();
 void* gHeadOriginal=nullptr;void HeadObserveStub();
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 void SignalLeftRequestStub();void SignalRightRequestStub();
@@ -74,6 +76,9 @@ std::atomic<bool> gameHornValid{false};
 SPF_KeyBinds_Handle* gestureKeys=nullptr;
 LiveGesturePose liveGesturePose;
 LiveGesturePose liveSignalLeft{kSignalLeftTargets},liveSignalRight{kSignalRightTargets};
+SPF_Hook_Handle* nativeRecenterHook=nullptr;
+constexpr char kNativeRecenterPattern[]="84 C9 74 76 49 8B 8C 24 08 0E 00 00 48 85 C9 74 06 48 8B 01 FF 50 58 48 8D 45";
+std::atomic<uint64_t> nativeRecenterSequence{0},nativeRecenterTick{0};NativeRecenterGate nativeRecenterGate;
 SPF_Hook_Handle* headHook=nullptr;
 constexpr char kHeadPattern[]="8B D8 85 C0 0F 89 9F 00 00 00 48 8B 46 58 48 85 C0 74 7E 48 8B 4E 10 48 85";
 std::mutex headMutex;ObservedHead latestHead{};
@@ -210,7 +215,7 @@ void TruckSignals(const SPF_TruckData* data,void*) {
  if(direction){signalDirection.store(direction);signalEventTick.store(GetTickCount64());signalSequence.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_EVENT direction=%s",direction==1?"left":"right");Log(SPF_LOG_INFO,text);}
 }
 void Reset() {
- headCalibration.Reset();{std::lock_guard lock(headDriveMutex);headDrive={};}
+ headCalibration.Reset();nativeRecenterGate={nativeRecenterSequence.load(),0,0};{std::lock_guard lock(headDriveMutex);headDrive={};}
  {std::lock_guard lock(signalGateMutex);signalGate.Cancel();}
  signalReady.store(0);skipSignalDirection.store(0);signalCancels.fetch_add(1);
  {std::lock_guard lock(engineGateMutex);engineStartGate.Cancel();}
@@ -248,7 +253,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.16.4");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.16.7");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -256,7 +261,6 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
  api->Policy_AddConfigurableSystem(h,"logging");
  api->Defaults_SetLogging(h,"info",true);
  api->Policy_AddConfigurableSystem(h,"keybinds");
- api->Defaults_AddKeybind(h,"HeadTracking","Recenter","keyboard","KEY_F8","always");
  api->Defaults_AddKeybind(h,"Gestures","LeftWindowBird","keyboard","KEY_F10","always");
  api->Defaults_AddKeybind(h,"Gestures","RightHandBird","keyboard","KEY_F11","always");
 
@@ -282,6 +286,8 @@ void Activated(const SPF_Core_API* api) {
  if(hooks->Hook_FindPattern(kSignalLeftPattern)!=base+0x9f85e2 || hooks->Hook_FindPattern(kSignalRightPattern)!=base+0x9f8670){Log(SPF_LOG_ERROR,"SIGNAL_DELAY: input-site signature mismatch; no hooks registered.");return;}
  if(hooks->Hook_FindPattern(kHeadPattern)==base+0x1632dde)headHook=hooks->Hook_Register(kName,"HeadTrackingObserver","Observe local-space OpenXR head views",reinterpret_cast<void*>(HeadObserveStub),&gHeadOriginal,kHeadPattern,true);
  else Log(SPF_LOG_WARN,"HEAD_TRACKING: view-site signature mismatch; observer disabled.");
+ if(hooks->Hook_FindPattern(kNativeRecenterPattern)==base+0x428872)nativeRecenterHook=hooks->Hook_Register(kName,"NativeHeadRecenter","Observe ATS head-reset input without consuming it",reinterpret_cast<void*>(NativeRecenterObserveStub),&gRecenterOriginal,kNativeRecenterPattern,true);
+ else Log(SPF_LOG_WARN,"HEAD_RECENTER native input-site signature mismatch; observer disabled.");
  expectedReturn=base+0x9e1d92;
  resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15de620);
  enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15decc0);
@@ -429,16 +435,18 @@ void PollHeadTrackingGain() {
 }
 HeadTorsoDrive SnapshotHeadDrive(){std::lock_guard lock(headDriveMutex);return headDrive;}
 void UpdateHeadTorso() {
- static uint64_t previous=0;static bool wasRecenter=false;const auto now=GetTickCount64();float dt=previous?static_cast<float>(now-previous)/1000.f:0;previous=now;
+ static uint64_t previous=0;const auto now=GetTickCount64();float dt=previous?static_cast<float>(now-previous)/1000.f:0;previous=now;
  ObservedHead pose;{std::lock_guard lock(headMutex);pose=latestHead;}
  const auto controls=telemetryTick.load(),body=privateBodyTick.load();
  const bool interior=bodyCameraValid.load() && bodyCameraType.load()==2;
  const bool cameraKnown=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9;
  const bool fresh=cameraKnown && pose.tick && now-pose.tick<=250 && (pose.flags&15)==15 && controls && now-controls<=250 && body && now-body<=250;
- bool recenter=gestureKeys && core->keybinds->Kbind_GetActionValue(gestureKeys,"HeadTracking.Recenter")>.5f;
+ nativeRecenterGate.Observe(nativeRecenterSequence.load(),nativeRecenterTick.load());
+ bool recenter=nativeRecenterGate.Consume(now,pose.tick,fresh);
+ if(recenter)Log(SPF_LOG_INFO,"HEAD_RECENTER native action applied from fresh post-request pose.");
  if(!cameraKnown){headCalibration.filtered={};}
- else if(headCalibration.Step(pose,worldGeneration.load(),now,fresh,recenter && !wasRecenter,dt,headTrackingGain.load(),headForwardLimit.load(),headLateralLimit.load(),interior))Log(SPF_LOG_INFO,"HEAD_TORSO seated calibration captured.");
- wasRecenter=recenter;{std::lock_guard lock(headDriveMutex);headDrive=headCalibration.filtered;}
+ else if(headCalibration.Step(pose,worldGeneration.load(),now,fresh,recenter,dt,headTrackingGain.load(),headForwardLimit.load(),headLateralLimit.load(),interior))Log(SPF_LOG_INFO,"HEAD_TORSO seated calibration captured.");
+{std::lock_guard lock(headDriveMutex);headDrive=headCalibration.filtered;}
 }
 void PollObservedHead() {
  static uint64_t last=0,generation=0;static ObservedHead baseline{};
@@ -687,6 +695,12 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  if(privateHead){if(!CollapseDriverHead(palette))return;}else if(!CollapseDriverPalette(palette))return;
  __try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));if(privateBody)hiddenBodyFrames.fetch_add(1);if(playerStock)hiddenStockFrames.fetch_add(1);if(privateHead)hiddenHeadFrames.fetch_add(1);}
  __except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}
+}
+extern "C" void CaptureNativeRecenter(uintptr_t inputOwner,uint32_t requested) noexcept {
+ if(!enabled.load() || !(requested&255u) || !inputOwner)return;
+ uintptr_t input=0;if(!SafeRead(inputOwner+0xbd8,&input,sizeof(input)) || !input)return;
+ nativeRecenterTick.store(GetTickCount64());nativeRecenterSequence.fetch_add(1);
+ Log(SPF_LOG_INFO,"HEAD_RECENTER native ATS head-reset action observed.");
 }
 extern "C" void CaptureHeadViews(uintptr_t pointer,uint32_t count,uint64_t flags,int32_t result,uintptr_t info) noexcept {
  if(!enabled.load())return;

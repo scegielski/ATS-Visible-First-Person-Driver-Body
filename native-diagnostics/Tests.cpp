@@ -15,6 +15,7 @@
 #include "SignalTiming.hpp"
 #include "HeadTracking.hpp"
 #include "HeadTorso.hpp"
+#include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
 #include "BodyVisibility.hpp"
 #include "PlayerExteriorDriver.hpp"
@@ -31,6 +32,7 @@ extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
 void* gHeadOriginal=nullptr;
+void* gRecenterOriginal=nullptr;
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 uintptr_t EngineRequestObserveStub(uintptr_t,uint32_t,uint32_t,uint64_t,uint64_t);
 void* gAdvanceOriginal=nullptr;
@@ -62,6 +64,9 @@ extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t
  Check(vehicle==0x12345678 && request==0xabcdef01 && immediate==0xfedcba00,"engine observer preserves full register arguments");Check(caller!=0,"engine gate receives original return address");return suppressEngine;
 }
 extern "C" unsigned char CaptureSignalRequest(uintptr_t vehicle,uint32_t side,uint32_t input) noexcept {Check(vehicle==123 && side==signalTestSide && input==0x55667701,"signal mid-function callback arguments");return signalReplacement;}
+extern "C" uint64_t RecenterTestEntry(uintptr_t,uint64_t);
+extern "C" void RecenterTestContinuation();
+extern "C" void CaptureNativeRecenter(uintptr_t owner,uint32_t request) noexcept {Check(owner==123 && request==0x55667701,"native recenter observer callback arguments");}
 extern "C" uintptr_t HeadTestEntry(uintptr_t,uint32_t,uint64_t,int32_t);
 extern "C" void HeadTestContinuation();
 extern "C" void CaptureHeadViews(uintptr_t views,uint32_t count,uint64_t flags,int32_t result,uintptr_t locate) noexcept {
@@ -92,6 +97,13 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  Check(boneOriginalCalls==bonePostCalls+1,"visibility runs after original hierarchy assembly");++bonePostCalls;volatile double clobber=1.25;clobber=std::sin(clobber);
 }
 int main() {
+ gRecenterOriginal=reinterpret_cast<void*>(RecenterTestContinuation);Check(RecenterTestEntry(123,0x1122334455667701ull)==0x1122334455667701ull,"recenter observer leaves native edge register unchanged");
+ NativeRecenterGate nativeCalibration;nativeCalibration.Observe(1,100);
+ Check(!nativeCalibration.Consume(100,100,true),"recenter waits beyond pre-request pose");
+ Check(!nativeCalibration.Consume(120,110,false),"invalid tracking cannot recalibrate");
+ Check(nativeCalibration.Consume(130,120,true) && !nativeCalibration.Consume(140,130,true),"fresh post-request sample recalibrates once");
+ nativeCalibration.Observe(2,200);Check(!nativeCalibration.Consume(2300,2290,true) && !nativeCalibration.pending,"stale reset request expires");
+
  gHeadOriginal=reinterpret_cast<void*>(HeadTestContinuation);Check(HeadTestEntry(123,2,15,-3)==static_cast<uint32_t>(-3),"head observer preserves OpenXR result for game continuation");
  std::array<ObservedXRView,2> xrViews{};for(auto& view:xrViews){view.type=7;view.orientation={0,0,0,1};view.position={0,1.6f,-.2f};}
  xrViews[0].position[0]=-.032f;xrViews[1].position[0]=.032f;ObservedXRLocate xrInfo{};xrInfo.type=6;xrInfo.displayTime=1;xrInfo.space=123;ObservedHead xrHead;
@@ -138,12 +150,15 @@ int main() {
  Check(!exteriorCalibration.Step(exteriorHead,1,120,true,false,.05f,1,.3f,.24f,false) && exteriorCalibration.filtered.delta[2]<0,"external view retains neutral and tracks lean");
  exteriorHead.space=23;exteriorCalibration.Step(exteriorHead,1,130,true,false,.05f,1,.3f,.24f,false);Check(!exteriorCalibration.baseline.space,"changed tracking space cannot reuse exterior baseline");
  Check(exteriorCalibration.Step(exteriorHead,1,140,true,true,.05f,1,.3f,.24f,false),"explicit recenter available in exterior view");
+ HeadTrackingLimits largeForward;
+ Check(ParseHeadTrackingLimits("forward_m 0.70 max_lean_degrees 40 lateral_m 0.30",largeForward),"larger forward range and lean cap accepted");
+ Check(ParseHeadTrackingLimits("forward_m 1000 max_lean_degrees 1000 lateral_m 1000",largeForward),"live range settings have no arbitrary upper cap");
  HeadTrackingLimits lateralLimits;
  Check(ParseHeadTrackingLimits("forward_m 0.30 max_lean_degrees 28 lateral_m 0.24",lateralLimits) && lateralLimits.lateral==.24f,"live sideways limit accepted");
- Check(!ParseHeadTrackingLimits("forward_m 0.30 max_lean_degrees 28 lateral_m 1",lateralLimits),"invalid sideways limit rejected");
+ Check(!ParseHeadTrackingLimits("forward_m 0.30 max_lean_degrees 28 lateral_m -1",lateralLimits),"negative sideways limit rejected");
  HeadTrackingLimits limits;
  Check(ParseHeadTrackingLimits("forward_m 0.30\nmax_lean_degrees 28\n",limits) && limits.forward==.30f && limits.degrees==28,"live head limits parse");
- Check(!ParseHeadTrackingLimits("forward_m 9 max_lean_degrees 28",limits) && !ParseHeadTrackingLimits("forward_m 0.3 max_lean_degrees nan",limits),"invalid head limits retain accepted setting");
+ Check(!ParseHeadTrackingLimits("forward_m -1 max_lean_degrees 28",limits) && !ParseHeadTrackingLimits("forward_m 0.3 max_lean_degrees nan",limits),"invalid head limits retain accepted setting");
  SignalRequestGate sg;
  Check(sg.Step(123,1,100,true,0,1,true,0,10)==1,"left signal queued");
  Check(sg.Step(123,1,200,true,0,1,false,0,11)==0,"no signal before hand arrival");
@@ -266,6 +281,16 @@ int main() {
    Check(DriverIK::ApplyTrackedHead(candidate,positions,turn,originalHead),"exterior neck and head tracking applies");
    auto after=DriverIK::FK(candidate,positions);auto expected=DriverIK::Product(turn,originalHead);float dot=0;for(unsigned j=0;j<4;++j)dot+=after.q[47][j]*expected[j];Check(std::abs(dot)>.9999f,"head world rotation follows HMD without duplicate torso rotation");
    for(unsigned bone=0;bone<61;++bone)if(bone!=46 && bone!=47)Check(candidate[bone]==before[bone],"head animation preserves arms fingers torso and legs");
+  }
+  {
+   auto large=pose;auto before=DriverIK::FK(large,positions);float strength,error;
+   Check(DriverIK::TrackHeadTorso(large,positions,{0,0,-.70f},0,strength,error,40),"large forward range solves across steering");
+   auto after=DriverIK::FK(large,positions);for(unsigned hand:{7u,28u})Check(DriverIK::Length(DriverIK::Sub(after.p[hand],before.p[hand]))<.001f,"large forward lean preserves both hand targets");
+  }
+  for(float side:{-.6f,.6f}){
+   auto candidate=pose;auto before=DriverIK::FK(candidate,positions);float strength,error;
+   Check(DriverIK::TrackHeadTorso(candidate,positions,{side,0,0},0,strength,error,40),"larger lateral range accepted without arbitrary solver cap");
+   auto after=DriverIK::FK(candidate,positions);for(unsigned hand:{7u,28u})Check(DriverIK::Length(DriverIK::Sub(after.p[hand],before.p[hand]))<.001f,"large lateral lean retains both wrist targets");
   }
   for(unsigned mode=0;mode<6;++mode){
    auto candidate=pose;

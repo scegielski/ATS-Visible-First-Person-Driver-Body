@@ -1,12 +1,12 @@
 # Live VR head and torso tracking
 
-Validated release: 0.16.4. The user confirmed torso tracking inside and outside and exterior head animation. The final runtime snapshot recorded more than ten thousand torso updates and more than seven thousand exterior head updates with no rejected solves; the last hand-target error was below a millimetre. See head_tracking_validation.json.
+Validated release: 0.16.7. The user confirmed torso tracking inside and outside and exterior head animation. The final runtime snapshot recorded more than twenty-two thousand torso updates and more than three thousand exterior head updates with no rejected solves; the last hand-target error was below a millimetre. See head_tracking_validation.json.
 
 ## Tracked pose and calibration
 
 A guarded read-only observer runs after the game's local-space OpenXR xrLocateViews call. It averages the two eye positions and hemisphere-normalizes orientation, preserving tracking-space identity and predicted display time. The view-relative query is excluded because its pose describes eye offsets rather than room movement. Successful result, stereo count, structure layout, finite values, quaternion norms and eye separation are checked. Torso application additionally requires valid and tracked position/orientation flags, fresh controls and recent private-body observation.
 
-A seated baseline is captured in the interior camera. Press F8 once while seated neutrally to calibrate (SPF action HeadTracking.Recenter, remappable). Switching to an exterior view retains calibration. On world/tracking-space change, exterior mode waits for interior calibration or explicit recenter. Unknown cameras disable application. After ATS's own VR recenter, recalibrate with F8; following the native action is the next requested change.
+A seated baseline is captured in the interior camera. Use your usual ATS reset-head-tracking control once while seated neutrally to calibrate. The native action is observed without hardcoding its physical binding. Switching to an exterior view retains calibration. On world/tracking-space change, exterior mode waits for interior calibration or native recenter. Unknown cameras disable application. ATS recenter now automatically recalibrates the body from the next fresh headset sample; see [NATIVE_RECENTER.md](NATIVE_RECENTER.md).
 
 ## Body and head behavior
 
@@ -23,12 +23,12 @@ Copy both files from releases to the plugin config directory. They reload twice 
 `head_tracking_limits.txt` contains these ordered entries:
 
 ```
-forward_m 0.30
-max_lean_degrees 28
-lateral_m 0.24
+forward_m 0.70
+max_lean_degrees 40
+lateral_m 0.60
 ```
 
-Forward range accepts 0.05–0.40 metres, lean angle 5–35 degrees and symmetric lateral range 0.05–0.35 metres. Older two-line files default lateral range to 0.24 metres. Backward input remains capped at 0.08 metres and vertical input at ±0.08 metres before gain. The limits constrain input rather than guarantee equal physical torso displacement: hips stay fixed and spine motion distributes the lean.
+All three range settings accept finite, non-negative values without arbitrary upper caps. Older two-line files default lateral range to 0.24 metres. Backward input remains capped at 0.08 metres and vertical input at ±0.08 metres before gain. The limits constrain input rather than guarantee equal physical torso displacement: hips stay fixed and spine motion distributes the lean.
 
 ## Validation and references
 
