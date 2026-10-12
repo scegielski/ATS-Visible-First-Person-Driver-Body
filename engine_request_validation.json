@@ -1,0 +1,82 @@
+{
+  "runtime_start_request_validated": true,
+  "normal_starts_observed": 2,
+  "normal_stops_observed": 2,
+  "requests": [
+    {
+      "start": 1,
+      "immediate": 0,
+      "state_before": 0,
+      "electric": 1,
+      "valid": 1
+    },
+    {
+      "start": 0,
+      "immediate": 0,
+      "state_before": 2,
+      "electric": 0,
+      "valid": 1
+    },
+    {
+      "start": 1,
+      "immediate": 0,
+      "state_before": 0,
+      "electric": 1,
+      "valid": 1
+    },
+    {
+      "start": 0,
+      "immediate": 0,
+      "state_before": 2,
+      "electric": 0,
+      "valid": 1
+    }
+  ],
+  "request_precedes_starting_state": true,
+  "arguments_forwarded_unchanged": true,
+  "actual_delay_implemented": true,
+  "cancellation_and_automatic_start_not_yet_validated": true,
+  "plugin_version": "0.14.0",
+  "manual_start_runtime_validated": true,
+  "user_feedback": "Okay, that is awesome",
+  "user_approved_for_commit": true,
+  "runtime_releases": [
+    {
+      "reason": "key-reached",
+      "delay_ms": 437,
+      "state_after": 1
+    },
+    {
+      "reason": "key-reached",
+      "delay_ms": 437,
+      "state_after": 1
+    },
+    {
+      "reason": "key-reached",
+      "delay_ms": 453,
+      "state_after": 1
+    },
+    {
+      "reason": "key-reached",
+      "delay_ms": 453,
+      "state_after": 1
+    },
+    {
+      "reason": "key-reached",
+      "delay_ms": 454,
+      "state_after": 1
+    },
+    {
+      "reason": "key-reached",
+      "delay_ms": 454,
+      "state_after": 1
+    }
+  ],
+  "runtime_queued": 6,
+  "runtime_released": 6,
+  "runtime_timeouts": 0,
+  "runtime_cancels": 0,
+  "quick_cancel_runtime_not_observed": true,
+  "automatic_start_runtime_not_observed": true,
+  "installed_release_byte_exact": true
+}

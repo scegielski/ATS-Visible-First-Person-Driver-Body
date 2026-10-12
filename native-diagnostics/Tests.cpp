@@ -5,6 +5,7 @@
 #include "HornPose.hpp"
 #include "GameHorn.hpp"
 #include "GameEngine.hpp"
+#include "EngineStartGate.hpp"
 #include "IgnitionMotion.hpp"
 #include "IgnitionTargets.hpp"
 #include "RuntimeArmIK.hpp"
@@ -23,6 +24,8 @@
 #include <limits>
 extern "C" {
 void* gDriverOriginal=nullptr;
+void* gEngineOriginal=nullptr;
+uintptr_t EngineRequestObserveStub(uintptr_t,uint32_t,uint32_t,uint64_t,uint64_t);
 void* gAdvanceOriginal=nullptr;
 void* gBoneOriginal=nullptr;
 uintptr_t BoneObserveStub(uintptr_t,uintptr_t,uintptr_t,uintptr_t,uint32_t);
@@ -31,7 +34,7 @@ uintptr_t AdvanceObserveStub(uintptr_t,uint32_t,float,uint64_t,uint64_t);
 }
 static int observedDriver=0,observedAdvance=0,boneOriginalCalls=0,bonePostCalls=0;
 static uintptr_t recordedReturn=0;
-static bool replacePose=false;
+static bool replacePose=false,suppressEngine=false;static int engineOriginalCalls=0;
 static void Check(bool result,const char* message) {
  if(!result) { std::fprintf(stderr,"FAIL: %s\n",message);std::exit(1); }
 }
@@ -43,6 +46,12 @@ extern "C" void CaptureAdvance(uintptr_t model,uint32_t index,float requested,ui
  Check(ret!=0,"observer original return address");recordedReturn=ret;++observedAdvance;
  Check(replacement && *replacement==requested,"saved float argument address");
  if(replacePose)*replacement=1.25f;
+}
+extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t immediate,uintptr_t caller) noexcept {
+ Check(vehicle==0x12345678 && request==0xabcdef01 && immediate==0xfedcba00,"engine observer preserves full register arguments");Check(caller!=0,"engine gate receives original return address");return suppressEngine;
+}
+static uintptr_t EngineOriginal(uintptr_t vehicle,uint32_t request,uint32_t immediate,uint64_t fourth,uint64_t fifth){
+ Check(vehicle==0x12345678 && request==0xabcdef01 && immediate==0xfedcba00 && fourth==0x11223344 && fifth==0x55667788,"engine original receives unchanged arguments including stack");++engineOriginalCalls;return 0x987654;
 }
 static uintptr_t DriverOriginal(uintptr_t controller) {
  Check(controller==0x12345678,"original driver argument");return 0xabcdef;
@@ -64,6 +73,22 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  Check(boneOriginalCalls==bonePostCalls+1,"visibility runs after original hierarchy assembly");++bonePostCalls;volatile double clobber=1.25;clobber=std::sin(clobber);
 }
 int main() {
+ {
+ EngineStartGate gate;DeferredEngineStart replay;Check(gate.Queue(100,1,1000,9),"engine delay queues once");
+ Check(!gate.Queue(100,1,1010,10),"repeated request cannot restart delay");
+ Check(gate.Poll(100,1,1100,true,0,0,replay)==EngineStartGate::None,"engine held off before hand arrives");
+ Check(gate.Poll(100,1,1450,true,0,9,replay)==EngineStartGate::KeyReached && replay.vehicle==100,"key arrival releases original request once");
+ Check(gate.Poll(100,1,1460,true,0,9,replay)==EngineStartGate::None,"no double release");
+ gate.Queue(100,1,2000,10);Check(gate.Cancel() && gate.Poll(100,1,2500,true,0,10,replay)==EngineStartGate::None,"stop cancels queued start");
+ gate.Queue(100,1,3000,11);Check(gate.Poll(100,2,3100,true,0,11,replay)==EngineStartGate::Cancelled,"world reload prevents replay");
+ gate.Queue(100,1,3000,11);Check(gate.Poll(200,1,3100,true,0,11,replay)==EngineStartGate::Cancelled,"vehicle change prevents replay");
+ gate.Queue(100,1,3000,11);Check(gate.Poll(100,1,5000,true,0,0,replay)==EngineStartGate::Timeout,"missing animation has bounded delay fallback");
+ gate.Queue(100,1,6000,12);Check(gate.Poll(100,1,6100,false,0,0,replay)==EngineStartGate::Cancelled,"stale world does not start vehicle");
+ Check(IsManualEngineStartCaller(0x100000,0x100000+0x9f79ec) && !IsManualEngineStartCaller(0x100000,0x100000+0x5db25f),"manual caller guard excludes automatic engine paths");
+ }
+
+ gEngineOriginal=reinterpret_cast<void*>(EngineOriginal);Check(EngineRequestObserveStub(0x12345678,0xabcdef01,0xfedcba00,0x11223344,0x55667788)==0x987654,"engine observer preserves original return");
+ suppressEngine=true;Check(EngineRequestObserveStub(0x12345678,0xabcdef01,0xfedcba00,0x11223344,0x55667788)==0 && engineOriginalCalls==1,"deferred engine request skips original exactly once");suppressEngine=false;
  {
  constexpr uintptr_t base=0x100000,game=0x200000,owner=0x300000,vt=0x400000,vehicle=0x500000,model=0x600000;bool wrong=false;
  auto reader=[&](uintptr_t a,void* out,size_t n){uintptr_t value=0;if(a==base+0x36b8db0)value=game;else if(a==game+0xaa0)value=owner;else if(a==owner)value=vt;else if(a==vt+0x1b8)value=wrong?0:base+0x4d9c90;else if(a==owner+0x31b0)value=vehicle;else if(a==vehicle+0x1df8)value=model;else return false;if(n!=8)return false;std::memcpy(out,&value,8);return true;};

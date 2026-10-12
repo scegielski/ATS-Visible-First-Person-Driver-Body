@@ -1,4 +1,6 @@
 EXTERN gDriverOriginal:QWORD
+EXTERN gEngineOriginal:QWORD
+EXTERN CaptureEngineRequest:PROC
 EXTERN gAdvanceOriginal:QWORD
 EXTERN CaptureDriver:PROC
 EXTERN CaptureAdvance:PROC
@@ -43,6 +45,19 @@ RESTORE_STATE MACRO
  add rsp, 0c0h
  popfq
 ENDM
+EngineRequestObserveStub PROC FRAME
+ SAVE_STATE
+ mov r9, [rsp+0c8h] ; original caller, callback only
+ call CaptureEngineRequest
+ test al, al
+ jnz EngineRequestDeferred
+ RESTORE_STATE
+ jmp qword ptr [gEngineOriginal]
+EngineRequestDeferred:
+ mov qword ptr [rsp+58h], 0
+ RESTORE_STATE
+ ret
+EngineRequestObserveStub ENDP
 DriverObserveStub PROC FRAME
  SAVE_STATE
  call CaptureDriver

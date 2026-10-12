@@ -10,6 +10,7 @@
 #include "PlayerExteriorDriver.hpp"
 #include "GameHorn.hpp"
 #include "GameEngine.hpp"
+#include "EngineStartGate.hpp"
 #include "IgnitionMotion.hpp"
 #include "IgnitionTargets.hpp"
 #include "RuntimeArmIK.hpp"
@@ -33,6 +34,8 @@
 
 extern "C" {
 void* gDriverOriginal=nullptr;
+void* gEngineOriginal=nullptr;
+void EngineRequestObserveStub();
 void* gAdvanceOriginal=nullptr;
 void* gBoneOriginal=nullptr;
 void BoneObserveStub();
@@ -46,6 +49,9 @@ constexpr char kDriverPattern[]="40 53 48 83 EC 50 48 83 79 08 00 48 8B D9 0F 84
 constexpr char kAdvancePattern[]="48 8B C4 55 41 57 48 81 EC 88 00 00 00 48 8B E9 44 8B FA 48 81 C1 08 02 00 00 0F 29 70 C8 0F 28";
 constexpr char kBonePattern[]="48 8B C4 48 89 68 18 56 57 41 54 41 55 41 57 48 81 EC 00 02 00 00 8B AC 24 50 02 00 00 45 33 ED";
 SPF_Hook_Handle* boneHook=nullptr;
+SPF_Hook_Handle* engineRequestHook=nullptr;
+std::atomic<uint64_t> engineRequestCalls{0},playerEngineRequestCalls{0};
+constexpr char kEngineRequestPattern[]="48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 60 33 F6 0F 29 74 24 50 48 8B D9 84 D2 0F 84 47 02 00 00 0F 57 F6";
 std::atomic<bool> hornHeld{false};
 std::atomic<bool> bodyCameraValid{false},hideBody{false};
 std::atomic<int> bodyCameraType{-1};
@@ -74,6 +80,10 @@ std::atomic<float> leftElbowInset{.06f},rightElbowInset{.04f};
 std::atomic<uint64_t> rightElbowUpdates{0},rightElbowRejected{0};
 std::atomic<uint64_t> leftElbowUpdates{0},leftElbowRejected{0};
 int priorEngineSample=-1;
+EngineStartGate engineStartGate;std::mutex engineGateMutex;
+std::atomic<uint64_t> deferredEngineSequence{0},engineKeyReached{0},engineDelayCancels{0},privateBodyTick{0};
+std::atomic<uint64_t> engineDeferredCount{0},engineReleasedCount{0},engineTimeoutCount{0};
+std::atomic<bool> skipNextEngineStartEvent{false};
 std::atomic<bool> rightGestureHeld{false};
 std::atomic<uint64_t> rightGestureTick{0},rightGestureOverrides{0};
 std::atomic<bool> windowGestureHeld{false};
@@ -171,6 +181,8 @@ void TruckSignals(const SPF_TruckData* data,void*) {
  if(direction){signalDirection.store(direction);signalEventTick.store(GetTickCount64());signalSequence.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_EVENT direction=%s",direction==1?"left":"right");Log(SPF_LOG_INFO,text);}
 }
 void Reset() {
+ {std::lock_guard lock(engineGateMutex);engineStartGate.Cancel();}
+ deferredEngineSequence.store(0);engineKeyReached.store(0);privateBodyTick.store(0);skipNextEngineStartEvent.store(false);
  bodyCameraValid.store(false);hideBody.store(false);bodyCameraType.store(-1);hideStockDriver.store(false);expectedPlayerDriverController.store(0);expectedPlayerDriverModel.store(0);confirmedPlayerDriverModel.store(0);playerDriverTick.store(0);
  signalSelection.Reset();signalTick.store(0);signalEventTick.store(0);selectedLeft.store(false);selectedRight.store(false);
  worldGeneration.fetch_add(1);engineTick.store(0);engineStarting.store(false);priorEngineSample=-1;
@@ -204,7 +216,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.13.2");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.14.0");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -232,6 +244,7 @@ void Activated(const SPF_Core_API* api) {
     hooks->Hook_FindPattern(kAdvancePattern)!=base+0x15deed0) {
   Log(SPF_LOG_ERROR,"DIAG: expected unique entry signatures absent; no hooks registered.");return;
  }
+ if(hooks->Hook_FindPattern(kEngineRequestPattern)!=base+0x5e4a20){Log(SPF_LOG_ERROR,"ENGINE_REQUEST: signature mismatch; diagnostic disabled.");return;}
  if(hooks->Hook_FindPattern(kBonePattern)!=base+0x15dfbf0) {Log(SPF_LOG_ERROR,"HORN: bone entry signature mismatch; diagnostic disabled.");return;}
  expectedReturn=base+0x9e1d92;
  resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15de620);
@@ -241,7 +254,8 @@ void Activated(const SPF_Core_API* api) {
  driverHook=hooks->Hook_Register(kName,"DriverUpdate","Observe driver update",reinterpret_cast<void*>(DriverObserveStub),&gDriverOriginal,kDriverPattern,true);
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
  boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
- if(!driverHook || !advanceHook || !boneHook) {
+ engineRequestHook=hooks->Hook_Register(kName,"EngineRequest","Observe player engine start/stop request",reinterpret_cast<void*>(EngineRequestObserveStub),&gEngineOriginal,kEngineRequestPattern,true);
+ if(!driverHook || !advanceHook || !boneHook || !engineRequestHook) {
   Log(SPF_LOG_ERROR,"DIAG: incomplete hook registration; observers remain inactive.");return;
  }
  if(core->telemetry) {
@@ -321,6 +335,24 @@ void BlendLiveRightGesture(std::array<std::array<float,4>,61>& rotations,const W
 }
 void BlendLiveIgnition(std::array<std::array<float,4>,61>& rotations,std::array<std::array<float,4>,61>& unturned,const IgnitionMotion& motion) { const auto pose=liveIgnitionPose.Snapshot();unturned=rotations;auto reach=motion.Pose();reach.extend=0;BlendWindowGesture(unturned,reach,*pose);BlendWindowGesture(rotations,motion.Pose(),*pose); }
 void BlendLiveSignal(std::array<std::array<float,4>,61>& rotations,const SignalMotion& motion) {const auto pose=motion.direction==1?liveSignalLeft.Snapshot():liveSignalRight.Snapshot();BlendWindowGesture(rotations,motion.Pose(),*pose);}
+void PollDeferredEngineStart(bool engineValid,PlayerEngineState state) {
+ DeferredEngineStart request;EngineStartGate::Outcome outcome;
+ const auto now=GetTickCount64(),tick=telemetryTick.load(),controller=expectedPlayerDriverController.load();
+ unsigned char electric=0;const bool electricityValid=controller && SafeRead(controller-0x1df0+0x1bc,&electric,1) && electric==1;
+ const bool fresh=engineValid && tick && now-tick<=250 && electricityValid;
+ {std::lock_guard lock(engineGateMutex);outcome=engineStartGate.Poll(controller?controller-0x1df0:0,worldGeneration.load(),now,fresh,static_cast<uint32_t>(state),engineKeyReached.load(),request);}
+ if(outcome==EngineStartGate::None)return;
+ deferredEngineSequence.store(0);engineKeyReached.store(0);
+ if(outcome==EngineStartGate::Cancelled){if(!engineValid || state==PlayerEngineState::Off)engineDelayCancels.fetch_add(1);Log(SPF_LOG_INFO,"ENGINE_DELAY cancelled: vehicle/state/freshness changed.");return;}
+ // Original requests use these three arguments; all static callers ignore its return.
+ using EngineControl=void(*)(uintptr_t,bool,bool);
+ skipNextEngineStartEvent.store(true);
+ reinterpret_cast<EngineControl>(gEngineOriginal)(request.vehicle,true,false);
+ uint32_t after=99;SafeRead(request.vehicle+0x1b8,&after,4);
+ if(after!=1 && after!=2)skipNextEngineStartEvent.store(false);
+ engineReleasedCount.fetch_add(1);if(outcome==EngineStartGate::Timeout)engineTimeoutCount.fetch_add(1);
+ char message[192];std::snprintf(message,sizeof(message),"ENGINE_DELAY released reason=%s delay_ms=%llu state_after=%u",outcome==EngineStartGate::KeyReached?"key-reached":"timeout",static_cast<unsigned long long>(now-request.created),after);Log(SPF_LOG_INFO,message);
+}
 void Update() {
  if(!enabled.load()) return;
  PollBodyVisibilityMode();
@@ -330,8 +362,9 @@ void Update() {
  PollGesturePoseFile();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
- if(engineValid){const int value=static_cast<int>(engineState);if(priorEngineSample>=0 && priorEngineSample!=1 && value==1)engineStartSequence.fetch_add(1);priorEngineSample=value;}else priorEngineSample=-1;
+ if(engineValid){const int value=static_cast<int>(engineState);if(priorEngineSample>=0 && priorEngineSample!=1 && value==1){if(!skipNextEngineStartEvent.exchange(false))engineStartSequence.fetch_add(1);}priorEngineSample=value;}else priorEngineSample=-1;
  engineStarting.store(engineValid && engineState==PlayerEngineState::Starting);engineTick.store(engineValid?GetTickCount64():0);
+ PollDeferredEngineStart(engineValid,engineState);
  static int priorEngine=-2;const int engineValue=engineValid?static_cast<int>(engineState):-1;
  if(engineValue!=priorEngine){char message[128];std::snprintf(message,sizeof(message),"ENGINE_STATE valid=%d state=%d (0=off 1=starting 2=running 3=stopping)",engineValid?1:0,engineValue);Log(SPF_LOG_INFO,message);priorEngine=engineValue;}
  bool held=false;
@@ -339,8 +372,8 @@ void Update() {
  gameHornValid.store(valid);hornHeld.store(valid && held);hornTick.store(valid?GetTickCount64():0);
  if(gestureKeys){windowGestureHeld.store(core->keybinds->Kbind_GetActionValue(gestureKeys,"Gestures.LeftWindowBird")>.5f);windowGestureTick.store(GetTickCount64());rightGestureHeld.store(core->keybinds->Kbind_GetActionValue(gestureKeys,"Gestures.RightHandBird")>.5f);rightGestureTick.store(GetTickCount64());}
  static bool installed=false;
- if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook) && core->hooks->Hook_IsInstalled(boneHook)) {
-  installed=true; Log(SPF_LOG_INFO,"HORN: three hooks installed; private left-arm horn prototype enabled; validated game horn state drives the gesture through all ATS bindings.");
+ if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook) && core->hooks->Hook_IsInstalled(boneHook) && core->hooks->Hook_IsInstalled(engineRequestHook)) {
+  installed=true; Log(SPF_LOG_INFO,"ENGINE_DELAY: four hooks installed; guarded manual starts deferred until key reach with cancellation and timeout fallback.");
  }
  static uint64_t last=0;
  const uint64_t tick=GetTickCount64(); if(tick-last<250) return; last=tick;
@@ -373,6 +406,8 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"ENGINE_DELAY_HEALTH queued=%llu released=%llu timeouts=%llu cancels=%llu",static_cast<unsigned long long>(engineDeferredCount.load()),static_cast<unsigned long long>(engineReleasedCount.load()),static_cast<unsigned long long>(engineTimeoutCount.load()),static_cast<unsigned long long>(engineDelayCancels.load()));Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"ENGINE_REQUEST_HEALTH total=%llu player=%llu",static_cast<unsigned long long>(engineRequestCalls.load()),static_cast<unsigned long long>(playerEngineRequestCalls.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"HEAD_VISIBILITY hidden_frames=%llu camera=%d valid=%d",static_cast<unsigned long long>(hiddenHeadFrames.load()),bodyCameraType.load(),bodyCameraValid.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"PLAYER_EXTERIOR candidate_controller=%p candidate_model=%p confirmed_model=%p matches=%llu hidden_frames=%llu mode=%d",reinterpret_cast<void*>(expectedPlayerDriverController.load()),reinterpret_cast<void*>(expectedPlayerDriverModel.load()),reinterpret_cast<void*>(confirmedPlayerDriverModel.load()),static_cast<unsigned long long>(playerDriverMatches.load()),static_cast<unsigned long long>(hiddenStockFrames.load()),bodyVisibilityMode.load());Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"BODY_VISIBILITY camera=%d valid=%d hide=%d hidden_frames=%llu faults=%llu",bodyCameraType.load(),bodyCameraValid.load()?1:0,hideBody.load()?1:0,static_cast<unsigned long long>(hiddenBodyFrames.load()),static_cast<unsigned long long>(visibilityFaults.load()));Log(SPF_LOG_INFO,text);
@@ -413,6 +448,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  if(!ReadModelPath(model,path) || std::strcmp(path,"/model/spf_stock_driver/driver.pmd"))return;
  uintptr_t expected=0,pointers[4]{};
  if(!SafeRead(model+0x1c0,&expected,8) || output!=expected || !SafeRead(arrays,pointers,sizeof(pointers)))return;
+ privateBodyTick.store(GetTickCount64());
  float arm[4]{},hand[4]{},handPosition[3]{};
  if(!SafeRead(pointers[2]+5*16,arm,sizeof(arm)) || !SafeRead(pointers[2]+7*16,hand,sizeof(hand)) || !SafeRead(pointers[3]+7*12,handPosition,sizeof(handPosition)))return;
  for(float value:arm)if(!std::isfinite(value))return;
@@ -420,6 +456,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  static thread_local LeftArmGestures gestures;
  static thread_local SignalMotion signal;static thread_local uint64_t seenSignal=0;
  static thread_local WindowGestureMotion rightMotion;
+ static thread_local uint64_t observedDelayCancels=0;
  static thread_local IgnitionMotion ignition;static thread_local uint64_t seenEngineStart=0;
  static thread_local uintptr_t priorModel=0;
  static thread_local uint64_t priorGeneration=0,priorTick=0;
@@ -439,12 +476,14 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  signal.Step(signalFresh,held,dt);
  const auto rightTick=rightGestureTick.load();
  const bool rightHeld=rightGestureHeld.load() && rightTick && now-rightTick<=250 && telTick && now-telTick<=250;
+ const auto cancels=engineDelayCancels.load();if(cancels!=observedDelayCancels){observedDelayCancels=cancels;ignition.active=false;seenEngineStart=engineStartSequence.load();}
  const auto engTick=engineTick.load(),engSequence=engineStartSequence.load();
  const bool engineFresh=engTick && now-engTick<=250 && telTick && now-telTick<=250;
  const bool pendingStart=engSequence!=seenEngineStart;
  rightMotion.Step(rightHeld && !pendingStart && ignition.reach==0 && !ignition.active,dt);
  if(pendingStart && rightMotion.reach==0){seenEngineStart=engSequence;if(engineFresh)ignition.Start();}
  ignition.Step(engineStarting.load(),engineFresh,dt);
+ const auto delayedSequence=deferredEngineSequence.load();
  const bool leftActive=gestures.horn.reach>0 || gestures.window.reach>0 || signal.reach>0,rightActive=rightMotion.reach>0 || ignition.reach>0;
  const bool elbowFresh=telTick && now-telTick<=250;
  const bool elbowActive=leftElbowInset.load()>0 && elbowFresh,rightElbowActive=rightElbowInset.load()>0 && elbowFresh;
@@ -500,6 +539,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    if(rightActive)for(const auto& target:kRightGestureTargets)std::memcpy(reinterpret_cast<void*>(pointers[2]+target.bone*16),rotations[target.bone].data(),16);
    if(rightMotion.reach>0)rightGestureOverrides.fetch_add(1);
    if(ignition.reach>0)ignitionOverrides.fetch_add(1);
+   if(delayedSequence && seenEngineStart==delayedSequence && ignition.reach>=1 && torsoApplied)engineKeyReached.store(delayedSequence);
    if(signal.reach>0)signalOverrides.fetch_add(1);
    if(gestures.horn.reach>0)hornOverrides.fetch_add(1);
    if(gestures.window.reach>0)windowGestureOverrides.fetch_add(1);
@@ -525,6 +565,34 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  if(privateHead){if(!CollapseDriverHead(palette))return;}else if(!CollapseDriverPalette(palette))return;
  __try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));if(privateBody)hiddenBodyFrames.fetch_add(1);if(playerStock)hiddenStockFrames.fetch_add(1);if(privateHead)hiddenHeadFrames.fetch_add(1);}
  __except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}
+}
+extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t immediate,uintptr_t returnAddress) noexcept {
+ if(!enabled.load())return false;engineRequestCalls.fetch_add(1);
+ const auto expected=expectedPlayerDriverController.load();
+ if(!expected || vehicle!=expected-0x1df0 || !expectedPlayerDriverModel.load())return false;
+ const auto sample=playerEngineRequestCalls.fetch_add(1)+1;
+ uint32_t state=99;unsigned char electric=0;
+ const bool valid=SafeRead(vehicle+0x1b8,&state,4) && state<=3 && SafeRead(vehicle+0x1bc,&electric,1) && electric<=1;
+ const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+ const bool manual=IsManualEngineStartCaller(base,returnAddress);
+ if(sample<=128){char message[256];std::snprintf(message,sizeof(message),"ENGINE_REQUEST player=1 start=%u immediate=%u state_before=%u electric=%u valid=%d manual=%d caller_rva=%llx sample=%llu",request&255u,immediate&255u,state,electric,valid?1:0,manual?1:0,static_cast<unsigned long long>(returnAddress-base),static_cast<unsigned long long>(sample));Log(SPF_LOG_INFO,message);}
+ if(!(request&255u)){
+  bool cancelled=false;{std::lock_guard lock(engineGateMutex);cancelled=engineStartGate.Cancel();}
+  if(cancelled){deferredEngineSequence.store(0);engineKeyReached.store(0);engineDelayCancels.fetch_add(1);Log(SPF_LOG_INFO,"ENGINE_DELAY cancelled by stop request.");}
+  return false;
+ }
+ const auto now=GetTickCount64(),tick=telemetryTick.load(),bodyTick=privateBodyTick.load();
+ if(!manual || !valid || state!=0 || (immediate&255u) || !electric || !tick || now-tick>250 || !bodyTick || now-bodyTick>250)return false;
+ bool queued=false;
+ {std::lock_guard lock(engineGateMutex);
+  if(engineStartGate.pending.vehicle==vehicle)return true;
+  if(engineStartGate.pending.vehicle)return false;
+  const auto sequence=engineStartSequence.fetch_add(1)+1;
+  queued=engineStartGate.Queue(vehicle,worldGeneration.load(),now,sequence);
+  if(queued){deferredEngineSequence.store(sequence);engineKeyReached.store(0);}
+ }
+ if(queued){engineDeferredCount.fetch_add(1);Log(SPF_LOG_INFO,"ENGINE_DELAY queued: engine held off while hand reaches key.");}
+ return queued;
 }
 extern "C" void CaptureDriver(uintptr_t controller) noexcept {
  currentDriver={}; currentGeneration=worldGeneration.load();

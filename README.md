@@ -1,16 +1,16 @@
 # ATS Visible First Person Driver Body
 
-Current validated release: **0.13.2 plugin + 0.7.0 body archive**. The user confirmed the original driver's head appears outside and stays out of the first-person VR view. Our animated body replaces only the player's stock exterior driver, leaving traffic instances outside the hide guard.
+Current validated release: **0.14.0 plugin + 0.7.0 body archive**. The user confirmed the original driver's head appears outside and stays out of the first-person VR view. Our animated body replaces only the player's stock exterior driver, leaving traffic instances outside the hide guard.
 
-The original 61-bone driver mesh supports live steering and re-grabs, accelerator/brake/clutch motion, game-bound horn and turn signals, ignition with torso lean and runtime arm IK, and independent hand gestures. Pose files and elbow offsets are editable live. The head is restored from the original installed game mesh; interior head hiding changes only the rendered palette. Materials and textures remain references to installed game assets. The Mustang is the validated vehicle; broader calibrations remain planned.
+The original 61-bone driver mesh supports live steering and re-grabs, accelerator/brake/clutch motion, game-bound horn and turn signals, ignition with torso lean, runtime arm IK and engine starting delayed until the hand reaches the key, and independent hand gestures. Pose files and elbow offsets are editable live. The head is restored from the original installed game mesh; interior head hiding changes only the rendered palette. Materials and textures remain references to installed game assets. The Mustang is the validated vehicle; broader calibrations remain planned.
 
 ## Install
 
-With ATS closed, install `releases/SPF_DriverAnimationDiagnostics-0.13.2-exterior-head-test.dll` under the existing `SPF_DriverAnimationDiagnostics.dll` name in the SPF plugin folder. Enable the plugin in SPF's Plugins panel. Replace the current body archive with `releases/ATS-VisibleDriverBody-Mustang-0.7.0-exterior-head-test.scs`, preserving the existing installed filename if the profile uses it. The current installation retains `ATS-VisibleDriverBody-Mustang-0.1.0.scs`; do not enable a duplicate archive.
+With ATS closed, install `releases/SPF_DriverAnimationDiagnostics-0.14.0-engine-delay-test.dll` under the existing `SPF_DriverAnimationDiagnostics.dll` name in the SPF plugin folder. Enable the plugin in SPF's Plugins panel. Replace the current body archive with `releases/ATS-VisibleDriverBody-Mustang-0.7.0-exterior-head-test.scs`, preserving the existing installed filename if the profile uses it. The current installation retains `ATS-VisibleDriverBody-Mustang-0.1.0.scs`; do not enable a duplicate archive.
 
 Keep the existing gesture, ignition, turn-signal and elbow files in the plugin config folder. Add `body_visibility.txt`: `replace-exterior` shows our full body outside and hides only the confirmed player stock driver; `interior` shows our body only in the interior camera. This setting reloads live.
 
-See [BODY_VISIBILITY.md](BODY_VISIBILITY.md), [EXTERIOR_HEAD.md](EXTERIOR_HEAD.md), [IGNITION.md](IGNITION.md), [TURN_SIGNALS.md](TURN_SIGNALS.md), and [LEFT_ELBOW.md](LEFT_ELBOW.md). Earlier release sections below are historical checkpoints; the 0.6.1 pedal alignment archive remains an uninstalled checkpoint.
+See [ENGINE_START_DELAY.md](ENGINE_START_DELAY.md), [BODY_VISIBILITY.md](BODY_VISIBILITY.md), [EXTERIOR_HEAD.md](EXTERIOR_HEAD.md), [IGNITION.md](IGNITION.md), [TURN_SIGNALS.md](TURN_SIGNALS.md), and [LEFT_ELBOW.md](LEFT_ELBOW.md). Earlier release sections below are historical checkpoints; the 0.6.1 pedal alignment archive remains an uninstalled checkpoint.
 
 ## Source and validation
 
