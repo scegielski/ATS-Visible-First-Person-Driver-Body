@@ -10,6 +10,8 @@
 #include "RuntimeArmIK.hpp"
 #include "SignalMotion.hpp"
 #include "SignalTargets.hpp"
+#include "BodyVisibility.hpp"
+#include "PlayerExteriorDriver.hpp"
 #include <fstream>
 #include "WindowGesture.hpp"
 #include "LiveGesturePose.hpp"
@@ -27,7 +29,7 @@ uintptr_t BoneObserveStub(uintptr_t,uintptr_t,uintptr_t,uintptr_t,uint32_t);
 uintptr_t DriverObserveStub(uintptr_t);
 uintptr_t AdvanceObserveStub(uintptr_t,uint32_t,float,uint64_t,uint64_t);
 }
-static int observedDriver=0,observedAdvance=0;
+static int observedDriver=0,observedAdvance=0,boneOriginalCalls=0,bonePostCalls=0;
 static uintptr_t recordedReturn=0;
 static bool replacePose=false;
 static void Check(bool result,const char* message) {
@@ -54,9 +56,36 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone observer register and stack forwarding");
 }
 static uintptr_t BoneOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) {
- Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone original arguments unchanged");return 123456;
+ Check(output==11 && bounds==22 && arrays==33 && bones==44 && count==61,"bone original arguments unchanged");++boneOriginalCalls;return 123456;
+}
+static double BoneFloatOriginal(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count){BoneOriginal(output,bounds,arrays,bones,count);return 42.25;}
+extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexcept {
+ Check(output==11 && bounds==22 && count==61,"post bone receives original output/model/count");
+ Check(boneOriginalCalls==bonePostCalls+1,"visibility runs after original hierarchy assembly");++bonePostCalls;volatile double clobber=1.25;clobber=std::sin(clobber);
 }
 int main() {
+ {
+ constexpr uintptr_t base=0x100000,game=0x200000,owner=0x300000,vt=0x400000,vehicle=0x500000,model=0x600000;bool wrong=false;
+ auto reader=[&](uintptr_t a,void* out,size_t n){uintptr_t value=0;if(a==base+0x36b8db0)value=game;else if(a==game+0xaa0)value=owner;else if(a==owner)value=vt;else if(a==vt+0x1b8)value=wrong?0:base+0x4d9c90;else if(a==owner+0x31b0)value=vehicle;else if(a==vehicle+0x1df8)value=model;else return false;if(n!=8)return false;std::memcpy(out,&value,8);return true;};
+ uintptr_t controller=0,candidate=0;Check(ReadPlayerExteriorDriver(base,reader,controller,candidate) && controller==vehicle+0x1df0 && candidate==model,"player exterior identity follows guarded vehicle owner");
+ Check(IsConfirmedPlayerDriver(controller,candidate,controller,candidate),"exact observed player driver matches");
+ Check(!IsConfirmedPlayerDriver(vehicle+0x2c8,candidate,controller,candidate),"traffic driver using same asset rejected");
+ Check(!IsConfirmedPlayerDriver(controller,model+8,controller,candidate),"different model instance rejected");
+ wrong=true;Check(!ReadPlayerExteriorDriver(base,reader,controller,candidate) && !controller && !candidate,"wrong owner cannot nominate exterior actor");
+ }
+
+ {
+ Check(!HideInteriorBody(true,2) && !HideInteriorBody(false,1),"interior camera and unknown camera retain body");
+ for(int camera:{0,1,3,4,5,6,7,9})Check(HideInteriorBody(true,camera),"exterior camera hides private body");
+ DriverPalette palette{};for(auto& matrix:palette){matrix[0]=matrix[5]=matrix[10]=matrix[15]=1;matrix[12]=1;matrix[13]=2;matrix[14]=3;}
+ auto headOnly=palette;Check(CollapseDriverHead(headOnly),"interior head collapse remains finite");
+ for(unsigned bone=0;bone<61;++bone)if(bone!=46 && bone!=47)Check(headOnly[bone]==palette[bone],"head hiding preserves body arms fingers and legs");
+ Check(headOnly[46][0]==0 && headOnly[47][0]==0 && headOnly[46]==headOnly[47],"head and neck collapse at shared finite anchor");
+ Check(CollapseDriverPalette(palette),"finite palette collapses safely");
+ for(auto& matrix:palette)Check(matrix[0]==0 && matrix[5]==0 && matrix[10]==0 && matrix[12]==1 && matrix[13]==2 && matrix[14]==3 && matrix[15]==1,"every skinned vertex maps to same finite point");
+ auto invalid=palette;invalid[4][2]=std::numeric_limits<float>::quiet_NaN();Check(!CollapseDriverPalette(invalid),"invalid palette rejected before writing");
+ }
+
  {
  SignalSelection input;Check(input.Sample(true,false,false)==0,"loaded active signal does not replay");
  Check(input.Sample(false,false,false)==0,"signal off does not act as new turn");
@@ -285,6 +314,10 @@ int main() {
  horn.Step(true,std::numeric_limits<float>::quiet_NaN());Check(horn.reach==0,"invalid time does not advance horn");
  gBoneOriginal=reinterpret_cast<void*>(BoneOriginal);
  Check(BoneObserveStub(11,22,33,44,61)==123456,"bone observer preserves return");
+ gBoneOriginal=reinterpret_cast<void*>(BoneFloatOriginal);
+ using FloatBoneCall=double(*)(uintptr_t,uintptr_t,uintptr_t,uintptr_t,uint32_t);
+ Check(reinterpret_cast<FloatBoneCall>(&BoneObserveStub)(11,22,33,44,61)==42.25,"post hook preserves floating return despite callback clobber");
+ gBoneOriginal=reinterpret_cast<void*>(BoneOriginal);
  gDriverOriginal=reinterpret_cast<void*>(DriverOriginal);
  gAdvanceOriginal=reinterpret_cast<void*>(AdvanceOriginal);
  Check(DriverObserveStub(0x12345678)==0xabcdef,"driver return value");

@@ -1,0 +1,17 @@
+{
+  "full_original_driver_mesh_restored": true,
+  "skeleton_byte_exact": true,
+  "base_archive_sha256": "ad28d3f168e808dfc559ce4ed5ff0bfa747ae04c0041574b7cc38ab27f6dde1b",
+  "head_mesh_sha256": "e42b475861c9777caa56840d3627918b6eb21633c42f2ce0439bd832f3652859",
+  "other_animation_and_attachment_files_byte_exact": true,
+  "archive_version": "0.7.0",
+  "visual_test_pending": false,
+  "plugin_version": "0.13.2",
+  "user_visual_validation_passed": true,
+  "user_feedback": "Okay, that worked",
+  "runtime_head_hidden_frames": 3326,
+  "runtime_player_driver_matches": 12312,
+  "runtime_stock_hidden_frames": 445,
+  "runtime_visibility_faults": 0,
+  "installed_release_files_byte_exact": true
+}

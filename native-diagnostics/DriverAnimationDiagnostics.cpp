@@ -5,6 +5,9 @@
 #include <SPF_Logger_API.h>
 #include <SPF_Telemetry_API.h>
 #include <SPF_TelemetryData.h>
+#include <SPF_Camera_API.h>
+#include "BodyVisibility.hpp"
+#include "PlayerExteriorDriver.hpp"
 #include "GameHorn.hpp"
 #include "GameEngine.hpp"
 #include "IgnitionMotion.hpp"
@@ -44,6 +47,13 @@ constexpr char kAdvancePattern[]="48 8B C4 55 41 57 48 81 EC 88 00 00 00 48 8B E
 constexpr char kBonePattern[]="48 8B C4 48 89 68 18 56 57 41 54 41 55 41 57 48 81 EC 00 02 00 00 8B AC 24 50 02 00 00 45 33 ED";
 SPF_Hook_Handle* boneHook=nullptr;
 std::atomic<bool> hornHeld{false};
+std::atomic<bool> bodyCameraValid{false},hideBody{false};
+std::atomic<int> bodyCameraType{-1};
+std::atomic<uint64_t> hiddenBodyFrames{0},visibilityFaults{0};
+std::atomic<int> bodyVisibilityMode{1};
+std::atomic<bool> hideStockDriver{false};
+std::atomic<uintptr_t> expectedPlayerDriverController{0},expectedPlayerDriverModel{0},confirmedPlayerDriverModel{0};
+std::atomic<uint64_t> playerDriverTick{0},playerDriverMatches{0},hiddenStockFrames{0},hiddenHeadFrames{0};
 std::atomic<uint64_t> boneSamples{0},hornOverrides{0},hornFaults{0};
 std::atomic<uint64_t> hornTick{0};
 std::atomic<bool> gameHornValid{false};
@@ -161,6 +171,7 @@ void TruckSignals(const SPF_TruckData* data,void*) {
  if(direction){signalDirection.store(direction);signalEventTick.store(GetTickCount64());signalSequence.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_EVENT direction=%s",direction==1?"left":"right");Log(SPF_LOG_INFO,text);}
 }
 void Reset() {
+ bodyCameraValid.store(false);hideBody.store(false);bodyCameraType.store(-1);hideStockDriver.store(false);expectedPlayerDriverController.store(0);expectedPlayerDriverModel.store(0);confirmedPlayerDriverModel.store(0);playerDriverTick.store(0);
  signalSelection.Reset();signalTick.store(0);signalEventTick.store(0);selectedLeft.store(false);selectedRight.store(false);
  worldGeneration.fetch_add(1);engineTick.store(0);engineStarting.store(false);priorEngineSample=-1;
  std::lock_guard lock(sampleMutex); ledger={}; modelObservations={};inspectedModels={};inspectedCount=0;
@@ -193,7 +204,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.12.1");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.13.2");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -265,6 +276,15 @@ void PollOneGestureFile(const wchar_t* filename,const char* hand,LiveGesturePose
  else std::snprintf(text,sizeof(text),"POSE_RELOAD hand=%s rejected: %s; last valid pose retained.",hand,error.c_str());
  Log(SPF_LOG_INFO,text);
 }
+void PollBodyVisibilityMode() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t path[32768]{};
+ if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollBodyVisibilityMode),&module) || !GetModuleFileNameW(module,path,32768))return;
+ auto filePath=std::filesystem::path(path).parent_path()/L"config"/L"body_visibility.txt";std::error_code ec;auto size=std::filesystem::file_size(filePath,ec);if(ec || size>64)return;
+ std::ifstream file(filePath);std::string value,extra;if(!(file>>value) || (file>>extra))return;
+ int mode=value=="interior"?0:value=="replace-exterior"?1:-1;
+ if(mode>=0 && mode!=bodyVisibilityMode.load()){bodyVisibilityMode.store(mode);Log(SPF_LOG_INFO,mode==0?"VISIBILITY_MODE interior":"VISIBILITY_MODE replace-exterior");}
+}
 void PollLeftElbowInset() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
  HMODULE module=nullptr;wchar_t modulePath[32768]{};
@@ -303,6 +323,10 @@ void BlendLiveIgnition(std::array<std::array<float,4>,61>& rotations,std::array<
 void BlendLiveSignal(std::array<std::array<float,4>,61>& rotations,const SignalMotion& motion) {const auto pose=motion.direction==1?liveSignalLeft.Snapshot():liveSignalRight.Snapshot();BlendWindowGesture(rotations,motion.Pose(),*pose);}
 void Update() {
  if(!enabled.load()) return;
+ PollBodyVisibilityMode();
+ SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
+ bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
+ uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
  PollGesturePoseFile();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
@@ -349,6 +373,9 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"HEAD_VISIBILITY hidden_frames=%llu camera=%d valid=%d",static_cast<unsigned long long>(hiddenHeadFrames.load()),bodyCameraType.load(),bodyCameraValid.load()?1:0);Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"PLAYER_EXTERIOR candidate_controller=%p candidate_model=%p confirmed_model=%p matches=%llu hidden_frames=%llu mode=%d",reinterpret_cast<void*>(expectedPlayerDriverController.load()),reinterpret_cast<void*>(expectedPlayerDriverModel.load()),reinterpret_cast<void*>(confirmedPlayerDriverModel.load()),static_cast<unsigned long long>(playerDriverMatches.load()),static_cast<unsigned long long>(hiddenStockFrames.load()),bodyVisibilityMode.load());Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"BODY_VISIBILITY camera=%d valid=%d hide=%d hidden_frames=%llu faults=%llu",bodyCameraType.load(),bodyCameraValid.load()?1:0,hideBody.load()?1:0,static_cast<unsigned long long>(hiddenBodyFrames.load()),static_cast<unsigned long long>(visibilityFaults.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"TURN_SIGNAL events=%llu overrides=%llu left=%d right=%d",static_cast<unsigned long long>(signalSequence.load()),static_cast<unsigned long long>(signalOverrides.load()),selectedLeft.load()?1:0,selectedRight.load()?1:0);Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"RIGHT_ELBOW updates=%llu rejected=%llu guide_inset_m=%.4f",static_cast<unsigned long long>(rightElbowUpdates.load()),static_cast<unsigned long long>(rightElbowRejected.load()),rightElbowInset.load());Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"LEFT_ELBOW updates=%llu rejected=%llu guide_inset_m=%.4f",static_cast<unsigned long long>(leftElbowUpdates.load()),static_cast<unsigned long long>(leftElbowRejected.load()),leftElbowInset.load());Log(SPF_LOG_INFO,text);
@@ -484,6 +511,21 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    static_cast<unsigned long long>(sample),count,hornHeld.load()?1:0,arm[0],arm[1],arm[2],arm[3],hand[0],hand[1],hand[2],hand[3],handPosition[0],handPosition[1],handPosition[2],reinterpret_cast<void*>(bones));Log(SPF_LOG_INFO,text);
  }
 }
+extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexcept {
+ if(!enabled.load() || visibilityFaults.load() || count!=61 || bounds<0x1e0)return;
+ const uintptr_t model=bounds-0x1e0;char path[192]{};uintptr_t expected=0;
+ if(!ReadModelPath(model,path) || !SafeRead(model+0x1c0,&expected,8) || output!=expected)return;
+ const bool privateModel=!std::strcmp(path,"/model/spf_stock_driver/driver.pmd");
+ const bool privateBody=hideBody.load() && privateModel;
+ const bool privateHead=privateModel && !privateBody && (!bodyCameraValid.load() || bodyCameraType.load()==2);
+ const auto now=GetTickCount64(),tick=playerDriverTick.load();
+ const bool playerStock=hideStockDriver.load() && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && tick && now-tick<=750 && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd");
+ if(!privateBody && !playerStock && !privateHead)return;
+ DriverPalette palette{};if(!SafeRead(output,palette.data(),sizeof(palette)))return;
+ if(privateHead){if(!CollapseDriverHead(palette))return;}else if(!CollapseDriverPalette(palette))return;
+ __try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));if(privateBody)hiddenBodyFrames.fetch_add(1);if(playerStock)hiddenStockFrames.fetch_add(1);if(privateHead)hiddenHeadFrames.fetch_add(1);}
+ __except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}
+}
 extern "C" void CaptureDriver(uintptr_t controller) noexcept {
  currentDriver={}; currentGeneration=worldGeneration.load();
  if(!enabled.load()) return;
@@ -494,7 +536,12 @@ extern "C" void CaptureDriver(uintptr_t controller) noexcept {
  std::memcpy(&sample.model,data+8,8);
  std::memcpy(&sample.index,data+0x10,4);
  std::memcpy(&sample.duration,data+0x14,4);
- if(ValidSample(sample)) currentDriver=sample;
+ if(ValidSample(sample)) {
+  currentDriver=sample;
+  if(IsConfirmedPlayerDriver(controller,sample.model,expectedPlayerDriverController.load(),expectedPlayerDriverModel.load())){
+   char path[192]{};if(ReadModelPath(sample.model,path) && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd")){confirmedPlayerDriverModel.store(sample.model);playerDriverTick.store(GetTickCount64());playerDriverMatches.fetch_add(1);}
+  }
+ }
 }
 // Invoke the same reset/enable sequence as the exterior driver's verified caller.
 // Only the saved XMM2 float is changed; the assembly stub forwards everything else,
