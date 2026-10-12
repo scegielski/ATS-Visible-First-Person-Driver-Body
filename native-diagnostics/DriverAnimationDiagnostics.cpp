@@ -18,6 +18,8 @@
 #include "SignalRequestGate.hpp"
 #include "SignalReplayGuard.hpp"
 #include "SignalTiming.hpp"
+#include "HeadTracking.hpp"
+#include "HeadTorso.hpp"
 #include "SignalTargets.hpp"
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
@@ -38,6 +40,7 @@
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
+void* gHeadOriginal=nullptr;void HeadObserveStub();
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 void SignalLeftRequestStub();void SignalRightRequestStub();
 void EngineRequestObserveStub();
@@ -71,6 +74,13 @@ std::atomic<bool> gameHornValid{false};
 SPF_KeyBinds_Handle* gestureKeys=nullptr;
 LiveGesturePose liveGesturePose;
 LiveGesturePose liveSignalLeft{kSignalLeftTargets},liveSignalRight{kSignalRightTargets};
+SPF_Hook_Handle* headHook=nullptr;
+constexpr char kHeadPattern[]="8B D8 85 C0 0F 89 9F 00 00 00 48 8B 46 58 48 85 C0 74 7E 48 8B 4E 10 48 85";
+std::mutex headMutex;ObservedHead latestHead{};
+std::atomic<uint64_t> headAccepted{0},headRejected{0},headTorsoUpdates{0},headTorsoRejected{0},exteriorHeadUpdates{0},exteriorHeadRejected{0};
+std::mutex headDriveMutex;HeadTorsoDrive headDrive{};SeatedHeadCalibration headCalibration;
+std::atomic<float> headForwardLimit{.30f},headLeanLimitDegrees{28.f},headLateralLimit{.24f};
+std::atomic<float> headTrackingGain{.65f},headTorsoError{0},headTorsoStrength{0};
 SignalSelection signalSelection;
 SignalRequestGate signalGate;std::mutex signalGateMutex;
 std::atomic<uint64_t> signalReady{0},signalCancels{0},signalQueued{0},signalReleased{0},signalTimeouts{0};
@@ -200,6 +210,7 @@ void TruckSignals(const SPF_TruckData* data,void*) {
  if(direction){signalDirection.store(direction);signalEventTick.store(GetTickCount64());signalSequence.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_EVENT direction=%s",direction==1?"left":"right");Log(SPF_LOG_INFO,text);}
 }
 void Reset() {
+ headCalibration.Reset();{std::lock_guard lock(headDriveMutex);headDrive={};}
  {std::lock_guard lock(signalGateMutex);signalGate.Cancel();}
  signalReady.store(0);skipSignalDirection.store(0);signalCancels.fetch_add(1);
  {std::lock_guard lock(engineGateMutex);engineStartGate.Cancel();}
@@ -237,7 +248,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.15.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.16.4");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -245,6 +256,7 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
  api->Policy_AddConfigurableSystem(h,"logging");
  api->Defaults_SetLogging(h,"info",true);
  api->Policy_AddConfigurableSystem(h,"keybinds");
+ api->Defaults_AddKeybind(h,"HeadTracking","Recenter","keyboard","KEY_F8","always");
  api->Defaults_AddKeybind(h,"Gestures","LeftWindowBird","keyboard","KEY_F10","always");
  api->Defaults_AddKeybind(h,"Gestures","RightHandBird","keyboard","KEY_F11","always");
 
@@ -268,6 +280,8 @@ void Activated(const SPF_Core_API* api) {
  if(hooks->Hook_FindPattern(kEngineRequestPattern)!=base+0x5e4a20){Log(SPF_LOG_ERROR,"ENGINE_REQUEST: signature mismatch; diagnostic disabled.");return;}
  if(hooks->Hook_FindPattern(kBonePattern)!=base+0x15dfbf0) {Log(SPF_LOG_ERROR,"HORN: bone entry signature mismatch; diagnostic disabled.");return;}
  if(hooks->Hook_FindPattern(kSignalLeftPattern)!=base+0x9f85e2 || hooks->Hook_FindPattern(kSignalRightPattern)!=base+0x9f8670){Log(SPF_LOG_ERROR,"SIGNAL_DELAY: input-site signature mismatch; no hooks registered.");return;}
+ if(hooks->Hook_FindPattern(kHeadPattern)==base+0x1632dde)headHook=hooks->Hook_Register(kName,"HeadTrackingObserver","Observe local-space OpenXR head views",reinterpret_cast<void*>(HeadObserveStub),&gHeadOriginal,kHeadPattern,true);
+ else Log(SPF_LOG_WARN,"HEAD_TRACKING: view-site signature mismatch; observer disabled.");
  expectedReturn=base+0x9e1d92;
  resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15de620);
  enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15decc0);
@@ -397,13 +411,51 @@ void PollDeferredEngineStart(bool engineValid,PlayerEngineState state) {
  engineReleasedCount.fetch_add(1);if(outcome==EngineStartGate::Timeout)engineTimeoutCount.fetch_add(1);
  char message[192];std::snprintf(message,sizeof(message),"ENGINE_DELAY released reason=%s delay_ms=%llu state_after=%u",outcome==EngineStartGate::KeyReached?"key-reached":"timeout",static_cast<unsigned long long>(now-request.created),after);Log(SPF_LOG_INFO,message);
 }
+void PollHeadTrackingLimits() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollHeadTrackingLimits),&module) || !GetModuleFileNameW(module,name,32768))return;
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"head_tracking_limits.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>256)return;
+ std::ifstream file(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
+ HeadTrackingLimits limits;if(!ParseHeadTrackingLimits(text,limits))return;
+ const bool changed=limits.forward!=headForwardLimit.load() || limits.degrees!=headLeanLimitDegrees.load() || limits.lateral!=headLateralLimit.load();headForwardLimit.store(limits.forward);headLeanLimitDegrees.store(limits.degrees);headLateralLimit.store(limits.lateral);
+ if(changed){char message[160];std::snprintf(message,sizeof(message),"HEAD_LIMITS_RELOAD forward_m=%.3f max_lean_degrees=%.1f lateral_m=%.3f",limits.forward,limits.degrees,limits.lateral);Log(SPF_LOG_INFO,message);}
+}
+void PollHeadTrackingGain() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollHeadTrackingGain),&module) || !GetModuleFileNameW(module,name,32768))return;
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"head_tracking_gain.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
+ std::ifstream file(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>1)return;
+ if(headTrackingGain.exchange(value)!=value)Log(SPF_LOG_INFO,"HEAD_TORSO live gain accepted.");
+}
+HeadTorsoDrive SnapshotHeadDrive(){std::lock_guard lock(headDriveMutex);return headDrive;}
+void UpdateHeadTorso() {
+ static uint64_t previous=0;static bool wasRecenter=false;const auto now=GetTickCount64();float dt=previous?static_cast<float>(now-previous)/1000.f:0;previous=now;
+ ObservedHead pose;{std::lock_guard lock(headMutex);pose=latestHead;}
+ const auto controls=telemetryTick.load(),body=privateBodyTick.load();
+ const bool interior=bodyCameraValid.load() && bodyCameraType.load()==2;
+ const bool cameraKnown=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9;
+ const bool fresh=cameraKnown && pose.tick && now-pose.tick<=250 && (pose.flags&15)==15 && controls && now-controls<=250 && body && now-body<=250;
+ bool recenter=gestureKeys && core->keybinds->Kbind_GetActionValue(gestureKeys,"HeadTracking.Recenter")>.5f;
+ if(!cameraKnown){headCalibration.filtered={};}
+ else if(headCalibration.Step(pose,worldGeneration.load(),now,fresh,recenter && !wasRecenter,dt,headTrackingGain.load(),headForwardLimit.load(),headLateralLimit.load(),interior))Log(SPF_LOG_INFO,"HEAD_TORSO seated calibration captured.");
+ wasRecenter=recenter;{std::lock_guard lock(headDriveMutex);headDrive=headCalibration.filtered;}
+}
+void PollObservedHead() {
+ static uint64_t last=0,generation=0;static ObservedHead baseline{};
+ const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ ObservedHead pose;{std::lock_guard lock(headMutex);pose=latestHead;}
+ if(!pose.tick || now-pose.tick>250 || !bodyCameraValid.load() || bodyCameraType.load()!=2)return;
+ if(generation!=worldGeneration.load() || baseline.space!=pose.space){baseline=pose;generation=worldGeneration.load();Log(SPF_LOG_INFO,"HEAD_TRACKING baseline captured in interior camera; observation only.");}
+ char text[384];std::snprintf(text,sizeof(text),"HEAD_TRACKING valid=1 samples=%llu rejected=%llu flags=%llu position_m=%.4f,%.4f,%.4f delta_m=%.4f,%.4f,%.4f quat_xyzw=%.5f,%.5f,%.5f,%.5f",static_cast<unsigned long long>(headAccepted.load()),static_cast<unsigned long long>(headRejected.load()),static_cast<unsigned long long>(pose.flags),pose.position[0],pose.position[1],pose.position[2],pose.position[0]-baseline.position[0],pose.position[1]-baseline.position[1],pose.position[2]-baseline.position[2],pose.orientation[0],pose.orientation[1],pose.orientation[2],pose.orientation[3]);Log(SPF_LOG_INFO,text);
+}
 void Update() {
  if(!enabled.load()) return;
  PollBodyVisibilityMode();
+ PollObservedHead();
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
- PollGesturePoseFile();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
+ PollGesturePoseFile();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
  if(engineValid){const int value=static_cast<int>(engineState);if(priorEngineSample>=0 && priorEngineSample!=1 && value==1){if(!skipNextEngineStartEvent.exchange(false))engineStartSequence.fetch_add(1);}priorEngineSample=value;}else priorEngineSample=-1;
@@ -450,6 +502,8 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"EXTERIOR_HEAD_TRACKING updates=%llu rejected=%llu",static_cast<unsigned long long>(exteriorHeadUpdates.load()),static_cast<unsigned long long>(exteriorHeadRejected.load()));Log(SPF_LOG_INFO,text);
+  std::snprintf(text,sizeof(text),"HEAD_TORSO updates=%llu rejected=%llu strength=%.4f hand_error_m=%.6f",static_cast<unsigned long long>(headTorsoUpdates.load()),static_cast<unsigned long long>(headTorsoRejected.load()),headTorsoStrength.load(),headTorsoError.load());Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"SIGNAL_DELAY_HEALTH queued=%llu released=%llu timeouts=%llu cancels=%llu",static_cast<unsigned long long>(signalQueued.load()),static_cast<unsigned long long>(signalReleased.load()),static_cast<unsigned long long>(signalTimeouts.load()),static_cast<unsigned long long>(signalCancels.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"ENGINE_DELAY_HEALTH queued=%llu released=%llu timeouts=%llu cancels=%llu",static_cast<unsigned long long>(engineDeferredCount.load()),static_cast<unsigned long long>(engineReleasedCount.load()),static_cast<unsigned long long>(engineTimeoutCount.load()),static_cast<unsigned long long>(engineDelayCancels.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"ENGINE_REQUEST_HEALTH total=%llu player=%llu",static_cast<unsigned long long>(engineRequestCalls.load()),static_cast<unsigned long long>(playerEngineRequestCalls.load()));Log(SPF_LOG_INFO,text);
@@ -531,9 +585,12 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  ignition.Step(engineStarting.load(),engineFresh,dt);
  const auto delayedSequence=deferredEngineSequence.load();
  const bool leftActive=gestures.horn.reach>0 || gestures.window.reach>0 || signal.reach>0,rightActive=rightMotion.reach>0 || ignition.reach>0;
+ const HeadTorsoDrive trackedHead=SnapshotHeadDrive();
+ const bool headTorsoActive=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9 && trackedHead.tick && now-trackedHead.tick<=250 && (DriverIK::Length(trackedHead.delta)>1e-5f || std::abs(trackedHead.yaw)>1e-5f);
+  const bool exteriorHeadActive=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9 && bodyCameraType.load()!=2 && trackedHead.tick && now-trackedHead.tick<=250;
  const bool elbowFresh=telTick && now-telTick<=250;
  const bool elbowActive=leftElbowInset.load()>0 && elbowFresh,rightElbowActive=rightElbowInset.load()>0 && elbowFresh;
- if((leftActive || rightActive || elbowActive || rightElbowActive) && !hornFaults.load()) {
+ if((leftActive || rightActive || elbowActive || rightElbowActive || headTorsoActive || exteriorHeadActive) && !hornFaults.load()) {
   std::array<std::array<float,4>,61> rotations{};
   if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
   for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
@@ -543,6 +600,9 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   BlendLiveRightGesture(rotations,rightMotion);
   DriverIK::Pose unturned{};
   if(ignition.reach>0)BlendLiveIgnition(rotations,unturned,ignition);
+  DriverIK::Positions headPositions{};DriverIK::Q headNeutralWorld{1,0,0,0};
+  bool headPositionsValid=exteriorHeadActive && SafeRead(pointers[3],headPositions.data(),sizeof(headPositions));
+  if(headPositionsValid)headNeutralWorld=DriverIK::FK(rotations,headPositions).q[47];
   bool torsoApplied=false;
   if(ignition.reach>0){
    DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};
@@ -560,6 +620,15 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
     torsoApplied=degrees>0;runtimeIKUpdates.fetch_add(1);runtimeIKDegrees.store(degrees);runtimeIKError.store(error);
    }else{runtimeIKRejected.fetch_add(1);runtimeIKDegrees.store(0);}
   }
+  bool headTorsoApplied=false;
+  if(headTorsoActive){
+   DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};bool unitScale=SafeRead(pointers[1],scales.data(),sizeof(scales));
+   if(unitScale)for(const auto& scale:scales)for(float value:scale)if(!std::isfinite(value) || std::abs(value-1.f)>.001f)unitScale=false;
+   float strength=0,error=0;
+   if(unitScale && SafeRead(pointers[3],positions.data(),sizeof(positions)) && DriverIK::TrackHeadTorso(rotations,positions,trackedHead.delta,trackedHead.yaw,strength,error,headLeanLimitDegrees.load())){
+    headTorsoApplied=strength>0;headTorsoUpdates.fetch_add(1);headTorsoStrength.store(strength);headTorsoError.store(error);
+   }else headTorsoRejected.fetch_add(1);
+  }
   bool elbowApplied=false;
   if(elbowActive){
    DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};bool valid=true;float error=0;
@@ -574,10 +643,16 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    if(valid)for(const auto& scale:scales)for(float value:scale)if(!std::isfinite(value) || std::abs(value-1.f)>.001f)valid=false;
    if(valid && SafeRead(pointers[3],positions.data(),sizeof(positions)) && DriverIK::InsetRightElbow(rotations,positions,rightElbowInset.load(),error)){rightElbowApplied=true;rightElbowUpdates.fetch_add(1);}else rightElbowRejected.fetch_add(1);
   }
+  bool exteriorHeadApplied=false;
+  if(headPositionsValid){
+   if(DriverIK::ApplyTrackedHead(rotations,headPositions,trackedHead.headRotation,headNeutralWorld)){exteriorHeadApplied=true;exteriorHeadUpdates.fetch_add(1);}else exteriorHeadRejected.fetch_add(1);
+  }
   __try {
    if(rightElbowApplied)for(unsigned bone: {26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(elbowApplied)for(unsigned bone: {5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
-   if(torsoApplied){
+   if(exteriorHeadApplied)for(unsigned bone:{46u,47u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if(headTorsoApplied)for(unsigned bone:{5u,6u,7u,26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if(torsoApplied || headTorsoApplied){
     for(unsigned bone=1;bone<=3;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
     for(unsigned bone: {5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    }
@@ -612,6 +687,12 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  if(privateHead){if(!CollapseDriverHead(palette))return;}else if(!CollapseDriverPalette(palette))return;
  __try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));if(privateBody)hiddenBodyFrames.fetch_add(1);if(playerStock)hiddenStockFrames.fetch_add(1);if(privateHead)hiddenHeadFrames.fetch_add(1);}
  __except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}
+}
+extern "C" void CaptureHeadViews(uintptr_t pointer,uint32_t count,uint64_t flags,int32_t result,uintptr_t info) noexcept {
+ if(!enabled.load())return;
+ std::array<ObservedXRView,2> views{};ObservedXRLocate locate{};ObservedHead pose;
+ if(result<0 || count!=2 || !SafeRead(pointer,views.data(),sizeof(views)) || !SafeRead(info,&locate,sizeof(locate)) || !HeadFromStereo(views,flags,locate,pose)){headRejected.fetch_add(1);return;}
+ pose.tick=GetTickCount64();{std::lock_guard lock(headMutex);latestHead=pose;}headAccepted.fetch_add(1);
 }
 extern "C" unsigned char CaptureSignalRequest(uintptr_t vehicle,uint32_t side,uint32_t input) noexcept {
  const unsigned char edge=static_cast<unsigned char>(input);

@@ -1,0 +1,40 @@
+{
+  "read_only_observer_runtime_validated": true,
+  "torso_animation_enabled": true,
+  "samples_at_last_record": 6726,
+  "rejected_at_last_record": 0,
+  "view_state_flags_observed": [
+    15
+  ],
+  "position_span_m": [
+    0.438,
+    0.1436,
+    0.3927
+  ],
+  "quaternion_component_span": [
+    0.66117,
+    1.32189,
+    0.35633000000000004,
+    0.2940999999999999
+  ],
+  "observation": "Position changes in all three axes and orientation changes captured during user movement test. Exact movement timing is not independently annotated.",
+  "recenter_and_cabin_calibration_pending": true,
+  "version": "0.16.4",
+  "user_approved_for_commit": true,
+  "interior_torso_validated": true,
+  "exterior_torso_validated": true,
+  "exterior_head_validated": true,
+  "final_torso_updates": 10373,
+  "final_torso_rejected": 0,
+  "last_hand_error_m": 3e-06,
+  "final_exterior_head_updates": 7656,
+  "final_exterior_head_rejected": 0,
+  "gain": 1.0,
+  "forward_limit_m": 0.3,
+  "lateral_limit_m": 0.24,
+  "max_lean_degrees": 28,
+  "recenter_action": "SPF HeadTracking.Recenter, default F8",
+  "game_recenter_integration_pending": true,
+  "tests_passed": true,
+  "installed_release_and_configs_byte_exact": true
+}

@@ -13,6 +13,8 @@
 #include "SignalRequestGate.hpp"
 #include "SignalReplayGuard.hpp"
 #include "SignalTiming.hpp"
+#include "HeadTracking.hpp"
+#include "HeadTorso.hpp"
 #include "SignalTargets.hpp"
 #include "BodyVisibility.hpp"
 #include "PlayerExteriorDriver.hpp"
@@ -28,6 +30,7 @@
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
+void* gHeadOriginal=nullptr;
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 uintptr_t EngineRequestObserveStub(uintptr_t,uint32_t,uint32_t,uint64_t,uint64_t);
 void* gAdvanceOriginal=nullptr;
@@ -59,6 +62,13 @@ extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t
  Check(vehicle==0x12345678 && request==0xabcdef01 && immediate==0xfedcba00,"engine observer preserves full register arguments");Check(caller!=0,"engine gate receives original return address");return suppressEngine;
 }
 extern "C" unsigned char CaptureSignalRequest(uintptr_t vehicle,uint32_t side,uint32_t input) noexcept {Check(vehicle==123 && side==signalTestSide && input==0x55667701,"signal mid-function callback arguments");return signalReplacement;}
+extern "C" uintptr_t HeadTestEntry(uintptr_t,uint32_t,uint64_t,int32_t);
+extern "C" void HeadTestContinuation();
+extern "C" void CaptureHeadViews(uintptr_t views,uint32_t count,uint64_t flags,int32_t result,uintptr_t locate) noexcept {
+ const auto* info=reinterpret_cast<const ObservedXRLocate*>(locate);
+ Check(views==123 && count==2 && flags==15 && result==-3,"head observer reads native output registers and frame offsets");
+ Check(info->type==6 && info->displayTime==42 && info->space==456,"head observer forwards locate info as fifth callback argument");
+}
 static uintptr_t EngineOriginal(uintptr_t vehicle,uint32_t request,uint32_t immediate,uint64_t fourth,uint64_t fifth){
  Check(vehicle==0x12345678 && request==0xabcdef01 && immediate==0xfedcba00 && fourth==0x11223344 && fifth==0x55667788,"engine original receives unchanged arguments including stack");++engineOriginalCalls;return 0x987654;
 }
@@ -82,6 +92,14 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  Check(boneOriginalCalls==bonePostCalls+1,"visibility runs after original hierarchy assembly");++bonePostCalls;volatile double clobber=1.25;clobber=std::sin(clobber);
 }
 int main() {
+ gHeadOriginal=reinterpret_cast<void*>(HeadTestContinuation);Check(HeadTestEntry(123,2,15,-3)==static_cast<uint32_t>(-3),"head observer preserves OpenXR result for game continuation");
+ std::array<ObservedXRView,2> xrViews{};for(auto& view:xrViews){view.type=7;view.orientation={0,0,0,1};view.position={0,1.6f,-.2f};}
+ xrViews[0].position[0]=-.032f;xrViews[1].position[0]=.032f;ObservedXRLocate xrInfo{};xrInfo.type=6;xrInfo.displayTime=1;xrInfo.space=123;ObservedHead xrHead;
+ Check(HeadFromStereo(xrViews,15,xrInfo,xrHead) && std::abs(xrHead.position[0])<1e-6 && xrHead.position[1]==1.6f,"stereo eye midpoint yields head position");
+ xrViews[1].orientation={0,0,0,-1};Check(HeadFromStereo(xrViews,3,xrInfo,xrHead) && std::abs(xrHead.orientation[3]-1)<1e-6,"opposite quaternion signs average correctly");
+ Check(!HeadFromStereo(xrViews,1,xrInfo,xrHead),"untracked position is rejected");
+ xrViews[1].position[0]=1;Check(!HeadFromStereo(xrViews,3,xrInfo,xrHead),"implausible stereo separation rejected");
+
 
  uint64_t signalSaved[3]{};gSignalLeftOriginal=gSignalRightOriginal=reinterpret_cast<void*>(SignalTestContinuation);
  signalTestSide=1;signalReplacement=0;
@@ -108,6 +126,24 @@ int main() {
  Check(normalStalk.reach==slowStalk.reach && normalStalk.phase==SignalMotion::Actuate && slowStalk.phase==SignalMotion::Actuate,"stalk slowdown preserves reach timing");
  for(int i=0;i<8;++i){normalStalk.Step(true,false,.01f,.12f);slowStalk.Step(true,false,.01f,.16f);}
  Check(slowStalk.press<normalStalk.press && slowStalk.reach==1,"only stalk actuation moves more slowly");
+ SeatedHeadCalibration calibration;ObservedHead seated;seated.space=10;seated.orientation={0,0,0,1};seated.flags=15;seated.position={0,1.6f,0};
+ Check(calibration.Step(seated,1,100,true,false,.01f,.65f),"initial seated head calibration");
+ seated.position[0]=.2f;calibration.Step(seated,1,110,true,false,.05f,.65f);Check(calibration.filtered.delta[0]>0 && calibration.filtered.delta[0]<.12f,"head translation gain clamp and smoothing");
+ Check(calibration.Step(seated,1,120,true,true,.01f,.65f) && DriverIK::Length(calibration.filtered.delta)==0,"recenter zeroes neutral offset");
+ seated.space=11;Check(calibration.Step(seated,1,130,true,false,.01f,.65f),"reference-space change recalibrates");
+ SeatedHeadCalibration exteriorCalibration;ObservedHead exteriorHead;exteriorHead.space=22;exteriorHead.orientation={0,0,0,1};exteriorHead.flags=15;
+ Check(!exteriorCalibration.Step(exteriorHead,1,100,true,false,.05f,1,.3f,.24f,false) && !exteriorCalibration.baseline.space,"exterior startup waits for seated baseline");
+ Check(exteriorCalibration.Step(exteriorHead,1,110,true,false,.05f,1,.3f,.24f,true),"interior establishes seated baseline");
+ exteriorHead.position[2]=-.2f;
+ Check(!exteriorCalibration.Step(exteriorHead,1,120,true,false,.05f,1,.3f,.24f,false) && exteriorCalibration.filtered.delta[2]<0,"external view retains neutral and tracks lean");
+ exteriorHead.space=23;exteriorCalibration.Step(exteriorHead,1,130,true,false,.05f,1,.3f,.24f,false);Check(!exteriorCalibration.baseline.space,"changed tracking space cannot reuse exterior baseline");
+ Check(exteriorCalibration.Step(exteriorHead,1,140,true,true,.05f,1,.3f,.24f,false),"explicit recenter available in exterior view");
+ HeadTrackingLimits lateralLimits;
+ Check(ParseHeadTrackingLimits("forward_m 0.30 max_lean_degrees 28 lateral_m 0.24",lateralLimits) && lateralLimits.lateral==.24f,"live sideways limit accepted");
+ Check(!ParseHeadTrackingLimits("forward_m 0.30 max_lean_degrees 28 lateral_m 1",lateralLimits),"invalid sideways limit rejected");
+ HeadTrackingLimits limits;
+ Check(ParseHeadTrackingLimits("forward_m 0.30\nmax_lean_degrees 28\n",limits) && limits.forward==.30f && limits.degrees==28,"live head limits parse");
+ Check(!ParseHeadTrackingLimits("forward_m 9 max_lean_degrees 28",limits) && !ParseHeadTrackingLimits("forward_m 0.3 max_lean_degrees nan",limits),"invalid head limits retain accepted setting");
  SignalRequestGate sg;
  Check(sg.Step(123,1,100,true,0,1,true,0,10)==1,"left signal queued");
  Check(sg.Step(123,1,200,true,0,1,false,0,11)==0,"no signal before hand arrival");
@@ -183,6 +219,14 @@ int main() {
  for(unsigned frame=0;frame<47;++frame){
   DriverIK::Pose pose{};DriverIK::Positions positions{};
   for(unsigned bone=0;bone<61;++bone){float values[14]{};source.seekg(offset+(frame*61+bone)*56);source.read(reinterpret_cast<char*>(values),56);Check(static_cast<bool>(source),"runtime IK fixture read");for(unsigned i=0;i<4;++i)pose[bone][i]=values[4+i];for(unsigned i=0;i<3;++i){positions[bone][i]=values[8+i];Check(std::abs(values[11+i]-1.f)<.001f,"stock rig uses unit scale");}}
+  for(DriverIK::V delta: {DriverIK::V{.08f,0,0},DriverIK::V{-.08f,0,0},DriverIK::V{0,0,-.10f},DriverIK::V{0,0,.04f}}){
+   auto candidate=pose;auto before=DriverIK::FK(candidate,positions);float strength,error;
+   Check(DriverIK::TrackHeadTorso(candidate,positions,delta,.08f,strength,error),"head torso compensation solves across steering range");
+   auto after=DriverIK::FK(candidate,positions);
+   Check(DriverIK::Length(DriverIK::Sub(after.p[7],before.p[7]))<.001f && DriverIK::Length(DriverIK::Sub(after.p[28],before.p[28]))<.001f,"both wrists retain live steering positions");
+   for(unsigned bone=0;bone<61;++bone)if(bone!=1 && bone!=2 && bone!=3 && bone!=5 && bone!=6 && bone!=7 && bone!=26 && bone!=27 && bone!=28)Check(candidate[bone]==pose[bone],"head tracking preserves hips legs fingers and other joints");
+   for(unsigned bone:{7u,28u})Check(std::abs(DriverIK::Dot({after.q[bone][1],after.q[bone][2],after.q[bone][3]},{before.q[bone][1],before.q[bone][2],before.q[bone][3]})+after.q[bone][0]*before.q[bone][0])>.9999f,"head compensation preserves hand orientation");
+  }
   for(unsigned mode=0;mode<3;++mode){
    auto candidate=pose;if(mode==1)BlendWindowGesture(candidate,{1,1,1},kRightGestureTargets);if(mode==2)BlendWindowGesture(candidate,{1,1,1},kIgnitionTargets);
    auto before=DriverIK::FK(candidate,positions);float error;
@@ -204,6 +248,39 @@ int main() {
    Check(DriverIK::InsetLeftElbow(candidate,positions,.06f,error),"signal pose supports inward elbow correction");
    auto after=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(after.p[7],before.p[7]))<.001f,"signal elbow retains stalk target");
    for(unsigned i=25;i<61;++i)Check(candidate[i]==pose[i],"signal leaves right arm and pedals unchanged");
+  }
+  {
+   auto expanded=pose;auto before=DriverIK::FK(expanded,positions);float strength,error;
+   Check(DriverIK::TrackHeadTorso(expanded,positions,{0,0,-.30f},0,strength,error,28),"expanded forward torso range solves through steering");
+   auto after=DriverIK::FK(expanded,positions);
+   for(unsigned hand:{7u,28u})Check(DriverIK::Length(DriverIK::Sub(after.p[hand],before.p[hand]))<.001f,"expanded torso range keeps hand targets fixed");
+  }
+  for(float side:{-.24f,.24f}){
+   auto wide=pose;auto before=DriverIK::FK(wide,positions);float strength,error;
+   Check(DriverIK::TrackHeadTorso(wide,positions,{side,0,0},0,strength,error,28),"expanded sideways lean solves across steering range");
+   auto after=DriverIK::FK(wide,positions);for(unsigned hand:{7u,28u})Check(DriverIK::Length(DriverIK::Sub(after.p[hand],before.p[hand]))<.001f,"expanded sideways range preserves hand targets");
+  }
+  for(DriverIK::Q turn:{DriverIK::Q{.9659258f,0,.258819f,0},DriverIK::Q{.9659258f,.258819f,0,0},DriverIK::Q{.9659258f,0,0,.258819f}}){
+   auto candidate=pose;auto originalHead=DriverIK::FK(candidate,positions).q[47];float strength,error;
+   Check(DriverIK::TrackHeadTorso(candidate,positions,{.06f,0,-.12f},.08f,strength,error,28),"torso fixture for exterior head");auto before=candidate;
+   Check(DriverIK::ApplyTrackedHead(candidate,positions,turn,originalHead),"exterior neck and head tracking applies");
+   auto after=DriverIK::FK(candidate,positions);auto expected=DriverIK::Product(turn,originalHead);float dot=0;for(unsigned j=0;j<4;++j)dot+=after.q[47][j]*expected[j];Check(std::abs(dot)>.9999f,"head world rotation follows HMD without duplicate torso rotation");
+   for(unsigned bone=0;bone<61;++bone)if(bone!=46 && bone!=47)Check(candidate[bone]==before[bone],"head animation preserves arms fingers torso and legs");
+  }
+  for(unsigned mode=0;mode<6;++mode){
+   auto candidate=pose;
+   if(mode==1)BlendHornPose(candidate,{1,1});
+   if(mode==2)BlendWindowGesture(candidate,{1,1,1},kWindowGestureTargets);
+   if(mode==3)BlendWindowGesture(candidate,{1,1,1},kRightGestureTargets);
+   if(mode==4)BlendWindowGesture(candidate,{1,1,1},kSignalLeftTargets);
+   if(mode==5){BlendWindowGesture(candidate,{1,1,1},kIgnitionTargets);float d,e;Check(DriverIK::LeanAndCompensate(candidate,positions,1,d,e,.1524f),"ignition fixture before head compensation");}
+   auto before=DriverIK::FK(candidate,positions);float strength,error;auto original=candidate;
+   const bool solved=DriverIK::TrackHeadTorso(candidate,positions,{.04f,0,-.04f},.05f,strength,error);
+   Check(solved,"head lean combines with horn gestures signals and ignition");
+   auto after=DriverIK::FK(candidate,positions);
+   for(unsigned hand:{7u,28u})Check(DriverIK::Length(DriverIK::Sub(after.p[hand],before.p[hand]))<.001f,"head lean retains existing action targets");
+   for(unsigned finger=8;finger<=22;++finger)Check(candidate[finger]==original[finger],"head lean retains active left finger shape");
+   for(unsigned finger=29;finger<=43;++finger)Check(candidate[finger]==original[finger],"head lean retains active right finger shape");
   }
   for(unsigned turnStep=0;turnStep<=10;++turnStep){
    auto unturned=pose,turning=pose;BlendWindowGesture(unturned,{1,1,0},kIgnitionTargets);BlendWindowGesture(turning,{1,1,turnStep/10.f},kIgnitionTargets);
@@ -233,6 +310,7 @@ int main() {
  }
  auto pose=kDriverReferenceRotations;auto badPositions=kDriverLocalPositions;badPositions[7][0]=std::numeric_limits<float>::quiet_NaN();float degrees,error;
  Check(!DriverIK::LeanAndCompensate(pose,badPositions,1,degrees,error) && pose==kDriverReferenceRotations,"invalid runtime IK input leaves pose unchanged");
+ auto headInvalid=pose;float headStrength,headError;Check(!DriverIK::TrackHeadTorso(headInvalid,kDriverLocalPositions,{std::numeric_limits<float>::quiet_NaN(),0,0},0,headStrength,headError) && headInvalid==pose,"invalid head target leaves skeleton unchanged");
  auto before=pose;Check(!DriverIK::Solve(pose,kDriverLocalPositions,5,6,7,{100,100,100},{1,0,0,0},{0,1,0}) && pose==before,"unreachable IK target fails without mutation");
  }
 
