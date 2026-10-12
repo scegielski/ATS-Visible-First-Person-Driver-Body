@@ -15,6 +15,9 @@
 #include "IgnitionTargets.hpp"
 #include "RuntimeArmIK.hpp"
 #include "SignalMotion.hpp"
+#include "SignalRequestGate.hpp"
+#include "SignalReplayGuard.hpp"
+#include "SignalTiming.hpp"
 #include "SignalTargets.hpp"
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
@@ -35,6 +38,8 @@
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
+void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
+void SignalLeftRequestStub();void SignalRightRequestStub();
 void EngineRequestObserveStub();
 void* gAdvanceOriginal=nullptr;
 void* gBoneOriginal=nullptr;
@@ -67,6 +72,13 @@ SPF_KeyBinds_Handle* gestureKeys=nullptr;
 LiveGesturePose liveGesturePose;
 LiveGesturePose liveSignalLeft{kSignalLeftTargets},liveSignalRight{kSignalRightTargets};
 SignalSelection signalSelection;
+SignalRequestGate signalGate;std::mutex signalGateMutex;
+std::atomic<uint64_t> signalReady{0},signalCancels{0},signalQueued{0},signalReleased{0},signalTimeouts{0};
+std::atomic<float> signalActivationDelay{.22f},signalActuationSeconds{.16f};
+std::atomic<int> skipSignalDirection{0};std::atomic<uint64_t> signalReplayTick{0};
+SPF_Hook_Handle* signalLeftHook=nullptr;SPF_Hook_Handle* signalRightHook=nullptr;
+constexpr char kSignalLeftPattern[]="84 C9 74 6A 0F B6 87 48 02 00 00 80 A7 49 02 00 00 F9 0F B6 C8 C0 E9 02";
+constexpr char kSignalRightPattern[]="84 C9 74 65 0F B6 87 48 02 00 00 80 A7 49 02 00 00 F9 0F B6 C8 C0 E9 03";
 std::atomic<uint64_t> signalSequence{0},signalTick{0},signalEventTick{0},signalOverrides{0};
 std::atomic<int> signalDirection{0};
 std::atomic<bool> selectedLeft{false},selectedRight{false};
@@ -178,9 +190,18 @@ void TruckSignals(const SPF_TruckData* data,void*) {
  if(!data)return;
  selectedLeft.store(data->lblinker);selectedRight.store(data->rblinker);signalTick.store(GetTickCount64());
  int direction=signalSelection.Sample(data->lblinker,data->rblinker,data->hazard_warning);
+ const int replayed=skipSignalDirection.load();
+ const int observed=data->lblinker==data->rblinker?0:data->lblinker?1:2;
+ if(replayed){
+  if(KeepSignalReplay(replayed,signalReplayTick.load(),GetTickCount64(),observed,data->hazard_warning)){
+   if(observed==replayed){skipSignalDirection.store(0);if(direction==replayed)direction=0;}
+  }else skipSignalDirection.store(0);
+ }
  if(direction){signalDirection.store(direction);signalEventTick.store(GetTickCount64());signalSequence.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_EVENT direction=%s",direction==1?"left":"right");Log(SPF_LOG_INFO,text);}
 }
 void Reset() {
+ {std::lock_guard lock(signalGateMutex);signalGate.Cancel();}
+ signalReady.store(0);skipSignalDirection.store(0);signalCancels.fetch_add(1);
  {std::lock_guard lock(engineGateMutex);engineStartGate.Cancel();}
  deferredEngineSequence.store(0);engineKeyReached.store(0);privateBodyTick.store(0);skipNextEngineStartEvent.store(false);
  bodyCameraValid.store(false);hideBody.store(false);bodyCameraType.store(-1);hideStockDriver.store(false);expectedPlayerDriverController.store(0);expectedPlayerDriverModel.store(0);confirmedPlayerDriverModel.store(0);playerDriverTick.store(0);
@@ -216,7 +237,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.14.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.15.0");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -246,6 +267,7 @@ void Activated(const SPF_Core_API* api) {
  }
  if(hooks->Hook_FindPattern(kEngineRequestPattern)!=base+0x5e4a20){Log(SPF_LOG_ERROR,"ENGINE_REQUEST: signature mismatch; diagnostic disabled.");return;}
  if(hooks->Hook_FindPattern(kBonePattern)!=base+0x15dfbf0) {Log(SPF_LOG_ERROR,"HORN: bone entry signature mismatch; diagnostic disabled.");return;}
+ if(hooks->Hook_FindPattern(kSignalLeftPattern)!=base+0x9f85e2 || hooks->Hook_FindPattern(kSignalRightPattern)!=base+0x9f8670){Log(SPF_LOG_ERROR,"SIGNAL_DELAY: input-site signature mismatch; no hooks registered.");return;}
  expectedReturn=base+0x9e1d92;
  resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15de620);
  enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15decc0);
@@ -255,7 +277,9 @@ void Activated(const SPF_Core_API* api) {
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
  boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
  engineRequestHook=hooks->Hook_Register(kName,"EngineRequest","Observe player engine start/stop request",reinterpret_cast<void*>(EngineRequestObserveStub),&gEngineOriginal,kEngineRequestPattern,true);
- if(!driverHook || !advanceHook || !boneHook || !engineRequestHook) {
+ signalLeftHook=hooks->Hook_Register(kName,"SignalLeftRequest","Delay player left toggle until stalk contact",reinterpret_cast<void*>(SignalLeftRequestStub),&gSignalLeftOriginal,kSignalLeftPattern,true);
+ signalRightHook=hooks->Hook_Register(kName,"SignalRightRequest","Delay player right toggle until stalk contact",reinterpret_cast<void*>(SignalRightRequestStub),&gSignalRightOriginal,kSignalRightPattern,true);
+ if(!driverHook || !advanceHook || !boneHook || !engineRequestHook || !signalLeftHook || !signalRightHook) {
   Log(SPF_LOG_ERROR,"DIAG: incomplete hook registration; observers remain inactive.");return;
  }
  if(core->telemetry) {
@@ -298,6 +322,26 @@ void PollBodyVisibilityMode() {
  std::ifstream file(filePath);std::string value,extra;if(!(file>>value) || (file>>extra))return;
  int mode=value=="interior"?0:value=="replace-exterior"?1:-1;
  if(mode>=0 && mode!=bodyVisibilityMode.load()){bodyVisibilityMode.store(mode);Log(SPF_LOG_INFO,mode==0?"VISIBILITY_MODE interior":"VISIBILITY_MODE replace-exterior");}
+}
+void PollSignalActivationDelay() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t modulePath[32768]{};
+ if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollSignalActivationDelay),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
+ auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"signal_activation_delay.txt";
+ std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
+ std::ifstream file(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
+ float value=0;if(!ParseSignalDelay(text,value))return;
+ if(signalActivationDelay.exchange(value)!=value){char message[128];std::snprintf(message,sizeof(message),"SIGNAL_TIMING_RELOAD accepted delay_seconds=%.3f",value);Log(SPF_LOG_INFO,message);}
+}
+void PollSignalActuationSeconds() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t modulePath[32768]{};
+ if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollSignalActuationSeconds),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
+ auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"signal_actuation_seconds.txt";
+ std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
+ std::ifstream file(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
+ float value=0;if(!ParseSignalActuation(text,value))return;
+ if(signalActuationSeconds.exchange(value)!=value){char message[128];std::snprintf(message,sizeof(message),"SIGNAL_TIMING_RELOAD accepted actuation_seconds=%.3f",value);Log(SPF_LOG_INFO,message);}
 }
 void PollLeftElbowInset() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
@@ -359,7 +403,7 @@ void Update() {
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
- PollGesturePoseFile();PollLeftElbowInset();PollRightElbowInset();
+ PollGesturePoseFile();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
  if(engineValid){const int value=static_cast<int>(engineState);if(priorEngineSample>=0 && priorEngineSample!=1 && value==1){if(!skipNextEngineStartEvent.exchange(false))engineStartSequence.fetch_add(1);}priorEngineSample=value;}else priorEngineSample=-1;
@@ -406,6 +450,7 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"SIGNAL_DELAY_HEALTH queued=%llu released=%llu timeouts=%llu cancels=%llu",static_cast<unsigned long long>(signalQueued.load()),static_cast<unsigned long long>(signalReleased.load()),static_cast<unsigned long long>(signalTimeouts.load()),static_cast<unsigned long long>(signalCancels.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"ENGINE_DELAY_HEALTH queued=%llu released=%llu timeouts=%llu cancels=%llu",static_cast<unsigned long long>(engineDeferredCount.load()),static_cast<unsigned long long>(engineReleasedCount.load()),static_cast<unsigned long long>(engineTimeoutCount.load()),static_cast<unsigned long long>(engineDelayCancels.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"ENGINE_REQUEST_HEALTH total=%llu player=%llu",static_cast<unsigned long long>(engineRequestCalls.load()),static_cast<unsigned long long>(playerEngineRequestCalls.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"HEAD_VISIBILITY hidden_frames=%llu camera=%d valid=%d",static_cast<unsigned long long>(hiddenHeadFrames.load()),bodyCameraType.load(),bodyCameraValid.load()?1:0);Log(SPF_LOG_INFO,text);
@@ -454,7 +499,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  for(float value:arm)if(!std::isfinite(value))return;
  for(float value:hand)if(!std::isfinite(value))return;
  static thread_local LeftArmGestures gestures;
- static thread_local SignalMotion signal;static thread_local uint64_t seenSignal=0;
+ static thread_local SignalMotion signal;static thread_local uint64_t seenSignal=0,seenSignalCancels=0;
  static thread_local WindowGestureMotion rightMotion;
  static thread_local uint64_t observedDelayCancels=0;
  static thread_local IgnitionMotion ignition;static thread_local uint64_t seenEngineStart=0;
@@ -469,11 +514,12 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  const bool windowHeld=windowGestureHeld.load() && gestureTick && now-gestureTick<=250 && telTick && now-telTick<=250;
  const auto sigSequence=signalSequence.load(),sigTick=signalTick.load(),sigEvent=signalEventTick.load();
  const bool signalFresh=sigTick && now-sigTick<=250 && telTick && now-telTick<=250;
+ const auto cancelSignal=signalCancels.load();if(cancelSignal!=seenSignalCancels){seenSignalCancels=cancelSignal;signal.phase=signal.reach>0?SignalMotion::Return:SignalMotion::Idle;seenSignal=sigSequence;}
  const bool pendingSignal=sigSequence!=seenSignal;
  if(signal.phase!=SignalMotion::Idle)gestures.Step(false,false,dt);
  else gestures.Step(held,windowHeld && !pendingSignal,dt);
  if(pendingSignal && signal.phase==SignalMotion::Idle && gestures.horn.reach==0 && gestures.window.reach==0 && !held){seenSignal=sigSequence;if(signalFresh && sigEvent && now-sigEvent<2000)signal.Start(signalDirection.load());}
- signal.Step(signalFresh,held,dt);
+ signal.Step(signalFresh,held,dt,signalActuationSeconds.load());
  const auto rightTick=rightGestureTick.load();
  const bool rightHeld=rightGestureHeld.load() && rightTick && now-rightTick<=250 && telTick && now-telTick<=250;
  const auto cancels=engineDelayCancels.load();if(cancels!=observedDelayCancels){observedDelayCancels=cancels;ignition.active=false;seenEngineStart=engineStartSequence.load();}
@@ -540,6 +586,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    if(rightMotion.reach>0)rightGestureOverrides.fetch_add(1);
    if(ignition.reach>0)ignitionOverrides.fetch_add(1);
    if(delayedSequence && seenEngineStart==delayedSequence && ignition.reach>=1 && torsoApplied)engineKeyReached.store(delayedSequence);
+   if(signal.phase!=SignalMotion::Idle && signal.reach>0 && signalFresh && !held && signal.age>=signalActivationDelay.load())signalReady.store(seenSignal);
    if(signal.reach>0)signalOverrides.fetch_add(1);
    if(gestures.horn.reach>0)hornOverrides.fetch_add(1);
    if(gestures.window.reach>0)windowGestureOverrides.fetch_add(1);
@@ -565,6 +612,25 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  if(privateHead){if(!CollapseDriverHead(palette))return;}else if(!CollapseDriverPalette(palette))return;
  __try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));if(privateBody)hiddenBodyFrames.fetch_add(1);if(playerStock)hiddenStockFrames.fetch_add(1);if(privateHead)hiddenHeadFrames.fetch_add(1);}
  __except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}
+}
+extern "C" unsigned char CaptureSignalRequest(uintptr_t vehicle,uint32_t side,uint32_t input) noexcept {
+ const unsigned char edge=static_cast<unsigned char>(input);
+ if(!enabled.load())return edge;
+ const auto controller=expectedPlayerDriverController.load();if(!controller || vehicle!=controller-0x1df0 || !expectedPlayerDriverModel.load())return edge;
+ unsigned char flags=0;if(!SafeRead(vehicle+0x248,&flags,1))return edge;
+ const auto now=GetTickCount64(),tick=telemetryTick.load(),body=privateBodyTick.load();
+ const bool fresh=tick && now-tick<=250 && body && now-body<=250;
+ int outcome=0;uint64_t delay=0;bool wasPending=false;
+ {std::lock_guard lock(signalGateMutex);
+  wasPending=signalGate.vehicle!=0;delay=wasPending?now-signalGate.created:0;
+  outcome=signalGate.Step(vehicle,worldGeneration.load(),now,fresh,flags,side,edge!=0,signalReady.load(),signalSequence.load()+1);
+  if(outcome==1){signalReady.store(0);signalDirection.store(side);signalEventTick.store(now);signalSequence.store(signalGate.sequence);}
+  if(wasPending && !signalGate.vehicle && outcome==0)signalCancels.fetch_add(1);
+ }
+ if(outcome==1){signalQueued.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_DELAY queued direction=%u",side);Log(SPF_LOG_INFO,text);return 0;}
+ if(outcome==2){signalCancels.fetch_add(1);Log(SPF_LOG_INFO,"SIGNAL_DELAY cancelled by repeated toggle.");return 0;}
+ if(outcome==3 || outcome==4){signalReplayTick.store(now);skipSignalDirection.store(side);signalReleased.fetch_add(1);if(outcome==4)signalTimeouts.fetch_add(1);char text[160];std::snprintf(text,sizeof(text),"SIGNAL_DELAY released direction=%u reason=%s delay_ms=%llu",side,outcome==3?"stalk-contact":"timeout",static_cast<unsigned long long>(delay));Log(SPF_LOG_INFO,text);return 1;}
+ return edge;
 }
 extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t immediate,uintptr_t returnAddress) noexcept {
  if(!enabled.load())return false;engineRequestCalls.fetch_add(1);

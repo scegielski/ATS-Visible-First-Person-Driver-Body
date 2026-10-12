@@ -6,6 +6,6 @@ target_include_directories(SPF_DriverAnimationDiagnostics PRIVATE ../../SPF-Fram
 target_link_libraries(SPF_DriverAnimationDiagnostics PRIVATE bcrypt)
 target_compile_definitions(SPF_DriverAnimationDiagnostics PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(SPF_DriverAnimationDiagnostics PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4> $<$<COMPILE_LANGUAGE:CXX>:/EHsc>)
-add_executable(DriverDiagnosticTests Tests.cpp ObserveStubs.asm)
+add_executable(DriverDiagnosticTests Tests.cpp ObserveStubs.asm SignalStubTests.asm)
 enable_testing()
 add_test(NAME DriverDiagnosticRegression COMMAND DriverDiagnosticTests)

@@ -10,6 +10,9 @@
 #include "IgnitionTargets.hpp"
 #include "RuntimeArmIK.hpp"
 #include "SignalMotion.hpp"
+#include "SignalRequestGate.hpp"
+#include "SignalReplayGuard.hpp"
+#include "SignalTiming.hpp"
 #include "SignalTargets.hpp"
 #include "BodyVisibility.hpp"
 #include "PlayerExteriorDriver.hpp"
@@ -25,6 +28,7 @@
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
+void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 uintptr_t EngineRequestObserveStub(uintptr_t,uint32_t,uint32_t,uint64_t,uint64_t);
 void* gAdvanceOriginal=nullptr;
 void* gBoneOriginal=nullptr;
@@ -34,6 +38,10 @@ uintptr_t AdvanceObserveStub(uintptr_t,uint32_t,float,uint64_t,uint64_t);
 }
 static int observedDriver=0,observedAdvance=0,boneOriginalCalls=0,bonePostCalls=0;
 static uintptr_t recordedReturn=0;
+extern "C" uint64_t SignalTestLeft(uintptr_t,uint64_t,uint64_t,uint64_t*);
+extern "C" uint64_t SignalTestRight(uintptr_t,uint64_t,uint64_t,uint64_t*);
+extern "C" void SignalTestContinuation();
+static unsigned char signalReplacement=0;static unsigned signalTestSide=0;
 static bool replacePose=false,suppressEngine=false;static int engineOriginalCalls=0;
 static void Check(bool result,const char* message) {
  if(!result) { std::fprintf(stderr,"FAIL: %s\n",message);std::exit(1); }
@@ -50,6 +58,7 @@ extern "C" void CaptureAdvance(uintptr_t model,uint32_t index,float requested,ui
 extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t immediate,uintptr_t caller) noexcept {
  Check(vehicle==0x12345678 && request==0xabcdef01 && immediate==0xfedcba00,"engine observer preserves full register arguments");Check(caller!=0,"engine gate receives original return address");return suppressEngine;
 }
+extern "C" unsigned char CaptureSignalRequest(uintptr_t vehicle,uint32_t side,uint32_t input) noexcept {Check(vehicle==123 && side==signalTestSide && input==0x55667701,"signal mid-function callback arguments");return signalReplacement;}
 static uintptr_t EngineOriginal(uintptr_t vehicle,uint32_t request,uint32_t immediate,uint64_t fourth,uint64_t fifth){
  Check(vehicle==0x12345678 && request==0xabcdef01 && immediate==0xfedcba00 && fourth==0x11223344 && fifth==0x55667788,"engine original receives unchanged arguments including stack");++engineOriginalCalls;return 0x987654;
 }
@@ -73,6 +82,46 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  Check(boneOriginalCalls==bonePostCalls+1,"visibility runs after original hierarchy assembly");++bonePostCalls;volatile double clobber=1.25;clobber=std::sin(clobber);
 }
 int main() {
+
+ uint64_t signalSaved[3]{};gSignalLeftOriginal=gSignalRightOriginal=reinterpret_cast<void*>(SignalTestContinuation);
+ signalTestSide=1;signalReplacement=0;
+ Check(SignalTestLeft(123,0x1122334455667701ull,0xabcdef,signalSaved)==0x1122334455667700ull,"left signal observer alters only CL");
+ Check(signalSaved[0]==123 && signalSaved[1]==0x1122334455667701ull && signalSaved[2]==0xabcdef,"signal observer preserves vehicle and other registers");
+ signalTestSide=2;signalReplacement=1;
+ Check(SignalTestRight(123,0x1122334455667701ull,0xabcdef,signalSaved)==0x1122334455667701ull,"right signal observer preserves native edge");
+ Check(KeepSignalReplay(1,100,110,0,false),"old telemetry sample must retain replay suppression");
+ Check(KeepSignalReplay(1,100,120,1,false),"matching delayed selection consumes suppression");
+ Check(!KeepSignalReplay(1,100,120,2,false),"opposite signal is not suppressed");
+ Check(!KeepSignalReplay(1,100,601,0,false),"unacknowledged replay suppression expires");
+ Check(!KeepSignalReplay(1,100,120,0,true),"hazards clear replay suppression");
+ float liveDelay=.22f;
+ Check(ParseSignalDelay("0.10\n",liveDelay) && liveDelay==.10f,"live signal timing accepts seconds");
+ Check(!ParseSignalDelay("nan",liveDelay) && liveDelay==.10f,"bad timing retains last valid value");
+ Check(!ParseSignalDelay("-0.1",liveDelay) && !ParseSignalDelay("0.46",liveDelay) && !ParseSignalDelay("0.2 garbage",liveDelay),"timing rejects unsafe range and incomplete edits");
+ SignalMotion arrivalSignal;arrivalSignal.Start(1);
+ float arrivalTime=0;while(arrivalSignal.phase==SignalMotion::Reach){arrivalSignal.Step(true,false,.01f);arrivalTime+=.01f;}
+ Check(arrivalSignal.reach==1 && arrivalSignal.press==0 && arrivalTime<.24f,"signal contact occurs before stalk press rather than after it");
+ float actuation=.16f;
+ Check(ParseSignalActuation("0.16",actuation) && !ParseSignalActuation("0",actuation) && !ParseSignalActuation("1",actuation),"live stalk duration validates range");
+ SignalMotion normalStalk,slowStalk;normalStalk.Start(1);slowStalk.Start(1);
+ for(int i=0;i<23;++i){normalStalk.Step(true,false,.01f,.12f);slowStalk.Step(true,false,.01f,.16f);}
+ Check(normalStalk.reach==slowStalk.reach && normalStalk.phase==SignalMotion::Actuate && slowStalk.phase==SignalMotion::Actuate,"stalk slowdown preserves reach timing");
+ for(int i=0;i<8;++i){normalStalk.Step(true,false,.01f,.12f);slowStalk.Step(true,false,.01f,.16f);}
+ Check(slowStalk.press<normalStalk.press && slowStalk.reach==1,"only stalk actuation moves more slowly");
+ SignalRequestGate sg;
+ Check(sg.Step(123,1,100,true,0,1,true,0,10)==1,"left signal queued");
+ Check(sg.Step(123,1,200,true,0,1,false,0,11)==0,"no signal before hand arrival");
+ Check(sg.Step(123,1,450,true,0,1,false,10,11)==3 && !sg.vehicle,"native toggle released exactly once at contact");
+ Check(sg.Step(123,1,500,true,0,1,false,10,11)==0,"no duplicate replay");
+ sg.Step(123,1,600,true,0,1,true,0,11);Check(sg.Step(123,1,620,true,0,1,true,0,12)==2,"second left press cancels pending signal");
+ sg.Step(123,1,700,true,0,1,true,0,12);Check(sg.Step(123,1,710,true,0,2,true,0,13)==1 && sg.direction==2,"opposite direction replaces pending signal");
+ Check(sg.Step(123,1,2800,true,0,2,false,0,14)==4,"signal timeout falls back to native toggle");
+ sg.Step(123,1,3000,true,0,1,true,0,14);Check(sg.Step(123,1,3020,true,16,1,false,0,15)==0 && !sg.vehicle,"hazards cancel pending toggle");
+ Check(sg.Step(123,1,3030,true,4,1,true,0,15)==0,"already-selected signal cancels immediately");
+ Check(sg.Step(123,1,3040,false,0,1,true,0,15)==0,"stale body leaves native action intact");
+ sg.Step(123,1,3100,true,0,1,true,0,15);sg.Step(124,1,3120,true,0,1,false,0,16);Check(!sg.vehicle,"vehicle switch cannot replay old signal");
+ sg.Step(123,1,3200,true,0,1,true,0,16);sg.Step(123,2,3220,true,0,1,false,0,17);Check(!sg.vehicle,"world reset cannot replay old signal");
+
  {
  EngineStartGate gate;DeferredEngineStart replay;Check(gate.Queue(100,1,1000,9),"engine delay queues once");
  Check(!gate.Queue(100,1,1010,10),"repeated request cannot restart delay");

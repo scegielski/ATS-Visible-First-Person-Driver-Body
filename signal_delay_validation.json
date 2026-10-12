@@ -1,0 +1,211 @@
+{
+  "version": "0.15.0",
+  "runtime_validated": true,
+  "left_request_site_rva": "0x9f85e2",
+  "right_request_site_rva": "0x9f8670",
+  "native_replay": true,
+  "momentary_bindings_delayed": false,
+  "automatic_cancel_untouched": true,
+  "tests_passed": true,
+  "user_approved_for_commit": true,
+  "activation_delay_seconds": 0.22,
+  "actuation_seconds": 0.26,
+  "grab_extra_left_m": 0.0127,
+  "grab_extra_down_m": 0.0127,
+  "forward_adjustment_reverted": true,
+  "last_runtime_health": {
+    "queued": 38,
+    "released": 37,
+    "timeouts": 0,
+    "cancels": 2
+  },
+  "runtime_releases": [
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 218
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 204
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 250
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 218
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 235
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 218
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 218
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 218
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 250
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 235
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 235
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 250
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 235
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 1,
+      "reason": "stalk-contact",
+      "delay_ms": 219
+    },
+    {
+      "direction": 2,
+      "reason": "stalk-contact",
+      "delay_ms": 234
+    }
+  ],
+  "duplicate_trigger_fixed": true,
+  "installed_release_byte_exact": true
+}

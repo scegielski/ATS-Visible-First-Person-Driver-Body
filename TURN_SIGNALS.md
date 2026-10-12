@@ -15,3 +15,5 @@ The version-2 pose file's three quaternion groups are approach waypoint, final r
 Build, geometry and regression tests pass. Checks cover arm lengths, unchanged right arm/pedals, full steering-range elbow compatibility, no repeat while selected, hazards, world reset, staged actuation and stale data. The latest runtime recorded both directions, 17 selection events, 1,048 pose updates and zero caught pose faults. Installed files match the release copies byte-for-byte.
 
 The user approved the fingertip pose and requested this commit after the waypoint test. Final waypoint-specific visual feedback was not explicitly recorded; that pose remains editable live. Alignment is calibrated to the Mustang, with other vehicles unvalidated.
+
+The 0.15.0 synchronization prototype delays normal toggle bindings until stalk actuation; see [TURN_SIGNAL_DELAY.md](TURN_SIGNAL_DELAY.md). Momentary lane-change bindings retain their native timing. The user approved the synchronized delay and final live calibration.

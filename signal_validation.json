@@ -1,12 +1,12 @@
 {
   "stalk_wrist_target_m": [
-    -0.6334515529945707,
-    0.8019438833609188,
+    -0.6461515529945707,
+    0.7892438833609188,
     -0.26756915457593744
   ],
-  "leftward_adjustment_m": 0.0254,
+  "leftward_adjustment_m": 0.0381,
   "forward_adjustment_m": 0.0508,
-  "downward_adjustment_m": 0.0508,
+  "downward_adjustment_m": 0.0635,
   "finger_pose": "index and middle pinch with thumb",
   "pinch_fit": {
     "8": {
@@ -54,7 +54,7 @@
   ],
   "approved_finger_pose_retained": true,
   "midway_hand_open_blend": 0.25,
-  "visual_test_pending": true,
+  "visual_test_pending": false,
   "plugin_version": "0.12.1",
   "runtime_both_directions_validated": true,
   "runtime_events": 17,
@@ -63,5 +63,6 @@
   "installed_files_verified": true,
   "user_approved_finger_pose": true,
   "user_requested_commit_after_waypoint_test": true,
-  "final_waypoint_visual_feedback_not_explicitly_recorded": true
+  "final_waypoint_visual_feedback_not_explicitly_recorded": true,
+  "live_grab_calibration_approved": true
 }
