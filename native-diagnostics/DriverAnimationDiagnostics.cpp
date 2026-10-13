@@ -260,7 +260,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.18.6");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.18.9");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -700,8 +700,8 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    if(valid && SafeRead(pointers[3],positions.data(),sizeof(positions)))controllerMask=ApplyControllers(rotations,positions,!leftActive,!rightActive);
   }
   __try {
-   if(controllerMask&1)for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
-   if(controllerMask&2)for(unsigned bone:{26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if(controllerMask&1){for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);for(unsigned bone=8;bone<=22;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);}
+   if(controllerMask&2){for(unsigned bone:{26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);for(unsigned bone=29;bone<=43;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);}
    if(rightElbowApplied)for(unsigned bone: {26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(elbowApplied)for(unsigned bone: {5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(exteriorHeadApplied)for(unsigned bone:{46u,47u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);

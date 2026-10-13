@@ -17,6 +17,8 @@
 #include "HeadTorso.hpp"
 #include "GestureHeadFollow.hpp"
 #include "ControllerIK.hpp"
+#include "ControllerFingers.hpp"
+#include "LiveControllerFingers.hpp"
 #include "ControllerActionAttach.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
@@ -105,12 +107,23 @@ extern "C" uintptr_t PrepareControllerActionAttach(uintptr_t owner,uintptr_t inf
 extern "C" uintptr_t XRActionAttachTest(uintptr_t,uintptr_t);
 extern "C" void XRActionAttachContinuation();
 int main() {
+ std::ifstream fingerFile("../../releases/controller_left_fingers.txt");std::string fingerText((std::istreambuf_iterator<char>(fingerFile)),{}),fingerError;LiveControllerFingerPose liveFingerLeft(false),liveFingerRight(true);
+ Check(liveFingerLeft.Replace(fingerText,fingerError) && liveFingerLeft.Revision()==1,"live controller finger file loads all open closed joints");auto retained=liveFingerLeft.Snapshot();
+ Check(!liveFingerLeft.Replace("SPF_CONTROLLER_FINGERS 1\nbone 8 1 0 0 0 1 0 0 0",fingerError) && liveFingerLeft.Snapshot()==retained && liveFingerLeft.Revision()==1,"incomplete live finger edit retains last valid pose");
+ Check(!liveFingerRight.Replace(fingerText,fingerError),"left pose cannot edit right-hand bones");
+ std::string duplicate=fingerText+"bone 8 1 0 0 0 1 0 0 0\n";Check(!liveFingerLeft.Replace(duplicate,fingerError) && liveFingerLeft.Snapshot()==retained,"duplicate finger joints rejected transactionally");
+ std::string changed=fingerText;auto row=changed.find("bone 8 ");auto end=changed.find('\n',row);changed.replace(row,end-row,"bone 8 1 0 0 0 .923879533 0 0 .382683432");Check(liveFingerLeft.Replace(changed,fingerError) && liveFingerLeft.Revision()==2,"changed open closed targets publish a live revision");
+ DriverIK::Pose fingerProbe{};for(auto& q:fingerProbe)q={1,0,0,0};auto edited=liveFingerLeft.Snapshot();Check(BlendControllerFingers(fingerProbe,false,1,0,1,edited.get()) && std::abs(fingerProbe[8][3]-.382683432f)<.0001f,"live edited index closed pose is used by grip");
+ std::string zero=changed;row=zero.find("bone 8 ");end=zero.find('\n',row);zero.replace(row,end-row,"bone 8 0 0 0 0 1 0 0 0");auto currentFingerPose=liveFingerLeft.Snapshot();Check(!liveFingerLeft.Replace(zero,fingerError) && liveFingerLeft.Snapshot()==currentFingerPose,"zero quaternion retains latest valid finger pose");
+
  gXRActionAttachOriginal=reinterpret_cast<void*>(XRActionAttachContinuation);Check(XRActionAttachTest(123,456)==789,"XR attachment observer replaces only input pointer and preserves continuation");
  std::array<XrActionSet,17> attached{};XrActionSet originalAction=reinterpret_cast<XrActionSet>(1), extraAction=reinterpret_cast<XrActionSet>(2);XrSessionActionSetsAttachInfo originalInfo{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};originalInfo.countActionSets=1;originalInfo.actionSets=&originalAction;XrSessionActionSetsAttachInfo combinedInfo{};
  Check(CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached) && combinedInfo.countActionSets==2 && attached[0]==originalAction && attached[1]==extraAction,"native controller attachment retains ATS action sets");
  originalInfo.countActionSets=17;Check(!CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached),"unexpected attachment layout rejected");
 
  ControllerElbowGuides guides;Check(ParseControllerElbowGuides("left -.12 -.35 .12\nright .12 -.35 .12",guides),"live controller elbow guides parse");Check(!ParseControllerElbowGuides("left 0 0 0 right 1 0 0",guides),"zero elbow guide rejected without replacing valid settings");
+ ControllerFingerPose routedPose;std::string routeError;std::string routeIndex=changed;auto routePos=routeIndex.find("trigger_finger middle");routeIndex.replace(routePos,std::string("trigger_finger middle").size(),"trigger_finger index");Check(ParseControllerFingerPose(routeIndex,false,routedPose,routeError) && routedPose[0].triggerControlled && !routedPose[3].triggerControlled,"live routing can select index instead of middle");
+ Check(!ParseControllerFingerPose(changed+"trigger_finger thumb\n",false,routedPose,routeError),"duplicate routing rejected without partial pose updates");
  DriverIK::V priorRay{0,0,-1},priorBend{0,-1,0};
  for(unsigned step=0;step<200;++step){float t=step/199.f;auto ray=DriverIK::Unit(DriverIK::V{.3f*std::sin(t*6.28f),-.4f+.8f*t,-1});auto bend=StableControllerBend(ray,{0,-1,0},priorRay,priorBend,1.f/90.f);auto transported=DriverIK::Unit(DriverIK::Rotate(DriverIK::Between(priorRay,ray),priorBend));Check(DriverIK::Dot(bend,transported)>.998f,"controller elbow pole cannot flip between continuous frames");Check(std::abs(DriverIK::Dot(bend,ray))<.0001f,"stable elbow guide remains perpendicular to reach");priorRay=ray;priorBend=bend;}
  ControllerHand button;button.Button(true,100,true);Check(button.enabled && button.calibrate,"controller first thumbstick press enables calibration");button.Button(true,200,true);Check(button.enabled,"held click does not toggle repeatedly");button.Button(false,300,true);button.Button(true,400,true);Check(!button.enabled,"second click disables independently");button.Button(true,1200,true);Check(button.enabled && button.calibrate,"long hold recalibrates and enables");
@@ -275,6 +288,14 @@ int main() {
   DriverIK::Pose pose{};DriverIK::Positions positions{};
   for(unsigned bone=0;bone<61;++bone){float values[14]{};source.seekg(offset+(frame*61+bone)*56);source.read(reinterpret_cast<char*>(values),56);Check(static_cast<bool>(source),"runtime IK fixture read");for(unsigned i=0;i<4;++i)pose[bone][i]=values[4+i];for(unsigned i=0;i<3;++i){positions[bone][i]=values[8+i];Check(std::abs(values[11+i]-1.f)<.001f,"stock rig uses unit scale");}}
 
+
+  for(bool right:{false,true})for(float grip:{0.f,1.f})for(float trigger:{0.f,1.f}){
+   auto candidate=pose;auto wrist=right?28u:7u;auto before=DriverIK::FK(pose,positions);Check(BlendControllerFingers(candidate,right,grip,trigger,1),"controller open grip and trigger finger poses blend");
+   for(const auto& target:right?kControllerRightFingers:kControllerLeftFingers){auto expected=target.triggerControlled?(trigger?target.closed:target.open):(grip?target.closed:target.open);float dot=0;for(unsigned j=0;j<4;++j)dot+=candidate[target.bone][j]*expected[j];Check(std::abs(dot)>.99999f,"trigger controls selected finger independently from grip and thumb");}
+   unsigned start=right?29:8;for(unsigned bone=0;bone<61;++bone)if(bone<start || bone>=start+15)Check(candidate[bone]==pose[bone],"controller fingers leave arms opposite hand and body unchanged");
+   auto after=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(after.p[wrist],before.p[wrist]))<.00001f,"finger closure preserves IK wrist target");
+   candidate=pose;Check(BlendControllerFingers(candidate,right,grip,trigger,0) && candidate==pose,"disabled controller fingers retain stock pose exactly");
+  }
   for(bool right:{false,true}){
    unsigned lower=right?27:6,wrist=lower+1;ControllerHand twistState;twistState.neutralWrist=pose[wrist];auto axis=DriverIK::Unit(positions[wrist]);DriverIK::Q previousForearm=pose[lower];
    for(unsigned degrees=0;degrees<=200;degrees+=5){

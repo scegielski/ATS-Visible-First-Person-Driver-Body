@@ -7,20 +7,26 @@
 #include <vector>
 #include <cstring>
 #include <algorithm>
+#include <cmath>
 namespace {
 std::recursive_mutex mutex;PFN_xrGetInstanceProcAddr nextGet=nullptr;bool enabled=false;
 struct Context {
- XrInstance instance{};XrActionSet set{};XrAction actions[2]{};XrPath touch{};int status=1;
- PFN_xrGetInstanceProcAddr get{};PFN_xrCreateSession createSession{};PFN_xrDestroySession destroySession{};PFN_xrDestroyInstance destroyInstance{};PFN_xrAttachSessionActionSets attach{};PFN_xrSyncActions sync{};PFN_xrGetActionStateBoolean boolean{};
+ XrInstance instance{};XrActionSet set{};XrAction actions[2]{},grip[2]{},trigger[2]{};XrPath touch{};int status=1;
+ PFN_xrGetInstanceProcAddr get{};PFN_xrCreateSession createSession{};PFN_xrDestroySession destroySession{};PFN_xrDestroyInstance destroyInstance{};PFN_xrAttachSessionActionSets attach{};PFN_xrSyncActions sync{};PFN_xrGetActionStateBoolean boolean{};PFN_xrGetActionStateFloat analog{};
  PFN_xrCreateActionSet createSet{};PFN_xrCreateAction createAction{};PFN_xrStringToPath path{};PFN_xrSuggestInteractionProfileBindings suggest{};
  std::vector<XrActionSuggestedBinding> gameTouch;std::vector<XrActiveActionSet> gameActive;
  template<class T> bool Load(const char* name,T& function){PFN_xrVoidFunction f{};auto result=get(instance,name,&f);if(XR_FAILED(result)){status=result;return false;}function=reinterpret_cast<T>(f);return f!=nullptr;}
- bool Init(){return Load("xrCreateSession",createSession)&&Load("xrDestroySession",destroySession)&&Load("xrDestroyInstance",destroyInstance)&&Load("xrAttachSessionActionSets",attach)&&Load("xrSyncActions",sync)&&Load("xrGetActionStateBoolean",boolean)&&Load("xrCreateActionSet",createSet)&&Load("xrCreateAction",createAction)&&Load("xrStringToPath",path)&&Load("xrSuggestInteractionProfileBindings",suggest);}
+ bool Init(){return Load("xrCreateSession",createSession)&&Load("xrDestroySession",destroySession)&&Load("xrDestroyInstance",destroyInstance)&&Load("xrAttachSessionActionSets",attach)&&Load("xrSyncActions",sync)&&Load("xrGetActionStateBoolean",boolean)&&Load("xrGetActionStateFloat",analog)&&Load("xrCreateActionSet",createSet)&&Load("xrCreateAction",createAction)&&Load("xrStringToPath",path)&&Load("xrSuggestInteractionProfileBindings",suggest);}
  bool Prepare(){
   if(set)return status>=0;
   XrActionSetCreateInfo info{XR_TYPE_ACTION_SET_CREATE_INFO};strcpy_s(info.actionSetName,"spf_driver_controller_hands");strcpy_s(info.localizedActionSetName,"Driver controller hands");auto result=createSet(instance,&info,&set);if(XR_FAILED(result)){status=result;return false;}
   std::vector<XrActionSuggestedBinding> bindings=gameTouch;
   for(unsigned i=0;i<2;++i){XrActionCreateInfo ai{XR_TYPE_ACTION_CREATE_INFO};strcpy_s(ai.actionName,i?"right_hand_toggle":"left_hand_toggle");strcpy_s(ai.localizedActionName,i?"Right hand calibration":"Left hand calibration");ai.actionType=XR_ACTION_TYPE_BOOLEAN_INPUT;result=createAction(set,&ai,&actions[i]);if(XR_FAILED(result)){status=result;return false;}XrPath click{};result=path(instance,i?"/user/hand/right/input/thumbstick/click":"/user/hand/left/input/thumbstick/click",&click);if(XR_FAILED(result)){status=result;return false;}bindings.push_back({actions[i],click});}
+
+  for(unsigned side=0;side<2;++side)for(unsigned axis=0;axis<2;++axis){
+   XrActionCreateInfo ai{XR_TYPE_ACTION_CREATE_INFO};const char* names[2][2]={{"left_hand_grip","left_hand_trigger"},{"right_hand_grip","right_hand_trigger"}};strcpy_s(ai.actionName,names[side][axis]);strcpy_s(ai.localizedActionName,names[side][axis]);ai.actionType=XR_ACTION_TYPE_FLOAT_INPUT;auto action=axis?&trigger[side]:&grip[side];result=createAction(set,&ai,action);if(XR_FAILED(result)){status=result;return false;}
+   const char* paths[2][2]={{"/user/hand/left/input/squeeze/value","/user/hand/left/input/trigger/value"},{"/user/hand/right/input/squeeze/value","/user/hand/right/input/trigger/value"}};XrPath input{};result=path(instance,paths[side][axis],&input);if(XR_FAILED(result)){status=result;return false;}bindings.push_back({*action,input});
+  }
   result=path(instance,"/interaction_profiles/oculus/touch_controller",&touch);if(XR_FAILED(result)){status=result;return false;}XrInteractionProfileSuggestedBinding binding{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};binding.interactionProfile=touch;binding.countSuggestedBindings=static_cast<uint32_t>(bindings.size());binding.suggestedBindings=bindings.data();result=suggest(instance,&binding);status=result;return XR_SUCCEEDED(result);
  }
 };
@@ -54,12 +60,14 @@ extern "C" __declspec(dllexport) XrResult XRAPI_CALL xrNegotiateLoaderApiLayerIn
  if(!loader || !request || loader->minInterfaceVersion>1 || loader->maxInterfaceVersion<1 || request->structType!=XR_LOADER_INTERFACE_STRUCT_API_LAYER_REQUEST || request->structSize<sizeof(*request))return XR_ERROR_INITIALIZATION_FAILED;
  wchar_t path[MAX_PATH]{};GetModuleFileNameW(nullptr,path,MAX_PATH);auto file=wcsrchr(path,L'\\');enabled=file && !_wcsicmp(file+1,L"amtrucks.exe");request->layerInterfaceVersion=1;request->layerApiVersion=XR_MAKE_VERSION(1,0,0);request->getInstanceProcAddr=GetProc;request->createApiLayerInstance=CreateInstance;return XR_SUCCESS;
 }
-extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerButtons(unsigned char* left,unsigned char* right){
- std::lock_guard lock(mutex);*left=*right=0;if(!activeSession || !sessions.count(activeSession))return 5;auto c=sessions.at(activeSession);if(c->status<0)return c->status;
+extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerInput(unsigned char* left,unsigned char* right,float* curls){
+ std::lock_guard lock(mutex);*left=*right=0;for(unsigned i=0;i<4;++i)curls[i]=0;if(!activeSession || !sessions.count(activeSession))return 5;auto c=sessions.at(activeSession);if(c->status<0)return c->status;
  auto sets=c->gameActive;if(std::none_of(sets.begin(),sets.end(),[&](const auto& a){return a.actionSet==c->set;}))sets.push_back({c->set,XR_NULL_PATH});XrActionsSyncInfo info{XR_TYPE_ACTIONS_SYNC_INFO};info.countActiveActionSets=static_cast<uint32_t>(sets.size());info.activeActionSets=sets.data();auto result=c->sync(activeSession,&info);if(result!=XR_SUCCESS)return result;
  bool valid=true;for(unsigned i=0;i<2;++i){XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};gi.action=c->actions[i];XrActionStateBoolean state{XR_TYPE_ACTION_STATE_BOOLEAN};result=c->boolean(activeSession,&gi,&state);if(XR_FAILED(result))return result;valid=valid&&state.isActive;*(i?right:left)=state.isActive&&state.currentState;}
+ for(unsigned side=0;side<2;++side)for(unsigned axis=0;axis<2;++axis){XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};gi.action=axis?c->trigger[side]:c->grip[side];XrActionStateFloat state{XR_TYPE_ACTION_STATE_FLOAT};result=c->analog(activeSession,&gi,&state);if(XR_FAILED(result))return result;valid=valid&&state.isActive&&std::isfinite(state.currentState);if(state.isActive&&std::isfinite(state.currentState))curls[side*2+axis]=std::clamp(state.currentState,0.f,1.f);}
  return valid?0:4;
 }
+extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerButtons(unsigned char* left,unsigned char* right){float curls[4]{};return SPF_ReadControllerInput(left,right,curls);}
 #ifdef SPF_CONTROLLER_LAYER_TEST
 extern "C" void SPF_TestControllerLayer(PFN_xrGetInstanceProcAddr get,XrInstance instance,XrSession session){std::lock_guard lock(mutex);instances.clear();sessions.clear();auto c=std::make_shared<Context>();c->get=get;c->instance=instance;c->Init();instances[instance]=c;sessions[session]=c;enabled=true;}
 extern "C" XrResult SPF_TestControllerAttach(XrSession s,const XrSessionActionSetsAttachInfo* i){return Attach(s,i);}

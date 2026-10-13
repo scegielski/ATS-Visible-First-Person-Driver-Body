@@ -27,5 +27,25 @@
       0
     ],
     "caught_pose_faults": 0
+  },
+  "finger_checkpoint": {
+    "version": "0.18.9",
+    "trigger_finger": "middle",
+    "left_solves": 4878,
+    "right_solves": 4850,
+    "rejected_solves": [
+      0,
+      0
+    ],
+    "caught_pose_faults": 0,
+    "finger_pose_revision": [
+      1,
+      1
+    ],
+    "finger_pose_rejected": [
+      0,
+      0
+    ],
+    "user_request": "Commit the change before adding X/A finger-mode toggle buttons"
   }
 }
