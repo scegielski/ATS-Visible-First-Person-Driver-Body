@@ -15,5 +15,17 @@
     ],
     "caught_pose_faults": 0,
     "tests": "DriverDiagnosticRegression and ControllerLayerRegression passed"
+  },
+  "twist_checkpoint": {
+    "version": "0.18.6",
+    "user_request": "Commit the change before adding grip and trigger fingers",
+    "twist_share": 0.5,
+    "left_solves": 7245,
+    "right_solves": 6763,
+    "rejected_solves": [
+      0,
+      0
+    ],
+    "caught_pose_faults": 0
   }
 }

@@ -274,6 +274,18 @@ int main() {
  for(unsigned frame=0;frame<47;++frame){
   DriverIK::Pose pose{};DriverIK::Positions positions{};
   for(unsigned bone=0;bone<61;++bone){float values[14]{};source.seekg(offset+(frame*61+bone)*56);source.read(reinterpret_cast<char*>(values),56);Check(static_cast<bool>(source),"runtime IK fixture read");for(unsigned i=0;i<4;++i)pose[bone][i]=values[4+i];for(unsigned i=0;i<3;++i){positions[bone][i]=values[8+i];Check(std::abs(values[11+i]-1.f)<.001f,"stock rig uses unit scale");}}
+
+  for(bool right:{false,true}){
+   unsigned lower=right?27:6,wrist=lower+1;ControllerHand twistState;twistState.neutralWrist=pose[wrist];auto axis=DriverIK::Unit(positions[wrist]);DriverIK::Q previousForearm=pose[lower];
+   for(unsigned degrees=0;degrees<=200;degrees+=5){
+    float angle=degrees*.0174532925f;DriverIK::Q turn{std::cos(angle/2),axis[0]*std::sin(angle/2),axis[1]*std::sin(angle/2),axis[2]*std::sin(angle/2)};auto candidate=pose;candidate[wrist]=DriverIK::Product(turn,pose[wrist]);auto expected=DriverIK::FK(candidate,positions);
+    Check(ShareControllerWristTwist(candidate,positions,lower,wrist,twistState,.5f),"forearm and wrist share axial roll");auto result=DriverIK::FK(candidate,positions);
+    Check(DriverIK::Length(DriverIK::Sub(result.p[wrist],expected.p[wrist]))<.00001f,"twist share keeps wrist position fixed");float dot=0;for(unsigned i=0;i<4;++i)dot+=result.q[wrist][i]*expected.q[wrist][i];Check(std::abs(dot)>.99999f,"twist share keeps final hand orientation");
+    DriverIK::Q half{std::cos(angle/4),axis[0]*std::sin(angle/4),axis[1]*std::sin(angle/4),axis[2]*std::sin(angle/4)};auto remaining=DriverIK::Product(candidate[wrist],DriverIK::Inverse(pose[wrist]));float residualDot=0;for(unsigned i=0;i<4;++i)residualDot+=remaining[i]*half[i];Check(std::abs(residualDot)>.99999f,"wrist carries exactly half of axial twist");
+    Check(std::abs(twistState.previousTwist-angle)<.0001f,"twist angle remains continuous through 180 degrees");float continuity=0;for(unsigned i=0;i<4;++i)continuity+=candidate[lower][i]*previousForearm[i];Check(std::abs(continuity)>.999f,"forearm roll does not jump at quaternion wrap");previousForearm=candidate[lower];
+    for(unsigned bone=0;bone<61;++bone)if(bone!=lower && bone!=wrist)Check(candidate[bone]==pose[bone],"axial share changes only forearm and wrist local rotations");
+   }
+  }
   for(bool right:{false,true}){
    auto candidate=pose;auto before=DriverIK::FK(pose,positions);unsigned wrist=right?28:7;ControllerHand hand;hand.enabled=hand.calibrate=true;
    Check(ApplyControllerHand(candidate,positions,right,hand,{0,0,0},{1,0,0,0},{1,0,0,0},1),"controller calibration solves at current grip");
