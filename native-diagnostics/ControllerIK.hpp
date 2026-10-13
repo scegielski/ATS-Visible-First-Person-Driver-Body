@@ -43,7 +43,7 @@ inline bool ShareControllerWristTwist(DriverIK::Pose& pose,const DriverIK::Posit
  float amount=angle*share;Q turn{std::cos(amount/2),axis[0]*std::sin(amount/2),axis[1]*std::sin(amount/2),axis[2]*std::sin(amount/2)};
  pose[lower]=Product(pose[lower],turn);pose[wrist]=Product(Inverse(turn),pose[wrist]);hand.previousTwist=angle;hand.haveTwist=true;return true;
 }
-inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& positions,bool right,ControllerHand& hand,DriverIK::V point,DriverIK::Q rotation,DriverIK::Q headRotation,float blend,float seconds=1.f/90.f,DriverIK::V bodyGuide={0,0,0},float twistShare=.5f){
+inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& positions,bool right,ControllerHand& hand,DriverIK::V point,DriverIK::Q rotation,DriverIK::Q headRotation,float blend,float seconds=1.f/90.f,DriverIK::V bodyGuide={0,0,0},float twistShare=.5f,bool rigidControllerOffset=false){
  using namespace DriverIK;
  if(!hand.enabled || !std::isfinite(blend) || !std::isfinite(seconds) || seconds<0 || !std::isfinite(twistShare) || twistShare<0 || twistShare>1)return false;
  if(Length(bodyGuide)<1e-5f)bodyGuide=ControllerElbowGuides{}.values[right?1:0];for(float x:bodyGuide)if(!std::isfinite(x))return false;
@@ -57,6 +57,7 @@ inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& 
  V target=Add(hand.anchor,Rotate(hand.basis,Sub(point,hand.origin)));
  Q change=Product(Product(hand.basis,Product(rotation,Inverse(hand.originRotation))),Inverse(hand.basis));
  Q orientation=Product(change,hand.anchorRotation);
+ if(rigidControllerOffset)target=Add(point,Rotate(Product(rotation,Inverse(hand.originRotation)),Sub(hand.anchor,hand.origin)));
  // Clamp only to the physical arm envelope, never stretch the skeleton.
  V ray=Sub(target,world.p[upper]);float distance=Length(ray),maximum=Length(positions[lower])+Length(positions[wrist])-.002f,minimum=std::abs(Length(positions[lower])-Length(positions[wrist]))+.002f;
  if(distance<1e-6f)return false;target=Add(world.p[upper],Mul(ray,std::clamp(distance,minimum,maximum)/distance));

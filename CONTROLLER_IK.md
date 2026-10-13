@@ -82,3 +82,36 @@ Selection also briefly flexes the chosen finger over 0.35 seconds, then returns 
 
 ### Final controller selection checkpoint
 User requested commit and push after testing spoken names on both hands. Installed 0.18.19 plugin and 0.18.17 input bridge match packaged generic release binaries. Both live files default to index. Automated regression checks pass. Physical vibration and full multi-finger visual behavior have not received an explicit final confirmation.
+
+### Disabled-hand calibration markers (0.18.20 test)
+Uses SteamVR OpenVR overlays to show a six-centimetre ring/crosshair at each tracked controller position while that hand IK is disabled: blue left, orange right. Markers face the headset and use standing tracking space directly, independent of hand calibration. Hidden on tracking loss, inactive game context, or hand activation; destroyed on plugin shutdown. Overlay errors appear in controller status. VR visibility and placement require runtime validation. OpenVR overlay reference: https://github.com/ValveSoftware/openvr/wiki/IVROverlay_Overview
+
+### Controller-oriented axis markers (0.18.21 test)
+Replaces head-facing bitmap crosshairs with red X, green Y, blue Z axes attached to each controller device transform. Each 12 cm axis uses two crossed thin overlay strips to remain visible from multiple angles, extending from the tracked origin in the positive direction. These are spatial overlay planes, not a game mesh; no game-world occlusion. Visual validation pending.
+
+### Scene mesh marker prototype (0.18.22 / body archive 0.8.0)
+A second private animated accessory model contains solid axes weighted to two dedicated marker palette entries. Its identity guard is separate from the body. Controller positions relative to the headset are mapped through the current driver head transform; this eye-to-head approximation needs VR placement validation. Driver geometry and animation tracks remain byte unchanged. Overlay markers disabled for this test. Marker palette collapses when tracking is stale or that hand IK is enabled. Requires paired plugin/archive installation, and possibly reselecting the body accessory to recreate the new hookup.
+
+### Fixed seated marker frame (0.18.23 test)
+User confirmed scene meshes render but reported displaced positions and markers moving with head movement. Replaces animated-head-relative frame with a captured seated tracking-space origin and inverse neutral yaw. Controller transforms depend only on controller movement after capture; native game head reset recaptures the frame. Head anchor still uses the model head origin, so physical eye alignment needs visual calibration.
+
+### Marker material isolation (archive 0.8.1)
+Replaces every marker PMD material reference with private RGB materials: X red, Y green, Z blue. A private opaque white DDS/TOBJ supplies the base texture; no driver texture references remain on marker descriptor. Driver descriptor and textures unchanged. Visual color check pending.
+
+### Persistent controller axes (0.18.24 test)
+Scene axes remain visible for valid controller tracking regardless of per-hand IK enable state, allowing controller-to-hand alignment inspection while engaged. Stale/invalid tracking still collapses the marker palette. Visual check pending.
+
+### Shared calibrated marker target (0.18.25 test)
+After each hand has calibrated, its marker uses the same origin, wheel-grip anchor, basis and relative orientation as controller IK, before reach clamping and activation blending. Marker update runs after calibration processing to avoid a frame using old calibration. Uncalibrated hands retain the seated reference so they remain locatable. Reach limits and transient activation/action priority can still separate wrist from marker. Visual alignment pending.
+
+### Marker frame diagnostic (0.18.26)
+Static trace found the engine recenter reference at VR owner offsets 0x410/0x420 and current head pose at 0x438/0x448; getter at 0x14162e580 calls the reference-to-current transform at 0x14139bb90. Adds bounded one-second read-only logging for those values, camera seat offset, and actual driver root/head/wrist palette translations. Placement logic unchanged pending comparison.
+
+### Actual XR/SteamVR frame bridge (0.18.27 test)
+Diagnostic identified distinct tracking frames: ATS neutral origin/quaternion and local current head versus SteamVR standing head/controller poses. ControllerSceneFrame aligns headset poses to convert standing into ATS local, applies inverse engine recenter, then adds the Mustang interior camera base plus live seat head_offset. Removes per-hand calibration from marker placement. Tests verify stationary controller invariance under head translation and yaw. Camera base is Mustang-specific and requires visual alignment validation; samples stale beyond 250 ms hide axes.
+
+### Shared physical frame for controller hands (0.18.28 test)
+User confirms axes now stay at physical controller positions, but hands separate in some poses. Moves hand IK input into the validated scene frame with no independent yaw basis. Calibration records a rigid controller-to-wrist offset; rotation moves that offset instead of leaving it fixed in world space. Marker physical pose unchanged. Arm envelope remains enforced. Requires hand recalibration; visual hand alignment pending.
+
+### Validated scene/controller checkpoint
+User confirmed the scene axes stay at controller locations and the final rigid-offset hand update is exactly aligned. Installed plugin 0.18.28 and colored scene archive 0.8.1 match release binaries. Both regression suites pass. Scene meshes remain visible with hand IK on or off, with physical reach limits preserved. Camera mounting calibration currently targets the Mustang.

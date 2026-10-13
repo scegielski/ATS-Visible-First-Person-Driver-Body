@@ -20,6 +20,7 @@
 #include "ControllerFingers.hpp"
 #include "LiveControllerFingers.hpp"
 #include "ControllerFingerMode.hpp"
+#include "ControllerSceneFrame.hpp"
 #include "ControllerActionAttach.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
@@ -123,6 +124,9 @@ int main() {
  originalInfo.countActionSets=17;Check(!CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached),"unexpected attachment layout rejected");
 
  ControllerElbowGuides guides;Check(ParseControllerElbowGuides("left -.12 -.35 .12\nright .12 -.35 .12",guides),"live controller elbow guides parse");Check(!ParseControllerElbowGuides("left 0 0 0 right 1 0 0",guides),"zero elbow guide rejected without replacing valid settings");
+ ControllerSceneFrame sceneFrame;sceneFrame.camera={0,1,0};sceneFrame.neutral={2,0,3};sceneFrame.xrHead={2,0,3};auto physical=DriverIK::V{.3f,1.1f,-.4f};auto initialMarker=sceneFrame.Position(physical,{0,1,0},{1,0,0,0});
+ sceneFrame.xrHead={2.2f,.1f,3};auto movedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{1,0,0,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,movedMarker))<.00001f,"stationary controller marker stays fixed during head translation across tracking spaces");
+ sceneFrame.xrHeadQ={.70710678f,0,.70710678f,0};auto turnedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{.70710678f,0,.70710678f,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,turnedMarker))<.00001f,"stationary marker stays fixed during matching head rotation");
  ControllerFingerPose routedPose;std::string routeError;std::string routeIndex=changed;auto routePos=routeIndex.find("trigger_finger index");routeIndex.replace(routePos,std::string("trigger_finger index").size(),"trigger_finger index");Check(ParseControllerFingerPose(routeIndex,false,routedPose,routeError) && routedPose[0].triggerControlled && !routedPose[3].triggerControlled,"live routing can select index instead of middle");
  Check(!ParseControllerFingerPose(changed+"trigger_finger thumb\n",false,routedPose,routeError),"duplicate routing rejected without partial pose updates");
  DriverIK::V priorRay{0,0,-1},priorBend{0,-1,0};
@@ -331,6 +335,13 @@ int main() {
   }
   for(bool right:{false,true}){
    auto candidate=pose;auto before=DriverIK::FK(pose,positions);unsigned wrist=right?28:7;ControllerHand hand;hand.enabled=hand.calibrate=true;
+   {
+    auto rigidPose=pose;auto beforeRigid=DriverIK::FK(rigidPose,positions);unsigned wrist=right?28:7;ControllerHand rigidHand;rigidHand.enabled=true;rigidHand.calibrate=true;auto controller=DriverIK::Add(beforeRigid.p[wrist],DriverIK::V{0,.025f,0});
+    Check(ApplyControllerHand(rigidPose,positions,right,rigidHand,controller,{1,0,0,0},{1,0,0,0},1,1.f/90.f,{0,0,0},.5f,true),"rigid controller calibration retains wheel grip");
+    DriverIK::Q turn{.9961947f,0,0,.0871557f};auto expected=DriverIK::Add(controller,DriverIK::Rotate(turn,DriverIK::Sub(beforeRigid.p[wrist],controller)));
+    Check(ApplyControllerHand(rigidPose,positions,right,rigidHand,controller,turn,{1,0,0,0},1,1.f/90.f,{0,0,0},.5f,true),"controller roll rotates calibrated wrist offset");
+    Check(DriverIK::Length(DriverIK::Sub(DriverIK::FK(rigidPose,positions).p[wrist],expected))<.001f,"wrist maintains rigid controller offset through rotation");
+   }
    Check(ApplyControllerHand(candidate,positions,right,hand,{0,0,0},{1,0,0,0},{1,0,0,0},1),"controller calibration solves at current grip");
    auto calibrated=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(calibrated.p[wrist],before.p[wrist]))<.001f,"calibration preserves grip without jump");
    Check(ApplyControllerHand(candidate,positions,right,hand,{0,.01f,0},{.9961947f,0,.0871557f,0},{1,0,0,0},1),"controller live translation and rotation solve");

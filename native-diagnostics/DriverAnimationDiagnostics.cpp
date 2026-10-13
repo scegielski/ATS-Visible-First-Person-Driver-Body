@@ -260,7 +260,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.18.19");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.18.28");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -467,7 +467,7 @@ void UpdateHeadTorso() {
  const bool fresh=cameraKnown && pose.tick && now-pose.tick<=250 && (pose.flags&15)==15 && controls && now-controls<=250 && body && now-body<=250;
  nativeRecenterGate.Observe(nativeRecenterSequence.load(),nativeRecenterTick.load());
  bool recenter=nativeRecenterGate.Consume(now,pose.tick,fresh);
- if(recenter)Log(SPF_LOG_INFO,"HEAD_RECENTER native action applied from fresh post-request pose.");
+ if(recenter){ResetControllerMarkerFrame();Log(SPF_LOG_INFO,"HEAD_RECENTER native action applied from fresh post-request pose.");}
  if(!cameraKnown){headCalibration.filtered={};}
  else if(headCalibration.Step(pose,worldGeneration.load(),now,fresh,recenter,dt,headTrackingGain.load(),headForwardLimit.load(),headLateralLimit.load(),interior))Log(SPF_LOG_INFO,"HEAD_TORSO seated calibration captured.");
 {std::lock_guard lock(headDriveMutex);headDrive=headCalibration.filtered;}
@@ -484,6 +484,8 @@ void Update() {
  if(!enabled.load()) return;
  PollBodyVisibilityMode();PollInteriorHeadBackshift();
  PollObservedHead();
+ if(core && core->camera && core->camera->Cam_GetInteriorSeatPos){float x=0,y=0,z=0;if(core->camera->Cam_GetInteriorSeatPos(&x,&y,&z))SetControllerSceneCamera(x,y,z);}
+ static uint64_t markerCameraLog=0;auto cameraStamp=GetTickCount64();if(cameraStamp-markerCameraLog>=1000 && core && core->camera && core->camera->Cam_GetInteriorSeatPos){markerCameraLog=cameraStamp;float x=0,y=0,z=0;if(core->camera->Cam_GetInteriorSeatPos(&x,&y,&z)){char text[128];std::snprintf(text,sizeof(text),"MARKER_CAMERA_FRAME seat_offset=%.4f,%.4f,%.4f",x,y,z);Log(SPF_LOG_INFO,text);}}
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
@@ -731,6 +733,10 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  if(!enabled.load() || visibilityFaults.load() || count!=61 || bounds<0x1e0)return;
  const uintptr_t model=bounds-0x1e0;char path[192]{};uintptr_t expected=0;
  if(!ReadModelPath(model,path) || !SafeRead(model+0x1c0,&expected,8) || output!=expected)return;
+ if(!std::strcmp(path,"/model/spf_controller_markers/driver.pmd")){DriverPalette palette{};ApplyControllerMarkerPalette(palette);static std::atomic<uint64_t> markerFrames{0};auto sample=++markerFrames;if(sample==1 || sample%3000==0)Log(SPF_LOG_INFO,"CONTROLLER_SCENE_MARKER private scene model palette updated.");__try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));}__except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}return;}
+ if(!std::strcmp(path,"/model/spf_stock_driver/driver.pmd")){
+  static uint64_t logged=0;auto stamp=GetTickCount64();if(stamp-logged>=1000){logged=stamp;DriverPalette observed{};if(SafeRead(output,observed.data(),sizeof(observed))){char text[256];std::snprintf(text,sizeof(text),"MARKER_DRIVER_FRAME root=%.4f,%.4f,%.4f head=%.4f,%.4f,%.4f wrist_left=%.4f,%.4f,%.4f",observed[0][3],observed[0][7],observed[0][11],observed[47][3],observed[47][7],observed[47][11],observed[7][3],observed[7][7],observed[7][11]);Log(SPF_LOG_INFO,text);}}
+ }
  const bool privateModel=!std::strcmp(path,"/model/spf_stock_driver/driver.pmd");
  const bool privateBody=hideBody.load() && privateModel;
  const bool privateHead=privateModel && !privateBody && (!bodyCameraValid.load() || bodyCameraType.load()==2);
@@ -909,4 +915,12 @@ extern "C" SPF_PLUGIN_EXPORT bool SPF_GetPlugin(SPF_Plugin_Exports* api) {
  if(!api)return false;
  api->OnLoad=OnLoad;api->OnActivated=Activated;api->OnUpdate=Update;api->OnUnload=Unload;
  api->OnWorldUnloaded=Reset;api->OnGameWorldReady=Reset;return true;
+}
+
+extern "C" void ObserveMarkerXRFrame(uintptr_t owner) noexcept {
+ static std::atomic<uint64_t> last{0};auto now=GetTickCount64();
+ float reference[8]{},current[8]{};if(!SafeRead(owner+0x410,reference,sizeof(reference)) || !SafeRead(owner+0x438,current,sizeof(current)))return;
+ for(float v:reference)if(!std::isfinite(v))return;for(float v:current)if(!std::isfinite(v))return;
+ SetControllerSceneXRFrame(reference,current);if(now-last.load()<1000)return;last.store(now);
+ char text[512];std::snprintf(text,sizeof(text),"MARKER_XR_FRAME neutral_pos=%.4f,%.4f,%.4f neutral_q=%.5f,%.5f,%.5f,%.5f current_pos=%.4f,%.4f,%.4f current_q=%.5f,%.5f,%.5f,%.5f",reference[0],reference[1],reference[2],reference[4],reference[5],reference[6],reference[7],current[0],current[1],current[2],current[4],current[5],current[6],current[7]);Log(SPF_LOG_INFO,text);
 }

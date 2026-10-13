@@ -2,7 +2,8 @@
 #include "NativeControllerInput.hpp"
 #include <atomic>
 namespace {std::atomic<int> status{5};}
-extern "C" void CaptureXRContext(uintptr_t) noexcept {}
+extern "C" void ObserveMarkerXRFrame(uintptr_t) noexcept;
+extern "C" void CaptureXRContext(uintptr_t owner) noexcept {ObserveMarkerXRFrame(owner);}
 extern "C" uintptr_t PrepareControllerActionAttach(uintptr_t,uintptr_t info) noexcept {return info;}
 bool PollNativeControllerButtons(bool (&pressed)[2],float (&grip)[2],float (&trigger)[2],bool (&mode)[2],bool (&thumb)[2],float (&inward)[2]){
  inward[0]=inward[1]=0;pressed[0]=pressed[1]=false;grip[0]=grip[1]=trigger[0]=trigger[1]=0;mode[0]=mode[1]=thumb[0]=thumb[1]=false;auto module=GetModuleHandleW(L"spf_controller_xr_layer.dll");if(!module){status.store(5);return false;}

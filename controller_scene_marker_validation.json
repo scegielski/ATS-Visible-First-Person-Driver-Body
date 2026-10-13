@@ -1,0 +1,25 @@
+{
+  "marker_bones": [
+    7,
+    28
+  ],
+  "axes_per_hand": 3,
+  "axis_length_m": 0.12,
+  "mount_locators": 2,
+  "driver_mesh_unchanged": true,
+  "visual_validation_pending": false,
+  "physical_controller_axes_alignment_user_verified": true,
+  "hand_alignment_user_verified": true,
+  "controller_markers_persistent_when_hand_ik_enabled": true,
+  "private_axis_colors": [
+    "red X",
+    "green Y",
+    "blue Z"
+  ],
+  "tracking_frame": "SteamVR to ATS local via paired HMD poses, then native recenter and cabin camera",
+  "hand_mapping": "shared scene frame and rigid rotating controller-to-wrist calibration offset",
+  "plugin_version": "0.18.28",
+  "archive_version": "0.8.1",
+  "plugin_sha256": "d9ec08fdca8142550db3db6f509b94fda376ecad7f8b68ef8f4bfaedcd412c82",
+  "archive_sha256": "9d6f1d2aa0e5feb41f2931fe96a728cda9ddffccb60539190985f1310b84ead5"
+}
