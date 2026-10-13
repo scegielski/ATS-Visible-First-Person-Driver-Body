@@ -115,3 +115,12 @@ User confirms axes now stay at physical controller positions, but hands separate
 
 ### Validated scene/controller checkpoint
 User confirmed the scene axes stay at controller locations and the final rigid-offset hand update is exactly aligned. Installed plugin 0.18.28 and colored scene archive 0.8.1 match release binaries. Both regression suites pass. Scene meshes remain visible with hand IK on or off, with physical reach limits preserved. Camera mounting calibration currently targets the Mustang.
+
+### Calibration-only scene axes (0.18.29 test)
+Each scene marker now hides while that hand IK is enabled and reappears when disabled, preserving the validated physical controller frame and rigid-offset hand mapping. Each hand toggles independently. Visual recheck pending.
+
+### Hand activation feedback (0.18.30 test)
+Thumbstick click state changes request a vibration pulse on that hand plus an ascending two-tone engagement sound or descending two-tone disengagement sound. Long-hold re-enabling also cues the state change; a hold recalibrating an already-enabled hand does not repeat engagement feedback. Existing finger cues unchanged. Visual/audio runtime check pending.
+
+### Validated hand-toggle feedback checkpoint
+User confirmed engagement/disengagement tones and controller vibration work in game and requested commit/push. Final plugin 0.18.30 and both sound assets match installed files. Calibration axes hide while each hand is enabled. Both regression suites pass.
