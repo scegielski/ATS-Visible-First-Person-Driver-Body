@@ -47,3 +47,38 @@ The default trigger finger is now middle; grip curls thumb, index, ring and litt
 0.18.9 is installed with both live files routed to middle-trigger control. Pre-update plugin and live files are backed up. The existing early input bridge and controller-enabled launcher are unchanged. Visual test pending.
 
 The user requested the complete current finger-control checkpoint be committed. Installed plugin, bridge and both live pose files match the packaged files. Runtime health recorded 4878 left and 4850 right solves, zero rejected solves, zero caught pose faults and zero rejected live files. Both initial live pose revisions were accepted. Grip controls all except middle; trigger controls middle, with the selected finger editable in each live file. Controller X/A mode buttons are a separate subsequent change.
+
+## Controller X/A finger mode test (0.18.10, uncommitted)
+The early input layer adds X on the left Oculus Touch controller and A on the right as independent boolean mode actions. Each rising press alternates that hand's trigger-controlled finger between middle and index; grip controls the remaining fingers. Holding a button does not repeat. Tracking recovery with the button held does not create another edge. Choices are independent, reset on world changes, and revert to the live file's routing when its pose revision changes. Pose rotations and thumbstick calibration remain unchanged. The plugin and early layer must be installed as a matching pair. Regression tests cover binding/action type setup, independent mode state, held-button suppression, tracking recovery and live-file override reset. Runtime visual validation pending.
+
+### Finger mode transitions (0.18.11 test)
+X/A now blend index and middle input routing over 0.18 seconds, independently per hand. Grip and trigger values remain live during the eased transition; retoggling continues from the current blend. The live `config/controller_finger_mode_blend_seconds.txt` setting accepts a positive finite duration in seconds and reloads every half second; invalid edits retain the previous duration. This plugin update uses the existing 0.18.10 input bridge. Visual validation pending.
+
+### Independent thumb buttons (0.18.12 test)
+Hold Y on the left controller or B on the right to curl that thumb; release to return to its live open pose. Thumb input replaces grip control for the three thumb joints and is smoothed like grip/trigger. X/A finger mode switching remains independent. Requires the paired early input bridge update and one restart. Visual validation pending.
+
+### Four-finger cycle (0.18.13 test)
+X/A independently advance trigger control through index, middle, ring, and little finger (wrapping to index). Initial selection comes from each live pose file, currently middle, so the first press selects ring. Grip controls the remaining three fingers; Y/B retain separate thumb control. Mode changes retain the live eased blend duration. Tests cover both sides, full wraparound, held-button suppression, tracking recovery, and rapid cycling. Visual validation pending.
+
+### Finger cycle correction (0.18.14 test)
+User visual testing identified the ring/little groups as reversed in the assumed skeleton order. Cycle now uses joint groups 0, 1, 3, 2 to produce the visible index, middle, ring, pinky order on each hand. Status labels corrected accordingly. Smooth routing and thumb buttons unchanged. Visual recheck pending.
+
+### Multiple trigger fingers (0.18.15 test)
+X/A select the finger without changing current membership. Push the left stick right or the right stick left to add/remove that selected finger. An inward value above 0.7 toggles once; return below 0.3 to rearm. Tracking loss suppresses a held-stick recovery edge. A higher beep means added and a lower beep means removed. Selected members follow trigger together; others follow grip, and Y/B still control thumbs. Smooth live routing transitions retained. Paired input bridge update requires one restart. Visual validation pending.
+
+### Visible X/A cycling restored (0.18.16 test)
+X/A move the selected finger membership to the next finger while preserving other assigned fingers. Inward stick still toggles the selected finger membership. This restores visible cycling from the default single-finger mode; when the selected finger is unassigned, cycling only moves the selection until it is added. Regression covers preserving an additional middle-finger assignment. Visual recheck pending.
+
+### Controller vibration feedback (0.18.17 test)
+Adds native OpenXR haptic actions for both controllers. A successful X/A cycle or inward-stick membership toggle requests one 60 ms pulse at 60% amplitude on that hand; membership beeps retained. Paired bridge update requires restart. Mock tests validate output action selection, pulse parameters, and invalid side rejection. Physical feedback still needs runtime validation.
+
+### Independent membership correction (0.18.18 test)
+X/A now move only the selection cursor and preserve every trigger membership. Inward stick toggles exactly the currently selected finger on/off. This supersedes 0.18.16 assignment-transfer behavior, which interfered with building groups. Haptic selection feedback and membership beeps retained. Tests verify two-finger groups and unchanged membership across selection. Visual validation pending.
+
+### Spoken selection (0.18.19 test)
+X/A play pre-generated speech naming the selected side and finger, such as left index or right pinky. Eight WAV files reside in config; playback is asynchronous, with newer cues replacing older playback. Vibration and membership beeps retained. Both live pose files now default trigger assignment to index. Audio requires runtime listening check.
+
+Selection also briefly flexes the chosen finger over 0.35 seconds, then returns to its current live grip/trigger pose without changing membership. For a closed finger the preview opens it; for an open finger it curls it.
+
+### Final controller selection checkpoint
+User requested commit and push after testing spoken names on both hands. Installed 0.18.19 plugin and 0.18.17 input bridge match packaged generic release binaries. Both live files default to index. Automated regression checks pass. Physical vibration and full multi-finger visual behavior have not received an explicit final confirmation.
