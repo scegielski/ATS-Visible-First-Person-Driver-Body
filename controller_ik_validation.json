@@ -3,5 +3,17 @@
   "user_validation": "Both controller hands work; intermittent elbow bend-direction errors remain.",
   "runtime_last_health": "[2026-10-13 11:56:51.633] [5808] [INFO] [P] [SPF_DriverAnimationDiagnostics] CONTROLLER_IK connected=1 error=0 native_input=0 left_valid=1 right_valid=1 left_enabled=0 right_enabled=0 samples=10403,10403 solves=8330,6470 rejected=0,0 calibrations=4,5",
   "test_status": "DriverDiagnosticRegression and ControllerLayerRegression passed",
-  "launch_scope": "In-process bridge, external official loader and child-process explicit layer enable; normal Steam launch activation pending."
+  "launch_scope": "In-process bridge, external official loader and child-process explicit layer enable; normal Steam launch activation pending.",
+  "elbow_checkpoint": {
+    "version": "0.18.5",
+    "user_request": "Commit the changes before adding forearm twist sharing",
+    "left_solves": 6650,
+    "right_solves": 6501,
+    "rejected_solves": [
+      0,
+      0
+    ],
+    "caught_pose_faults": 0,
+    "tests": "DriverDiagnosticRegression and ControllerLayerRegression passed"
+  }
 }

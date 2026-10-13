@@ -110,6 +110,9 @@ int main() {
  Check(CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached) && combinedInfo.countActionSets==2 && attached[0]==originalAction && attached[1]==extraAction,"native controller attachment retains ATS action sets");
  originalInfo.countActionSets=17;Check(!CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached),"unexpected attachment layout rejected");
 
+ ControllerElbowGuides guides;Check(ParseControllerElbowGuides("left -.12 -.35 .12\nright .12 -.35 .12",guides),"live controller elbow guides parse");Check(!ParseControllerElbowGuides("left 0 0 0 right 1 0 0",guides),"zero elbow guide rejected without replacing valid settings");
+ DriverIK::V priorRay{0,0,-1},priorBend{0,-1,0};
+ for(unsigned step=0;step<200;++step){float t=step/199.f;auto ray=DriverIK::Unit(DriverIK::V{.3f*std::sin(t*6.28f),-.4f+.8f*t,-1});auto bend=StableControllerBend(ray,{0,-1,0},priorRay,priorBend,1.f/90.f);auto transported=DriverIK::Unit(DriverIK::Rotate(DriverIK::Between(priorRay,ray),priorBend));Check(DriverIK::Dot(bend,transported)>.998f,"controller elbow pole cannot flip between continuous frames");Check(std::abs(DriverIK::Dot(bend,ray))<.0001f,"stable elbow guide remains perpendicular to reach");priorRay=ray;priorBend=bend;}
  ControllerHand button;button.Button(true,100,true);Check(button.enabled && button.calibrate,"controller first thumbstick press enables calibration");button.Button(true,200,true);Check(button.enabled,"held click does not toggle repeatedly");button.Button(false,300,true);button.Button(true,400,true);Check(!button.enabled,"second click disables independently");button.Button(true,1200,true);Check(button.enabled && button.calibrate,"long hold recalibrates and enables");
 
  gRecenterOriginal=reinterpret_cast<void*>(RecenterTestContinuation);Check(RecenterTestEntry(123,0x1122334455667701ull)==0x1122334455667701ull,"recenter observer leaves native edge register unchanged");
@@ -279,6 +282,13 @@ int main() {
    auto moved=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(moved.p[wrist],DriverIK::Add(before.p[wrist],{0,.01f,0})))<.001f,"controller wrist follows calibrated displacement");
    for(unsigned bone=0;bone<61;++bone)if(bone!=(right?26:5) && bone!=(right?27:6) && bone!=wrist)Check(candidate[bone]==pose[bone],"controller preserves opposite arm fingers legs torso");
    Check(ApplyControllerHand(candidate,positions,right,hand,{0,0,-10},{1,0,0,0},{1,0,0,0},1),"controller unreachable target clamps to arm envelope");
+   auto upper=right?26u:5u;float armLength=DriverIK::Length(positions[upper+1])+DriverIK::Length(positions[wrist]);
+   for(unsigned step=0;step<60;++step){
+    float t=step/59.f;auto direction=DriverIK::Unit(DriverIK::Add(DriverIK::Sub(before.p[wrist],before.p[upper]),{.16f*std::sin(t*6.28f),.15f*std::sin(t*3.14f),0}));auto target=DriverIK::Add(before.p[upper],DriverIK::Mul(direction,armLength*.92f));auto point=DriverIK::Sub(target,hand.anchor);candidate=pose;
+    Check(ApplyControllerHand(candidate,positions,right,hand,point,{1,0,0,0},{1,0,0,0},1),"controller stable elbow solves continuous cross-body and extended sweep");auto solved=DriverIK::FK(candidate,positions);
+    Check(DriverIK::Length(DriverIK::Sub(solved.p[wrist],target))<.001f,"stable elbow retains controller wrist target throughout sweep");float orientationDot=0;for(unsigned j=0;j<4;++j)orientationDot+=solved.q[wrist][j]*before.q[wrist][j];Check(std::abs(orientationDot)>.9999f,"elbow stabilization retains hand orientation");
+   }
+
   }
 
   for(DriverIK::V delta: {DriverIK::V{.08f,0,0},DriverIK::V{-.08f,0,0},DriverIK::V{0,0,-.10f},DriverIK::V{0,0,.04f}}){
