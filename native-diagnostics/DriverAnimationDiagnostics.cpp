@@ -37,6 +37,7 @@
 #include <cstdio>
 #include <cstring>
 #include <vector>
+#include <limits>
 
 extern "C" {
 void* gDriverOriginal=nullptr;
@@ -66,7 +67,7 @@ std::atomic<bool> hornHeld{false};
 std::atomic<bool> bodyCameraValid{false},hideBody{false};
 std::atomic<int> bodyCameraType{-1};
 std::atomic<uint64_t> hiddenBodyFrames{0},visibilityFaults{0};
-std::atomic<int> bodyVisibilityMode{1};
+std::atomic<int> bodyVisibilityMode{1};std::atomic<float> interiorHeadBackshift{0.f};std::atomic<bool> collapseInteriorHead{false};
 std::atomic<bool> hideStockDriver{false};
 std::atomic<uintptr_t> expectedPlayerDriverController{0},expectedPlayerDriverModel{0},confirmedPlayerDriverModel{0};
 std::atomic<uint64_t> playerDriverTick{0},playerDriverMatches{0},hiddenStockFrames{0},hiddenHeadFrames{0};
@@ -253,7 +254,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.16.7");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.16.13");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -426,6 +427,16 @@ void PollHeadTrackingLimits() {
  const bool changed=limits.forward!=headForwardLimit.load() || limits.degrees!=headLeanLimitDegrees.load() || limits.lateral!=headLateralLimit.load();headForwardLimit.store(limits.forward);headLeanLimitDegrees.store(limits.degrees);headLateralLimit.store(limits.lateral);
  if(changed){char message[160];std::snprintf(message,sizeof(message),"HEAD_LIMITS_RELOAD forward_m=%.3f max_lean_degrees=%.1f lateral_m=%.3f",limits.forward,limits.degrees,limits.lateral);Log(SPF_LOG_INFO,message);}
 }
+void PollInteriorHeadBackshift() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollInteriorHeadBackshift),&module) || !GetModuleFileNameW(module,name,32768))return;
+ auto modePath=std::filesystem::path(name).parent_path()/L"config"/L"interior_head_mode.txt";
+ std::error_code modeError;auto modeSize=std::filesystem::file_size(modePath,modeError);
+ if(!modeError && modeSize<=64){std::ifstream modeFile(modePath);std::string mode,extra;if((modeFile>>mode) && !(modeFile>>extra) && (mode=="visible" || mode=="collapse")){bool collapse=mode=="collapse";if(collapseInteriorHead.exchange(collapse)!=collapse)Log(SPF_LOG_INFO,collapse?"INTERIOR_HEAD_MODE collapse":"INTERIOR_HEAD_MODE visible");}}
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"interior_head_backshift.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
+ std::ifstream file(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) )return;
+ if(interiorHeadBackshift.exchange(value)!=value){char message[128];std::snprintf(message,sizeof(message),"INTERIOR_HEAD_RELOAD backshift_m=%.4f",value);Log(SPF_LOG_INFO,message);}
+}
 void PollHeadTrackingGain() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
  HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollHeadTrackingGain),&module) || !GetModuleFileNameW(module,name,32768))return;
@@ -458,7 +469,7 @@ void PollObservedHead() {
 }
 void Update() {
  if(!enabled.load()) return;
- PollBodyVisibilityMode();
+ PollBodyVisibilityMode();PollInteriorHeadBackshift();
  PollObservedHead();
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
@@ -595,7 +606,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  const bool leftActive=gestures.horn.reach>0 || gestures.window.reach>0 || signal.reach>0,rightActive=rightMotion.reach>0 || ignition.reach>0;
  const HeadTorsoDrive trackedHead=SnapshotHeadDrive();
  const bool headTorsoActive=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9 && trackedHead.tick && now-trackedHead.tick<=250 && (DriverIK::Length(trackedHead.delta)>1e-5f || std::abs(trackedHead.yaw)>1e-5f);
-  const bool exteriorHeadActive=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9 && bodyCameraType.load()!=2 && trackedHead.tick && now-trackedHead.tick<=250;
+  const bool exteriorHeadActive=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9 && trackedHead.tick && now-trackedHead.tick<=250;
  const bool elbowFresh=telTick && now-telTick<=250;
  const bool elbowActive=leftElbowInset.load()>0 && elbowFresh,rightElbowActive=rightElbowInset.load()>0 && elbowFresh;
  if((leftActive || rightActive || elbowActive || rightElbowActive || headTorsoActive || exteriorHeadActive) && !hornFaults.load()) {
@@ -692,7 +703,12 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  const bool playerStock=hideStockDriver.load() && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && tick && now-tick<=750 && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd");
  if(!privateBody && !playerStock && !privateHead)return;
  DriverPalette palette{};if(!SafeRead(output,palette.data(),sizeof(palette)))return;
- if(privateHead){if(!CollapseDriverHead(palette))return;}else if(!CollapseDriverPalette(palette))return;
+ const auto headBefore=palette[47];
+ if(privateHead){if(collapseInteriorHead.load()){if(!CollapseDriverHead(palette,interiorHeadBackshift.load()))return;}else if(!OffsetDriverHead(palette,interiorHeadBackshift.load()))return;}else if(!CollapseDriverPalette(palette))return;
+ if(privateHead){
+  static float lastLogged=std::numeric_limits<float>::quiet_NaN();const float offset=interiorHeadBackshift.load();
+  if(offset!=lastLogged){lastLogged=offset;char message[192];std::snprintf(message,sizeof(message),"INTERIOR_HEAD_APPLIED collapse=%d offset_m=%.3f palette_delta=%.4f,%.4f,%.4f",collapseInteriorHead.load()?1:0,offset,palette[47][3]-headBefore[3],palette[47][7]-headBefore[7],palette[47][11]-headBefore[11]);Log(SPF_LOG_INFO,message);}
+ }
  __try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));if(privateBody)hiddenBodyFrames.fetch_add(1);if(playerStock)hiddenStockFrames.fetch_add(1);if(privateHead)hiddenHeadFrames.fetch_add(1);}
  __except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}
 }

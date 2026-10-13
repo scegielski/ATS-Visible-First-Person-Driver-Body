@@ -1,6 +1,6 @@
 # Live VR head and torso tracking
 
-Validated release: 0.16.7. The user confirmed torso tracking inside and outside and exterior head animation. The final runtime snapshot recorded more than twenty-two thousand torso updates and more than three thousand exterior head updates with no rejected solves; the last hand-target error was below a millimetre. See head_tracking_validation.json.
+Validated release: 0.16.13. The user confirmed torso tracking inside and outside and exterior head animation. The final runtime snapshot recorded more than twenty-two thousand torso updates and more than three thousand exterior head updates with no rejected solves; the last hand-target error was below a millimetre. See head_tracking_validation.json.
 
 ## Tracked pose and calibration
 
@@ -12,7 +12,7 @@ A seated baseline is captured in the interior camera. Use your usual ATS reset-h
 
 Head translation drives a restrained three-spine-joint lean, and one fifth of head yaw drives a torso turn capped at ten degrees before gain. Inputs smooth over approximately a tenth of a second. Hips and legs remain seated. Analytic arm IK preserves the current wrist targets and orientations, including steering re-grabs and active horn, gestures, signals or ignition. Unreachable combinations reduce lean transactionally instead of stretching the arms. Calibrated elbow guides still apply afterward.
 
-In exterior views, calibrated headset rotation drives neck and head joints, with a world-space target compensating torso lean rather than applying its rotation twice. Correction is distributed 65 percent to neck, with the residual at the head. Total head rotation is bounded to 85 degrees. First-person head/neck hiding and the guarded player exterior replacement remain intact. Lost tracking fades toward neutral. This approximates torso motion from head tracking rather than reconstructing full-body pose.
+In interior and exterior views, calibrated headset rotation drives neck and head joints, with a world-space target compensating torso lean rather than applying its rotation twice. Correction is distributed 65 percent to neck, with the residual at the head. Total head rotation is bounded to 85 degrees. The user-approved first-person head remains intact with zero offset; the guarded player exterior replacement remains active. Lost tracking fades toward neutral. This approximates torso motion from head tracking rather than reconstructing full-body pose.
 
 ## Live configuration
 

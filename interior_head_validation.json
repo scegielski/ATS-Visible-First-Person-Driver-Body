@@ -1,0 +1,43 @@
+{
+  "version": "0.16.13",
+  "final_mode": "visible",
+  "final_offset_m": 0,
+  "head_tracking_interior_and_exterior": true,
+  "user_approved_for_commit": true,
+  "corrected_collapse_visual_test_passed": true,
+  "corrected_intact_offset_visual_test_passed": true,
+  "user_final_preference": "Intact tracked head, zero offset, no collapse",
+  "render_matrix_layout": "row-major affine, translation elements 3,7,11",
+  "collapse_anchor": "neck bone matrix origin before inverse-bind multiplication",
+  "render_applied_samples": [
+    {
+      "collapse": true,
+      "offset_m": 0.0,
+      "translation_delta_m": [
+        0.0003,
+        -0.0768,
+        0.0201
+      ]
+    },
+    {
+      "collapse": false,
+      "offset_m": 0.1,
+      "translation_delta_m": [
+        0.0,
+        0.0,
+        0.1
+      ]
+    },
+    {
+      "collapse": false,
+      "offset_m": 0.0,
+      "translation_delta_m": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "tests_passed": true,
+  "installed_release_and_configs_byte_exact": true
+}

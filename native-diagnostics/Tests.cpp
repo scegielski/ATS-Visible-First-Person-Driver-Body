@@ -202,13 +202,34 @@ int main() {
  {
  Check(!HideInteriorBody(true,2) && !HideInteriorBody(false,1),"interior camera and unknown camera retain body");
  for(int camera:{0,1,3,4,5,6,7,9})Check(HideInteriorBody(true,camera),"exterior camera hides private body");
- DriverPalette palette{};for(auto& matrix:palette){matrix[0]=matrix[5]=matrix[10]=matrix[15]=1;matrix[12]=1;matrix[13]=2;matrix[14]=3;}
+ DriverPalette palette{};for(auto& matrix:palette){matrix[0]=matrix[5]=matrix[10]=matrix[15]=1;matrix[3]=1;matrix[7]=2;matrix[11]=3;}
  auto headOnly=palette;Check(CollapseDriverHead(headOnly),"interior head collapse remains finite");
  for(unsigned bone=0;bone<61;++bone)if(bone!=46 && bone!=47)Check(headOnly[bone]==palette[bone],"head hiding preserves body arms fingers and legs");
  Check(headOnly[46][0]==0 && headOnly[47][0]==0 && headOnly[46]==headOnly[47],"head and neck collapse at shared finite anchor");
+ auto visibleHead=palette;Check(OffsetDriverHead(visibleHead,0) && visibleHead==palette,"visible interior head retains complete normal palette at default position");
+ Check(OffsetDriverHead(visibleHead,.08f),"intact head rearward offset is finite");
+ for(unsigned bone=0;bone<61;++bone)for(unsigned element=0;element<16;++element){if((bone==46 || bone==47) && element==11)Check(std::abs(visibleHead[bone][element]-palette[bone][element]-.08f)<1e-6f,"intact head moves rearward");else Check(visibleHead[bone][element]==palette[bone][element],"intact head keeps rotation scale and all other bones");}
+ auto forwardHead=palette;Check(OffsetDriverHead(forwardHead,-.20f),"signed head offset supports opposite direction");Check(std::abs(forwardHead[47][11]-palette[47][11]+.20f)<1e-6f,"opposite offset moves head forwards");
+ auto rearHead=palette;Check(CollapseDriverHead(rearHead,.08f),"interior head rearward adjustment is finite");
+ Check(std::abs(rearHead[47][11]-headOnly[47][11]-.08f)<1e-6f && rearHead[47][3]==headOnly[47][3] && rearHead[47][7]==headOnly[47][7],"rearward shift changes Z without lowering Y");
+ for(unsigned bone=0;bone<61;++bone)if(bone!=46 && bone!=47)Check(rearHead[bone]==palette[bone],"rearward hiding does not change torso arms or legs");
+ auto rejectRear=palette;Check(!CollapseDriverHead(rejectRear,std::numeric_limits<float>::quiet_NaN()) && rejectRear==palette,"invalid backshift leaves palette unchanged");
+ auto rotatedRoot=palette;rotatedRoot[0][0]=0;rotatedRoot[0][2]=-1;rotatedRoot[0][8]=1;rotatedRoot[0][10]=0;auto noShift=rotatedRoot;
+ Check(CollapseDriverHead(noShift) && CollapseDriverHead(rotatedRoot,.08f),"model-space rearward shift with rotated root");
+ Check(std::abs(rotatedRoot[47][11]-noShift[47][11]-.08f)<1e-6f && rotatedRoot[47][3]==noShift[47][3] && rotatedRoot[47][7]==noShift[47][7],"head shift uses model Z independently of root rotation");
+ auto visibleRotated=palette;visibleRotated[0]=rotatedRoot[0];auto originalVisible=visibleRotated;
+ Check(OffsetDriverHead(visibleRotated,-.20f),"intact head model-space forward shift with rotated root");
+ Check(std::abs(visibleRotated[47][11]-originalVisible[47][11]+.20f)<1e-6f && visibleRotated[47][3]==originalVisible[47][3] && visibleRotated[47][7]==originalVisible[47][7],"rotation cannot convert forward offset into downward or sideways motion");
  Check(CollapseDriverPalette(palette),"finite palette collapses safely");
- for(auto& matrix:palette)Check(matrix[0]==0 && matrix[5]==0 && matrix[10]==0 && matrix[12]==1 && matrix[13]==2 && matrix[14]==3 && matrix[15]==1,"every skinned vertex maps to same finite point");
+ for(auto& matrix:palette)Check(matrix[0]==0 && matrix[5]==0 && matrix[10]==0 && matrix[3]==1 && matrix[7]==2 && matrix[11]==3 && matrix[15]==1,"every skinned vertex maps to same finite point");
  auto invalid=palette;invalid[4][2]=std::numeric_limits<float>::quiet_NaN();Check(!CollapseDriverPalette(invalid),"invalid palette rejected before writing");
+ auto worldNeck=originalVisible;worldNeck[46]={0,0,1,.30f,0,1,0,1.50f,-1,0,0,-.10f,0,0,0,1};
+ Check(CollapseDriverHead(worldNeck),"row-major neck origin collapse");
+ Check(worldNeck[47][3]==.30f && worldNeck[47][7]==1.50f && worldNeck[47][11]==-.10f && worldNeck[47][12]==0 && worldNeck[47][13]==0 && worldNeck[47][14]==0 && worldNeck[47][15]==1,"collapse retains actual neck origin and homogeneous row");
+ std::array<float,16> inverseBind{0,0,-1,2,0,1,0,-1.5f,1,0,0,3,0,0,0,1},skinned{};
+ for(unsigned row=0;row<4;++row)for(unsigned col=0;col<4;++col)for(unsigned k=0;k<4;++k)skinned[row*4+col]+=worldNeck[47][row*4+k]*inverseBind[k*4+col];
+ for(std::array<float,4> vertex:{std::array<float,4>{0,0,0,1},std::array<float,4>{2,1.6f,-4,1}}){std::array<float,4> result{};for(unsigned row=0;row<4;++row)for(unsigned col=0;col<4;++col)result[row]+=skinned[row*4+col]*vertex[col];Check(result[0]==.30f && result[1]==1.50f && result[2]==-.10f && result[3]==1,"inverse bind leaves collapsed vertices at neck rather than zero origin");}
+
  }
 
  {
