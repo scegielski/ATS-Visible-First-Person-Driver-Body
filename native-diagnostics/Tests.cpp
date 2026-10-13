@@ -15,6 +15,7 @@
 #include "SignalTiming.hpp"
 #include "HeadTracking.hpp"
 #include "HeadTorso.hpp"
+#include "GestureHeadFollow.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
 #include "BodyVisibility.hpp"
@@ -98,6 +99,7 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
 }
 int main() {
  gRecenterOriginal=reinterpret_cast<void*>(RecenterTestContinuation);Check(RecenterTestEntry(123,0x1122334455667701ull)==0x1122334455667701ull,"recenter observer leaves native edge register unchanged");
+ Check(GestureLookPitch({.9659258f,.258819f,0,0})>.5f && GestureLookPitch({.9659258f,-.258819f,0,0})<-.5f,"upward and downward head pitch signs follow tracked look");
  NativeRecenterGate nativeCalibration;nativeCalibration.Observe(1,100);
  Check(!nativeCalibration.Consume(100,100,true),"recenter waits beyond pre-request pose");
  Check(!nativeCalibration.Consume(120,110,false),"invalid tracking cannot recalibrate");
@@ -312,6 +314,24 @@ int main() {
    auto candidate=pose;auto before=DriverIK::FK(candidate,positions);float strength,error;
    Check(DriverIK::TrackHeadTorso(candidate,positions,{side,0,0},0,strength,error,40),"larger lateral range accepted without arbitrary solver cap");
    auto after=DriverIK::FK(candidate,positions);for(unsigned hand:{7u,28u})Check(DriverIK::Length(DriverIK::Sub(after.p[hand],before.p[hand]))<.001f,"large lateral lean retains both wrist targets");
+  }
+  for(bool right:{false,true})for(float yaw:{-1.f,0.f,1.f}){
+   auto candidate=pose;BlendWindowGesture(candidate,{1,1,1},right?kRightGestureTargets:kWindowGestureTargets);auto original=candidate;auto before=DriverIK::FK(candidate,positions);unsigned upper=right?26:5,lower=right?27:6,hand=right?28:7;
+   Check(FollowGestureHead(candidate,positions,right,1,yaw,1),"gesture follows calibrated look yaw at shoulder");
+   auto after=DriverIK::FK(candidate,positions);DriverIK::Q turn{std::cos(yaw/2),0,std::sin(yaw/2),0};auto target=DriverIK::Add(before.p[upper],DriverIK::Rotate(turn,DriverIK::Sub(before.p[hand],before.p[upper])));
+   Check(DriverIK::Length(DriverIK::Sub(after.p[hand],target))<.001f && DriverIK::Length(DriverIK::Sub(after.p[upper],before.p[upper]))<.001f,"gesture wrist rotates around stationary shoulder");
+   Check(std::abs(DriverIK::Length(DriverIK::Sub(after.p[lower],after.p[upper]))-DriverIK::Length(DriverIK::Sub(before.p[lower],before.p[upper])))<1e-5f,"gesture follow preserves arm length");
+   for(unsigned bone=0;bone<61;++bone)if(bone!=upper)Check(candidate[bone]==original[bone],"look following preserves finger pose and all other local joints");
+   float strength,error;Check(DriverIK::TrackHeadTorso(candidate,positions,{.04f,0,-.05f},.05f,strength,error,40),"torso compensation supports moving gesture target");auto leaned=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(leaned.p[hand],target))<.001f,"torso IK retains head-following gesture target");
+   auto neutral=original;Check(FollowGestureHead(neutral,positions,right,0,yaw,1) && neutral==original,"released gesture leaves steering unchanged");
+  }
+  for(bool right:{false,true})for(float pitch:{-.6f,.6f}){
+   auto candidate=pose;BlendWindowGesture(candidate,{1,1,1},right?kRightGestureTargets:kWindowGestureTargets);auto original=candidate;auto before=DriverIK::FK(candidate,positions);unsigned upper=right?26:5,hand=right?28:7;float yaw=.4f;
+   Check(FollowGestureHead(candidate,positions,right,1,yaw,1,pitch),"gesture follows head pitch and yaw together");
+   DriverIK::Q yawQ{std::cos(yaw/2),0,std::sin(yaw/2),0},pitchQ{std::cos(pitch/2),std::sin(pitch/2),0,0};auto turn=DriverIK::Product(yawQ,pitchQ);auto target=DriverIK::Add(before.p[upper],DriverIK::Rotate(turn,DriverIK::Sub(before.p[hand],before.p[upper])));auto after=DriverIK::FK(candidate,positions);
+   Check(DriverIK::Length(DriverIK::Sub(after.p[hand],target))<.001f,"pitched hand swings about shoulder pivot");
+   for(unsigned bone=0;bone<61;++bone)if(bone!=upper)Check(candidate[bone]==original[bone],"pitch follow preserves all other local joints and finger shape");
+   float strength,error;Check(DriverIK::TrackHeadTorso(candidate,positions,{.04f,0,-.05f},.05f,strength,error,40),"pitched gesture remains compatible with torso IK");auto leaned=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(leaned.p[hand],target))<.001f,"torso IK preserves pitched gesture hand target");
   }
   for(unsigned mode=0;mode<6;++mode){
    auto candidate=pose;

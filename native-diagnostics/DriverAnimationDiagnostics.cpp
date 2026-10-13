@@ -20,6 +20,7 @@
 #include "SignalTiming.hpp"
 #include "HeadTracking.hpp"
 #include "HeadTorso.hpp"
+#include "GestureHeadFollow.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
 #include "DriverSamples.hpp"
@@ -86,6 +87,7 @@ std::mutex headMutex;ObservedHead latestHead{};
 std::atomic<uint64_t> headAccepted{0},headRejected{0},headTorsoUpdates{0},headTorsoRejected{0},exteriorHeadUpdates{0},exteriorHeadRejected{0};
 std::mutex headDriveMutex;HeadTorsoDrive headDrive{};SeatedHeadCalibration headCalibration;
 std::atomic<float> headForwardLimit{.30f},headLeanLimitDegrees{28.f},headLateralLimit{.24f};
+std::atomic<float> gestureHeadFollowGain{1.f};std::atomic<uint64_t> gestureHeadFollowUpdates{0},gestureHeadFollowRejected{0};
 std::atomic<float> headTrackingGain{.65f},headTorsoError{0},headTorsoStrength{0};
 SignalSelection signalSelection;
 SignalRequestGate signalGate;std::mutex signalGateMutex;
@@ -254,7 +256,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.16.13");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.17.1");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -444,6 +446,13 @@ void PollHeadTrackingGain() {
  std::ifstream file(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>1)return;
  if(headTrackingGain.exchange(value)!=value)Log(SPF_LOG_INFO,"HEAD_TORSO live gain accepted.");
 }
+void PollGestureHeadFollowGain() {
+ static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
+ HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollGestureHeadFollowGain),&module) || !GetModuleFileNameW(module,name,32768))return;
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"gesture_head_follow_gain.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
+ std::ifstream file(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>1)return;
+ if(gestureHeadFollowGain.exchange(value)!=value)Log(SPF_LOG_INFO,"GESTURE_HEAD_FOLLOW live gain accepted.");
+}
 HeadTorsoDrive SnapshotHeadDrive(){std::lock_guard lock(headDriveMutex);return headDrive;}
 void UpdateHeadTorso() {
  static uint64_t previous=0;const auto now=GetTickCount64();float dt=previous?static_cast<float>(now-previous)/1000.f:0;previous=now;
@@ -474,7 +483,7 @@ void Update() {
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
- PollGesturePoseFile();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
+ PollGesturePoseFile();PollGestureHeadFollowGain();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
  if(engineValid){const int value=static_cast<int>(engineState);if(priorEngineSample>=0 && priorEngineSample!=1 && value==1){if(!skipNextEngineStartEvent.exchange(false))engineStartSequence.fetch_add(1);}priorEngineSample=value;}else priorEngineSample=-1;
@@ -521,6 +530,7 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  std::snprintf(text,sizeof(text),"GESTURE_HEAD_FOLLOW updates=%llu rejected=%llu gain=%.3f",static_cast<unsigned long long>(gestureHeadFollowUpdates.load()),static_cast<unsigned long long>(gestureHeadFollowRejected.load()),gestureHeadFollowGain.load());Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"EXTERIOR_HEAD_TRACKING updates=%llu rejected=%llu",static_cast<unsigned long long>(exteriorHeadUpdates.load()),static_cast<unsigned long long>(exteriorHeadRejected.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"HEAD_TORSO updates=%llu rejected=%llu strength=%.4f hand_error_m=%.6f",static_cast<unsigned long long>(headTorsoUpdates.load()),static_cast<unsigned long long>(headTorsoRejected.load()),headTorsoStrength.load(),headTorsoError.load());Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"SIGNAL_DELAY_HEALTH queued=%llu released=%llu timeouts=%llu cancels=%llu",static_cast<unsigned long long>(signalQueued.load()),static_cast<unsigned long long>(signalReleased.load()),static_cast<unsigned long long>(signalTimeouts.load()),static_cast<unsigned long long>(signalCancels.load()));Log(SPF_LOG_INFO,text);
@@ -617,6 +627,17 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   BlendLiveWindowGesture(rotations,gestures.window);
   if(signal.reach>0)BlendLiveSignal(rotations,signal);
   BlendLiveRightGesture(rotations,rightMotion);
+  if(exteriorHeadActive && (gestures.window.reach>0 || rightMotion.reach>0)){
+   DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};bool valid=SafeRead(pointers[1],scales.data(),sizeof(scales));
+   if(valid)for(const auto& scale:scales)for(float x:scale)if(!std::isfinite(x) || std::abs(x-1.f)>.001f)valid=false;
+   valid=valid && SafeRead(pointers[3],positions.data(),sizeof(positions));
+   if(valid){
+    const float yaw=GestureLookYaw(trackedHead.headRotation),pitch=GestureLookPitch(trackedHead.headRotation);bool accepted=true;
+    if(gestures.window.reach>0)accepted=FollowGestureHead(rotations,positions,false,gestures.window.reach,yaw,gestureHeadFollowGain.load(),pitch) && accepted;
+    if(rightMotion.reach>0)accepted=FollowGestureHead(rotations,positions,true,rightMotion.reach,yaw,gestureHeadFollowGain.load(),pitch) && accepted;
+    if(accepted)gestureHeadFollowUpdates.fetch_add(1);else gestureHeadFollowRejected.fetch_add(1);
+   }else gestureHeadFollowRejected.fetch_add(1);
+  }
   DriverIK::Pose unturned{};
   if(ignition.reach>0)BlendLiveIgnition(rotations,unturned,ignition);
   DriverIK::Positions headPositions{};DriverIK::Q headNeutralWorld{1,0,0,0};
