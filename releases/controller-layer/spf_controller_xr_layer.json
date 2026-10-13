@@ -1,0 +1,11 @@
+{
+  "file_format_version": "1.0.0",
+  "api_layer": {
+    "name": "XR_APILAYER_SPF_driver_controller_input",
+    "library_path": "./spf_controller_xr_layer.dll",
+    "api_version": "1.0",
+    "implementation_version": "1",
+    "description": "ATS driver hand controller input bridge; pass-through for other applications",
+    "disable_environment": "SPF_DISABLE_CONTROLLER_HANDS"
+  }
+}

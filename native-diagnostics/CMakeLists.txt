@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(DriverAnimationDiagnostics LANGUAGES CXX ASM_MASM)
 set(CMAKE_CXX_STANDARD 20)
-add_library(SPF_DriverAnimationDiagnostics SHARED DriverAnimationDiagnostics.cpp ObserveStubs.asm)
+add_library(SPF_DriverAnimationDiagnostics SHARED DriverAnimationDiagnostics.cpp ControllerRuntime.cpp NativeControllerInput.cpp ObserveStubs.asm)
 target_include_directories(SPF_DriverAnimationDiagnostics PRIVATE ../../SPF-Framework-1.2.5/include/SPF/SPF_API)
 target_link_libraries(SPF_DriverAnimationDiagnostics PRIVATE bcrypt)
 target_compile_definitions(SPF_DriverAnimationDiagnostics PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -9,3 +9,9 @@ target_compile_options(SPF_DriverAnimationDiagnostics PRIVATE $<$<COMPILE_LANGUA
 add_executable(DriverDiagnosticTests Tests.cpp ObserveStubs.asm SignalStubTests.asm)
 enable_testing()
 add_test(NAME DriverDiagnosticRegression COMMAND DriverDiagnosticTests)
+
+add_library(spf_controller_xr_layer SHARED ControllerLayer.cpp)
+target_compile_definitions(spf_controller_xr_layer PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+add_executable(ControllerLayerTests ControllerLayerTests.cpp ControllerLayer.cpp)
+target_compile_definitions(ControllerLayerTests PRIVATE SPF_CONTROLLER_LAYER_TEST WIN32_LEAN_AND_MEAN NOMINMAX)
+add_test(NAME ControllerLayerRegression COMMAND ControllerLayerTests)

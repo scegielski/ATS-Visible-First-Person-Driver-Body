@@ -16,6 +16,8 @@
 #include "HeadTracking.hpp"
 #include "HeadTorso.hpp"
 #include "GestureHeadFollow.hpp"
+#include "ControllerIK.hpp"
+#include "ControllerActionAttach.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
 #include "BodyVisibility.hpp"
@@ -33,6 +35,7 @@ extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
 void* gHeadOriginal=nullptr;
+void* gXRActionAttachOriginal=nullptr;
 void* gRecenterOriginal=nullptr;
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 uintptr_t EngineRequestObserveStub(uintptr_t,uint32_t,uint32_t,uint64_t,uint64_t);
@@ -97,7 +100,18 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  Check(output==11 && bounds==22 && count==61,"post bone receives original output/model/count");
  Check(boneOriginalCalls==bonePostCalls+1,"visibility runs after original hierarchy assembly");++bonePostCalls;volatile double clobber=1.25;clobber=std::sin(clobber);
 }
+extern "C" void CaptureXRContext(uintptr_t) noexcept {}
+extern "C" uintptr_t PrepareControllerActionAttach(uintptr_t owner,uintptr_t info) noexcept {Check(owner==123 && info==456,"XR attach observer receives owner and original info");return 789;}
+extern "C" uintptr_t XRActionAttachTest(uintptr_t,uintptr_t);
+extern "C" void XRActionAttachContinuation();
 int main() {
+ gXRActionAttachOriginal=reinterpret_cast<void*>(XRActionAttachContinuation);Check(XRActionAttachTest(123,456)==789,"XR attachment observer replaces only input pointer and preserves continuation");
+ std::array<XrActionSet,17> attached{};XrActionSet originalAction=reinterpret_cast<XrActionSet>(1), extraAction=reinterpret_cast<XrActionSet>(2);XrSessionActionSetsAttachInfo originalInfo{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};originalInfo.countActionSets=1;originalInfo.actionSets=&originalAction;XrSessionActionSetsAttachInfo combinedInfo{};
+ Check(CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached) && combinedInfo.countActionSets==2 && attached[0]==originalAction && attached[1]==extraAction,"native controller attachment retains ATS action sets");
+ originalInfo.countActionSets=17;Check(!CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached),"unexpected attachment layout rejected");
+
+ ControllerHand button;button.Button(true,100,true);Check(button.enabled && button.calibrate,"controller first thumbstick press enables calibration");button.Button(true,200,true);Check(button.enabled,"held click does not toggle repeatedly");button.Button(false,300,true);button.Button(true,400,true);Check(!button.enabled,"second click disables independently");button.Button(true,1200,true);Check(button.enabled && button.calibrate,"long hold recalibrates and enables");
+
  gRecenterOriginal=reinterpret_cast<void*>(RecenterTestContinuation);Check(RecenterTestEntry(123,0x1122334455667701ull)==0x1122334455667701ull,"recenter observer leaves native edge register unchanged");
  Check(GestureLookPitch({.9659258f,.258819f,0,0})>.5f && GestureLookPitch({.9659258f,-.258819f,0,0})<-.5f,"upward and downward head pitch signs follow tracked look");
  NativeRecenterGate nativeCalibration;nativeCalibration.Observe(1,100);
@@ -257,6 +271,16 @@ int main() {
  for(unsigned frame=0;frame<47;++frame){
   DriverIK::Pose pose{};DriverIK::Positions positions{};
   for(unsigned bone=0;bone<61;++bone){float values[14]{};source.seekg(offset+(frame*61+bone)*56);source.read(reinterpret_cast<char*>(values),56);Check(static_cast<bool>(source),"runtime IK fixture read");for(unsigned i=0;i<4;++i)pose[bone][i]=values[4+i];for(unsigned i=0;i<3;++i){positions[bone][i]=values[8+i];Check(std::abs(values[11+i]-1.f)<.001f,"stock rig uses unit scale");}}
+  for(bool right:{false,true}){
+   auto candidate=pose;auto before=DriverIK::FK(pose,positions);unsigned wrist=right?28:7;ControllerHand hand;hand.enabled=hand.calibrate=true;
+   Check(ApplyControllerHand(candidate,positions,right,hand,{0,0,0},{1,0,0,0},{1,0,0,0},1),"controller calibration solves at current grip");
+   auto calibrated=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(calibrated.p[wrist],before.p[wrist]))<.001f,"calibration preserves grip without jump");
+   Check(ApplyControllerHand(candidate,positions,right,hand,{0,.01f,0},{.9961947f,0,.0871557f,0},{1,0,0,0},1),"controller live translation and rotation solve");
+   auto moved=DriverIK::FK(candidate,positions);Check(DriverIK::Length(DriverIK::Sub(moved.p[wrist],DriverIK::Add(before.p[wrist],{0,.01f,0})))<.001f,"controller wrist follows calibrated displacement");
+   for(unsigned bone=0;bone<61;++bone)if(bone!=(right?26:5) && bone!=(right?27:6) && bone!=wrist)Check(candidate[bone]==pose[bone],"controller preserves opposite arm fingers legs torso");
+   Check(ApplyControllerHand(candidate,positions,right,hand,{0,0,-10},{1,0,0,0},{1,0,0,0},1),"controller unreachable target clamps to arm envelope");
+  }
+
   for(DriverIK::V delta: {DriverIK::V{.08f,0,0},DriverIK::V{-.08f,0,0},DriverIK::V{0,0,-.10f},DriverIK::V{0,0,.04f}}){
    auto candidate=pose;auto before=DriverIK::FK(candidate,positions);float strength,error;
    Check(DriverIK::TrackHeadTorso(candidate,positions,delta,.08f,strength,error),"head torso compensation solves across steering range");

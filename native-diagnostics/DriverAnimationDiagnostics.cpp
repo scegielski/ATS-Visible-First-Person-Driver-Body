@@ -21,6 +21,7 @@
 #include "HeadTracking.hpp"
 #include "HeadTorso.hpp"
 #include "GestureHeadFollow.hpp"
+#include "ControllerRuntime.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
 #include "DriverSamples.hpp"
@@ -45,6 +46,7 @@ void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;
 void* gRecenterOriginal=nullptr;void NativeRecenterObserveStub();
 void* gHeadOriginal=nullptr;void HeadObserveStub();
+void* gXRActionAttachOriginal=nullptr;void XRActionAttachStub();
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 void SignalLeftRequestStub();void SignalRightRequestStub();
 void EngineRequestObserveStub();
@@ -82,6 +84,8 @@ SPF_Hook_Handle* nativeRecenterHook=nullptr;
 constexpr char kNativeRecenterPattern[]="84 C9 74 76 49 8B 8C 24 08 0E 00 00 48 85 C9 74 06 48 8B 01 FF 50 58 48 8D 45";
 std::atomic<uint64_t> nativeRecenterSequence{0},nativeRecenterTick{0};NativeRecenterGate nativeRecenterGate;
 SPF_Hook_Handle* headHook=nullptr;
+SPF_Hook_Handle* controllerAttachHook=nullptr;
+constexpr char kControllerAttachPattern[]="FF 96 38 01 00 00 8B D8 85 C0 79 58 48 8B 46 58 48 85 C0";
 constexpr char kHeadPattern[]="8B D8 85 C0 0F 89 9F 00 00 00 48 8B 46 58 48 85 C0 74 7E 48 8B 4E 10 48 85";
 std::mutex headMutex;ObservedHead latestHead{};
 std::atomic<uint64_t> headAccepted{0},headRejected{0},headTorsoUpdates{0},headTorsoRejected{0},exteriorHeadUpdates{0},exteriorHeadRejected{0};
@@ -256,7 +260,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.17.1");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.18.4");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -483,6 +487,7 @@ void Update() {
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
+ PollControllers(cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
  PollGesturePoseFile();PollGestureHeadFollowGain();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
@@ -530,6 +535,7 @@ void Update() {
  static uint64_t lastHealth=0;
  if(tick-lastHealth>=2000) {
   lastHealth=tick;
+  ControllerStatus(text,sizeof(text));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"GESTURE_HEAD_FOLLOW updates=%llu rejected=%llu gain=%.3f",static_cast<unsigned long long>(gestureHeadFollowUpdates.load()),static_cast<unsigned long long>(gestureHeadFollowRejected.load()),gestureHeadFollowGain.load());Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"EXTERIOR_HEAD_TRACKING updates=%llu rejected=%llu",static_cast<unsigned long long>(exteriorHeadUpdates.load()),static_cast<unsigned long long>(exteriorHeadRejected.load()));Log(SPF_LOG_INFO,text);
   std::snprintf(text,sizeof(text),"HEAD_TORSO updates=%llu rejected=%llu strength=%.4f hand_error_m=%.6f",static_cast<unsigned long long>(headTorsoUpdates.load()),static_cast<unsigned long long>(headTorsoRejected.load()),headTorsoStrength.load(),headTorsoError.load());Log(SPF_LOG_INFO,text);
@@ -566,7 +572,7 @@ void Update() {
   Log(SPF_LOG_INFO,text);
  }
 }
-void Unload() { enabled.store(false); Reset(); }
+void Unload() { enabled.store(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.
@@ -619,7 +625,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   const bool exteriorHeadActive=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9 && trackedHead.tick && now-trackedHead.tick<=250;
  const bool elbowFresh=telTick && now-telTick<=250;
  const bool elbowActive=leftElbowInset.load()>0 && elbowFresh,rightElbowActive=rightElbowInset.load()>0 && elbowFresh;
- if((leftActive || rightActive || elbowActive || rightElbowActive || headTorsoActive || exteriorHeadActive) && !hornFaults.load()) {
+ if((leftActive || rightActive || elbowActive || rightElbowActive || headTorsoActive || exteriorHeadActive || elbowFresh) && !hornFaults.load()) {
   std::array<std::array<float,4>,61> rotations{};
   if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
   for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
@@ -687,7 +693,15 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   if(headPositionsValid){
    if(DriverIK::ApplyTrackedHead(rotations,headPositions,trackedHead.headRotation,headNeutralWorld)){exteriorHeadApplied=true;exteriorHeadUpdates.fetch_add(1);}else exteriorHeadRejected.fetch_add(1);
   }
+  unsigned controllerMask=0;
+  if(elbowFresh && bodyCameraValid.load()){
+   DriverIK::Positions positions{};std::array<std::array<float,3>,61> scales{};bool valid=SafeRead(pointers[1],scales.data(),sizeof(scales));
+   if(valid)for(const auto& scale:scales)for(float x:scale)if(!std::isfinite(x) || std::abs(x-1.f)>.001f)valid=false;
+   if(valid && SafeRead(pointers[3],positions.data(),sizeof(positions)))controllerMask=ApplyControllers(rotations,positions,!leftActive,!rightActive);
+  }
   __try {
+   if(controllerMask&1)for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if(controllerMask&2)for(unsigned bone:{26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(rightElbowApplied)for(unsigned bone: {26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(elbowApplied)for(unsigned bone: {5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(exteriorHeadApplied)for(unsigned bone:{46u,47u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);

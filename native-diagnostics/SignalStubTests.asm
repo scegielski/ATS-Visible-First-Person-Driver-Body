@@ -1,4 +1,5 @@
 EXTERN NativeRecenterObserveStub:PROC
+EXTERN XRActionAttachStub:PROC
 EXTERN HeadObserveStub:PROC
 EXTERN SignalLeftRequestStub:PROC
 EXTERN SignalRightRequestStub:PROC
@@ -69,4 +70,24 @@ RecenterTestContinuation PROC
  pop r12
  ret
 RecenterTestContinuation ENDP
+XRActionAttachTest PROC FRAME
+ push rsi
+ .pushreg rsi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rsi, rcx
+ mov rcx, 42
+ jmp XRActionAttachStub
+XRActionAttachTest ENDP
+XRActionAttachContinuation PROC
+ mov rax, rdx
+ cmp rcx, 42
+ je AttachArgsOK
+ xor eax, eax
+AttachArgsOK:
+ add rsp, 20h
+ pop rsi
+ ret
+XRActionAttachContinuation ENDP
 END
