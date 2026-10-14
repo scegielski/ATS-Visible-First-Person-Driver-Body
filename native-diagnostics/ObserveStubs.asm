@@ -16,6 +16,10 @@ EXTERN CaptureHeadViews:PROC
 EXTERN CaptureXRContext:PROC
 EXTERN gXRActionAttachOriginal:QWORD
 EXTERN PrepareControllerActionAttach:PROC
+EXTERN gRadioInputOriginal:QWORD
+EXTERN CaptureRadioInput:PROC
+EXTERN gWipersOriginal:QWORD
+EXTERN gLightsOriginal:QWORD
 EXTERN gSignalLeftOriginal:QWORD
 EXTERN gSignalRightOriginal:QWORD
 EXTERN CaptureSignalRequest:PROC
@@ -101,6 +105,44 @@ name PROC FRAME
  jmp qword ptr [original]
 name ENDP
 ENDM
+RadioInputObserveStub PROC FRAME
+ pushfq
+ .allocstack 8
+ sub rsp, 0c8h
+ .allocstack 0c8h
+ .endprolog
+ mov [rsp+58h], rax
+ mov [rsp+28h], rcx
+ mov [rsp+30h], rdx
+ mov [rsp+38h], r8
+ mov [rsp+40h], r9
+ mov [rsp+48h], r10
+ mov [rsp+50h], r11
+ movdqu [rsp+60h], xmm0
+ movdqu [rsp+70h], xmm1
+ movdqu [rsp+80h], xmm2
+ movdqu [rsp+90h], xmm3
+ movdqu [rsp+0a0h], xmm4
+ movdqu [rsp+0b0h], xmm5
+ mov rcx, rsi
+ call CaptureRadioInput
+ movdqu xmm0, [rsp+60h]
+ movdqu xmm1, [rsp+70h]
+ movdqu xmm2, [rsp+80h]
+ movdqu xmm3, [rsp+90h]
+ movdqu xmm4, [rsp+0a0h]
+ movdqu xmm5, [rsp+0b0h]
+ mov r11, [rsp+50h]
+ mov r10, [rsp+48h]
+ mov r9, [rsp+40h]
+ mov r8, [rsp+38h]
+ mov rdx, [rsp+30h]
+ mov rcx, [rsp+28h]
+ mov rax, [rsp+58h]
+ add rsp, 0c8h
+ popfq
+ jmp qword ptr [gRadioInputOriginal]
+RadioInputObserveStub ENDP
 NativeRecenterObserveStub PROC FRAME
  pushfq
  .allocstack 8
@@ -226,6 +268,8 @@ XRActionAttachStub PROC FRAME
  jmp qword ptr [gXRActionAttachOriginal]
 XRActionAttachStub ENDP
 
+SIGNAL_STUB WipersRequestStub, gWipersOriginal, 4
+SIGNAL_STUB LightsRequestStub, gLightsOriginal, 3
 SIGNAL_STUB SignalLeftRequestStub, gSignalLeftOriginal, 1
 SIGNAL_STUB SignalRightRequestStub, gSignalRightOriginal, 2
 EngineRequestObserveStub PROC FRAME

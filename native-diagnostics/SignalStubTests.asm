@@ -1,9 +1,28 @@
 EXTERN NativeRecenterObserveStub:PROC
 EXTERN XRActionAttachStub:PROC
 EXTERN HeadObserveStub:PROC
+EXTERN RadioInputObserveStub:PROC
+EXTERN WipersRequestStub:PROC
+EXTERN LightsRequestStub:PROC
 EXTERN SignalLeftRequestStub:PROC
 EXTERN SignalRightRequestStub:PROC
 .code
+RadioInputTest PROC FRAME
+ push rsi
+ .pushreg rsi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rsi, rcx
+ mov rcx, rdx
+ jmp RadioInputObserveStub
+RadioInputTest ENDP
+RadioInputContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop rsi
+ ret
+RadioInputContinuation ENDP
 SignalTestLeft PROC FRAME
  push rdi
  .pushreg rdi
@@ -14,6 +33,26 @@ SignalTestLeft PROC FRAME
  mov rcx, rdx
  jmp SignalLeftRequestStub
 SignalTestLeft ENDP
+WipersTest PROC FRAME
+ push rdi
+ .pushreg rdi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rdi, rcx
+ mov rcx, rdx
+ jmp WipersRequestStub
+WipersTest ENDP
+LightsTest PROC FRAME
+ push rdi
+ .pushreg rdi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rdi, rcx
+ mov rcx, rdx
+ jmp LightsRequestStub
+LightsTest ENDP
 SignalTestRight PROC FRAME
  push rdi
  .pushreg rdi

@@ -5,6 +5,9 @@
 #include "HornPose.hpp"
 #include "GameHorn.hpp"
 #include "GameEngine.hpp"
+#include "GameWindow.hpp"
+#include "WiperCycle.hpp"
+#include "RadioInteraction.hpp"
 #include "EngineStartGate.hpp"
 #include "IgnitionMotion.hpp"
 #include "IgnitionTargets.hpp"
@@ -44,6 +47,9 @@ void* gEngineOriginal=nullptr;
 void* gHeadOriginal=nullptr;
 void* gXRActionAttachOriginal=nullptr;
 void* gRecenterOriginal=nullptr;
+void* gRadioInputOriginal=nullptr;
+void* gWipersOriginal=nullptr;
+void* gLightsOriginal=nullptr;
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 uintptr_t EngineRequestObserveStub(uintptr_t,uint32_t,uint32_t,uint64_t,uint64_t);
 void* gAdvanceOriginal=nullptr;
@@ -54,6 +60,11 @@ uintptr_t AdvanceObserveStub(uintptr_t,uint32_t,float,uint64_t,uint64_t);
 }
 static int observedDriver=0,observedAdvance=0,boneOriginalCalls=0,bonePostCalls=0;
 static uintptr_t recordedReturn=0;
+extern "C" uint64_t RadioInputTest(uintptr_t,uint64_t);
+extern "C" void RadioInputContinuation();
+extern "C" void CaptureRadioInput(uintptr_t context) noexcept {if(context!=123)std::abort();}
+extern "C" uint64_t WipersTest(uintptr_t,uint64_t,uint64_t,uint64_t*);
+extern "C" uint64_t LightsTest(uintptr_t,uint64_t,uint64_t,uint64_t*);
 extern "C" uint64_t SignalTestLeft(uintptr_t,uint64_t,uint64_t,uint64_t*);
 extern "C" uint64_t SignalTestRight(uintptr_t,uint64_t,uint64_t,uint64_t*);
 extern "C" void SignalTestContinuation();
@@ -137,6 +148,25 @@ int main() {
  BoxGrabInput grab[2]{};grab[0].valid=grab[1].valid=true;editor.Step(grab);grab[0].grip=1;editor.Step(grab);Check(editor.selected==0,"grip acquires nearby box");grab[0].position={.1f,0,0};editor.Step(grab);Check(std::abs(editor.boxes[0].center[0]-.1f)<.0001f,"one hand moves box");
  grab[0].rotation={.70710678f,0,.70710678f,0};editor.Step(grab);Check(std::abs(editor.boxes[0].rotation[2]-.70710678f)<.0001f,"one hand rotates box");grab[1].position={.3f,0,0};grab[1].grip=1;editor.Step(grab);grab[1].position={.5f,0,0};editor.Step(grab);Check(std::abs(editor.boxes[0].stretch[2]-2)<.001f && editor.boxes[0].stretch[0]==1 && editor.boxes[0].stretch[1]==1,"two hand separation scales only selected local axis");
  auto beforeHandoff=editor.boxes[0];grab[1].grip=0;editor.Step(grab);Check(DriverIK::Length(DriverIK::Sub(editor.boxes[0].center,beforeHandoff.center))<.0001f,"two to one hand transfer does not jump");grab[0].grip=0;editor.Step(grab);Check(editor.dirty && editor.selected<0,"release requests persistent save");
+ Check(NextControllerRadioStation(0,34,1)==1 && NextControllerRadioStation(33,34,1)==0 && NextControllerRadioStation(0,34,-1)==33 && NextControllerRadioStation(5,34,-1)==4,"radio full-list next previous and wrap");Check(NextControllerRadioStation(~uint64_t{},34,1)==0 && NextControllerRadioStation(~uint64_t{},34,-1)==33 && NextControllerRadioStation(0,0,1)==-1 && NextControllerRadioStation(0,10001,1)==-1,"radio missing selection and invalid counts");
+ uint64_t lazyCount=0;int loads=0,reads=0;auto load=[&](){++loads;return true;};auto refresh=[&](){++reads;lazyCount=34;return true;};Check(EnsureControllerRadioList(lazyCount,load,refresh) && loads==1 && reads==1 && NextControllerRadioStation(~uint64_t{},lazyCount,1)==0,"first controller station request loads list before selecting once");Check(EnsureControllerRadioList(lazyCount,load,refresh) && loads==1 && reads==1,"loaded radio list skips initialization");lazyCount=0;Check(!EnsureControllerRadioList(lazyCount,[](){return false;},refresh) && reads==1,"failed radio initialization does not select");Check(!EnsureControllerRadioList(lazyCount,load,[](){return false;}),"failed station refresh rejects request");
+ Check(ControllerRadioPlaybackAction(true,5,34)==-2 && ControllerRadioPlaybackAction(false,5,34)==5 && ControllerRadioPlaybackAction(false,~uint64_t{},34)==0 && ControllerRadioPlaybackAction(false,0,0)==-1,"radio trigger toggles existing stream or starts same selected station without advancing");IgnitionTriggerGate radioTriggerTest;radioTriggerTest.Step(0,true,true);Check(radioTriggerTest.Step(1,true,true) && !radioTriggerTest.Step(1,true,true),"radio trigger toggles once while held");radioTriggerTest.Step(0,true,false);Check(!radioTriggerTest.Step(1,true,false),"radio trigger outside target has no effect");
+ ControllerRadioStick radioStickTest;auto radioTest=radioStickTest.Step(.9f,.8f,true);Check(radioTest.station==1 && radioTest.volume==.8f,"radio stick changes next station and volume independently");Check(radioStickTest.Step(.9f,0,true).station==0,"held radio stick does not repeatedly change stations");radioStickTest.Step(0,0,true);Check(radioStickTest.Step(-.9f,-.7f,true).station==-1 && radioStickTest.Step(0,-.7f,true).volume==-.7f,"radio previous station and held volume down");Check(radioStickTest.Step(.9f,.8f,false).station==0 && radioStickTest.Step(0,0,false).volume==0,"radio stops on target or tracking loss");
+ InteractionBoxEditor radioEditor;radioEditor.boxes[11].center={11,12,13};Check(ParseInteractionBoxes(SerializeInteractionBoxes(radioEditor),radioEditor) && radioEditor.authored[11] && MirrorContact(radioEditor,{11,12,13},{1,0,0,0})==9,"radio target and twelve-box persistence");
+ unsigned wiperSets=0;uint32_t wiperNext=99;auto setWiper=[&](uintptr_t actor,uint32_t next){Check(actor==123,"wiper native setter owner preserved");++wiperSets;wiperNext=next;};
+ Check(ApplyControllerWiperCycle(123,0,4,setWiper) && wiperNext==1 && wiperSets==1,"wipers advance once");Check(ApplyControllerWiperCycle(123,3,4,setWiper) && wiperNext==0 && wiperSets==2,"highest wiper speed wraps off through native setter");Check(ApplyControllerWiperCycle(123,1,2,setWiper) && wiperNext==0,"two-state vehicle wipers wrap off");Check(!ApplyControllerWiperCycle(123,4,4,setWiper) && !ApplyControllerWiperCycle(123,0,0,setWiper) && !ApplyControllerWiperCycle(123,0,33,setWiper) && wiperSets==3,"invalid wiper states never call setter");
+ InteractionBoxEditor wiperEditor;wiperEditor.boxes[10].center={10,11,12};Check(ParseInteractionBoxes(SerializeInteractionBoxes(wiperEditor),wiperEditor) && wiperEditor.authored[10] && MirrorContact(wiperEditor,{10,11,12},{1,0,0,0})==8,"wipers target and eleven-box persistence");
+ InteractionBoxEditor lightsEditor;lightsEditor.boxes[9].center={9,10,11};Check(ParseInteractionBoxes(SerializeInteractionBoxes(lightsEditor),lightsEditor) && lightsEditor.authored[9] && MirrorContact(lightsEditor,{9,10,11},{1,0,0,0})==7,"lights target and ten-box serialization");
+ IgnitionTriggerGate lightsGate;lightsGate.Step(0,true,false);Check(lightsGate.Step(1,true,true) && !lightsGate.Step(1,true,true),"lights cycle once per fresh trigger press");lightsGate.Step(0,true,true);Check(lightsGate.Step(1,true,true),"released lights trigger can cycle again");
+ Check(MirrorPhysicalSlot(6)==9 && MirrorPhysicalSlot(4)==-1 && MirrorPhysicalSlot(5)==-1,"wheel combined adjustment routing leaves windows separate");InteractionBoxEditor wheelEditor;wheelEditor.boxes[8].center={8,9,10};Check(MirrorContact(wheelEditor,{8,9,10},{1,0,0,0})==6 && ParseInteractionBoxes(SerializeInteractionBoxes(wheelEditor),wheelEditor) && wheelEditor.authored[8],"wheel box contact and nine-box persistence");
+ unsigned windowCalls=0;unsigned char passedOpen=0,passedClose=0;auto nativeWindow=[&](uintptr_t actor,uintptr_t state,float dt,unsigned char open,unsigned char close,unsigned char electric){++windowCalls;Check(actor==0x10000 && state==0x10434 && dt==.016f && electric==7,"window forwards owner state time and electrical flag");passedOpen=open;passedClose=close;return true;};
+ Check(ForwardControllerWindow(nativeWindow,0x10000,0x10434,.016f,0,0,7,0x10000,true,-1) && windowCalls==1 && passedOpen==1 && passedClose==0,"window down opens using one native call and preserves return");
+ ForwardControllerWindow(nativeWindow,0x10000,0x10434,.016f,0,0,7,0x10000,true,1);Check(passedOpen==0 && passedClose==1,"window up closes");
+ ForwardControllerWindow(nativeWindow,0x10000,0x10434,.016f,1,0,7,0x10000,true,1);Check(passedOpen==1 && passedClose==0,"manual window input takes priority");
+ ForwardControllerWindow(nativeWindow,0x10000,0x10434,.016f,0,0,7,0x20000,true,1);Check(!passedOpen && !passedClose,"other vehicle window passes untouched");
+ ForwardControllerWindow(nativeWindow,0x10000,0x10434,.016f,0,0,7,0x10000,false,1);Check(!passedOpen && !passedClose,"paused unfocused or disabled window input passes untouched");
+ Check(NativeWindowSide(0x10000,0x1044c,0x10000)==1 && NativeWindowSide(0x10000,0x10450,0x10000)==-1,"right window state identity and foreign state rejection");
+ InteractionBoxEditor windowEditor;windowEditor.boxes[6].center={3,4,5};windowEditor.boxes[7].center={6,4,5};Check(MirrorContact(windowEditor,{3,4,5},{1,0,0,0})==4 && MirrorContact(windowEditor,{6,4,5},{1,0,0,0})==5,"left and right window targets route independently");Check(ParseInteractionBoxes(SerializeInteractionBoxes(windowEditor),windowEditor) && windowEditor.authored[7],"eight boxes round trip with windows");
  Check(ControllerHornPressed(true,true,1) && !ControllerHornPressed(true,true,0) && !ControllerHornPressed(false,true,1) && !ControllerHornPressed(true,false,1) && !ControllerHornPressed(true,true,std::numeric_limits<float>::quiet_NaN()),"horn requires target plus valid held trigger and stops on release or target loss");
  InteractionBoxEditor rayEditor;for(unsigned j=0;j<InteractionBoxCount;++j)rayEditor.boxes[j].center={20.f+static_cast<float>(j),0,0};rayEditor.boxes[2].center={0,0,-1};rayEditor.boxes[3].center={0,0,-1.5f};
  auto ray=RayInteractionBoxes(rayEditor,{0,0,0},{0,0,-1});Check(ray.box==2 && std::abs(ray.distance-.95f)<.001f,"laser chooses nearest mirror box along controller forward");
@@ -202,6 +232,9 @@ int main() {
 
 
  uint64_t signalSaved[3]{};gSignalLeftOriginal=gSignalRightOriginal=reinterpret_cast<void*>(SignalTestContinuation);
+ gRadioInputOriginal=reinterpret_cast<void*>(RadioInputContinuation);Check(RadioInputTest(123,0x1122334455667788ull)==0x1122334455667788ull,"radio observer preserves original register state and forwards");
+ gWipersOriginal=reinterpret_cast<void*>(SignalTestContinuation);signalTestSide=4;signalReplacement=1;Check(WipersTest(123,0x1122334455667701ull,0xabcdef,signalSaved)==0x1122334455667701ull && signalSaved[0]==123 && signalSaved[2]==0xabcdef,"wipers stub preserves native input registers and forwards once");
+ gLightsOriginal=reinterpret_cast<void*>(SignalTestContinuation);signalTestSide=3;signalReplacement=1;Check(LightsTest(123,0x1122334455667701ull,0xabcdef,signalSaved)==0x1122334455667701ull && signalSaved[0]==123 && signalSaved[1]==0x1122334455667701ull && signalSaved[2]==0xabcdef,"lights cycle stub preserves register arguments and forwards once");
  signalTestSide=1;signalReplacement=0;
  Check(SignalTestLeft(123,0x1122334455667701ull,0xabcdef,signalSaved)==0x1122334455667700ull,"left signal observer alters only CL");
  Check(signalSaved[0]==123 && signalSaved[1]==0x1122334455667701ull && signalSaved[2]==0xabcdef,"signal observer preserves vehicle and other registers");

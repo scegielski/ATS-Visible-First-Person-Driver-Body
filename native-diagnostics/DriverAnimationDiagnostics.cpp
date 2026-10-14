@@ -10,6 +10,9 @@
 #include "PlayerExteriorDriver.hpp"
 #include "GameHorn.hpp"
 #include "GameEngine.hpp"
+#include "GameWindow.hpp"
+#include "WiperCycle.hpp"
+#include <SPF_GameWorld_API.h>
 #include "EngineStartGate.hpp"
 #include "IgnitionMotion.hpp"
 #include "IgnitionTargets.hpp"
@@ -47,6 +50,9 @@ void* gEngineOriginal=nullptr;void* gHornControlOriginal=nullptr;void HornContro
 void* gRecenterOriginal=nullptr;void NativeRecenterObserveStub();
 void* gHeadOriginal=nullptr;void HeadObserveStub();
 void* gXRActionAttachOriginal=nullptr;void XRActionAttachStub();
+void* gRadioInputOriginal=nullptr;void RadioInputObserveStub();
+void* gWipersOriginal=nullptr;void WipersRequestStub();
+void* gLightsOriginal=nullptr;void LightsRequestStub();
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
 void SignalLeftRequestStub();void SignalRightRequestStub();
 void EngineRequestObserveStub();
@@ -261,7 +267,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.25.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.31.2");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -276,6 +282,15 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
 }
 void OnLoad(const SPF_Load_API* api) {
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
+}
+using RadioStationFn=void(__fastcall*)(uintptr_t,unsigned char);using RadioVolumeFn=void(__fastcall*)(uintptr_t,float);RadioStationFn nativeRadioStation=nullptr;RadioVolumeFn nativeRadioVolume=nullptr;using RadioSelectFn=void(__fastcall*)(uintptr_t,uint64_t);RadioSelectFn nativeRadioSelect=nullptr;using RadioPauseFn=void(__fastcall*)(uintptr_t);RadioPauseFn nativeRadioPause=nullptr;RadioPauseFn nativeRadioInitialize=nullptr;
+using WiperCountFn=uint64_t(__fastcall*)(uintptr_t);using WiperSetFn=void(__fastcall*)(uintptr_t,uint32_t);WiperCountFn nativeWiperCount=nullptr;WiperSetFn nativeWiperSet=nullptr;
+using WindowControlFn=bool(__fastcall*)(uintptr_t,uintptr_t,float,unsigned char,unsigned char,unsigned char);
+WindowControlFn originalWindowControl=nullptr;
+bool __fastcall ControllerWindowControl(uintptr_t actor,uintptr_t state,float dt,unsigned char open,unsigned char close,unsigned char electricity){
+ auto controller=expectedPlayerDriverController.load();uintptr_t player=controller>=0x1df0?controller-0x1df0:0;int side=NativeWindowSide(actor,state,player);DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);
+ bool allowed=enabled.load() && foreground==GetCurrentProcessId() && core && core->gameworld && !core->gameworld->GW_IsGamePaused();float direction=side>=0?ControllerWindowDirection(static_cast<unsigned>(side)):0;
+ return ForwardControllerWindow(originalWindowControl,actor,state,dt,open,close,electricity,player,allowed,direction);
 }
 void Activated(const SPF_Core_API* api) {
  core=api;
@@ -306,6 +321,25 @@ void Activated(const SPF_Core_API* api) {
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
  boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
  engineRequestHook=hooks->Hook_Register(kName,"EngineRequest","Observe player engine start/stop request",reinterpret_cast<void*>(EngineRequestObserveStub),&gEngineOriginal,kEngineRequestPattern,true);
+ constexpr char radioPausePattern[]="8B 91 F0 00 00 00 8B C2 83 E0 01 F6 C2 01 74 0E 85 C0 74 2D BA 01 00 00 00";
+ if(hooks->Hook_FindPattern(radioPausePattern)==base+0x9ae720)nativeRadioPause=reinterpret_cast<RadioPauseFn>(base+0x9ae720);else Log(SPF_LOG_ERROR,"RADIO_BOX pause signature mismatch.");
+ constexpr char radioInitializePattern[]="40 55 53 56 57 41 54 48 8D 6C 24 C0 48 81 EC 40 01 00 00 48 8B F1 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 F8 02";
+ if(hooks->Hook_FindPattern(radioInitializePattern)==base+0x59de70)nativeRadioInitialize=reinterpret_cast<RadioPauseFn>(base+0x59de70);else Log(SPF_LOG_ERROR,"RADIO_BOX station initializer signature mismatch.");
+ constexpr char radioSelectPattern[]="48 89 5C 24 08 57 48 83 EC 40 48 8B 01 48 8B FA 48 8B D9 FF 50 58 48 3B 7B 18";
+ if(hooks->Hook_FindPattern(radioSelectPattern)==base+0x59dba0)nativeRadioSelect=reinterpret_cast<RadioSelectFn>(base+0x59dba0);else Log(SPF_LOG_ERROR,"RADIO_BOX station selector signature mismatch.");
+ constexpr char radioInputPattern[]="48 8B 8E 08 02 00 00 48 85 C9 74 28 83 B9 F8 00 00 00 02 75 1F";
+ constexpr char radioStationPattern[]="48 89 5C 24 08 48 89 74 24 10 57 48 81 EC A0 00 00 00 48 8B 1D ?? ?? ?? ?? 0F B6 F2 48 8B F9";
+ constexpr char radioVolumePattern[]="48 8B C4 53 48 81 EC 30 01 00 00 0F 29 70 E8 48 8B D9 48 8D 0D ?? ?? ?? ?? 0F 29 78 D8 0F 28 F1";
+ if(hooks->Hook_FindPattern(radioInputPattern)==base+0x68ad9e && hooks->Hook_FindPattern(radioStationPattern)==base+0x68eba0 && hooks->Hook_FindPattern(radioVolumePattern)==base+0x68ecb0){nativeRadioStation=reinterpret_cast<RadioStationFn>(base+0x68eba0);nativeRadioVolume=reinterpret_cast<RadioVolumeFn>(base+0x68ecb0);hooks->Hook_Register(kName,"ControllerRadio","Apply controller radio station and volume input",reinterpret_cast<void*>(RadioInputObserveStub),&gRadioInputOriginal,radioInputPattern,true);}else Log(SPF_LOG_ERROR,"RADIO_BOX native signatures mismatch; controller radio disabled.");
+ constexpr char wiperCountPattern[]="48 83 EC 28 48 8B 41 18 48 8D 0D ?? ?? ?? ?? 48 8B 90 F8 01 00 00 48 8B 52 38 E8 ?? ?? ?? ?? 48 85 C0 74 0F 48 8B 80 B8 0F 00 00 48 FF C0";
+ constexpr char wiperSetPattern[]="48 89 5C 24 08 57 48 83 EC 20 48 8B 41 18 8B FA 48 8B D9 48 8D 0D ?? ?? ?? ?? 48 8B 90 F8 01 00 00 48 8B 52 38 E8 ?? ?? ?? ?? 48 85 C0 74 0C";
+ if(hooks->Hook_FindPattern(wiperCountPattern)==base+0x5ea360 && hooks->Hook_FindPattern(wiperSetPattern)==base+0x5ea220){nativeWiperCount=reinterpret_cast<WiperCountFn>(base+0x5ea360);nativeWiperSet=reinterpret_cast<WiperSetFn>(base+0x5ea220);}else Log(SPF_LOG_ERROR,"WIPERS_BOX cycle setter signature mismatch.");
+ constexpr char wipersPattern[]="84 C9 74 5D 48 8B 47 18 48 8D 0D ?? ?? ?? ?? 8B 9F 30 02 00 00 FF C3";
+ if(hooks->Hook_FindPattern(wipersPattern)==base+0x9f7b8c)hooks->Hook_Register(kName,"ControllerWipers","Combine player wiper cycle with controller trigger",reinterpret_cast<void*>(WipersRequestStub),&gWipersOriginal,wipersPattern,true);else Log(SPF_LOG_ERROR,"WIPERS_BOX input signature mismatch; controller wipers disabled.");
+ constexpr char lightsPattern[]="84 C9 0F 84 99 00 00 00 0F B6 87 48 02 00 00 0F B6 8F 49 02 00 00";
+ if(hooks->Hook_FindPattern(lightsPattern)==base+0x9f83fb)hooks->Hook_Register(kName,"ControllerLights","Combine player lights cycle with controller trigger",reinterpret_cast<void*>(LightsRequestStub),&gLightsOriginal,lightsPattern,true);else Log(SPF_LOG_ERROR,"LIGHTS_BOX input signature mismatch; controller lights disabled.");
+ constexpr char windowPattern[]="48 83 EC 68 4C 8B 51 20 4D 8B 42 30 49 8D 4A 20 0F 29 7C 24 40 0F 28 FA 49 83 F8 2F";
+ if(hooks->Hook_FindPattern(windowPattern)==base+0x9ec110)hooks->Hook_Register(kName,"ControllerWindows","Combine player window controls with controller box input",reinterpret_cast<void*>(ControllerWindowControl),reinterpret_cast<void**>(&originalWindowControl),windowPattern,true);else Log(SPF_LOG_ERROR,"WINDOW_BOX native signature mismatch; controller window adjustment disabled.");
  constexpr char hornControlPattern[]="4C 8B DC 49 89 5B 08 49 89 6B 10 49 89 73 18 49 89 7B 20 41 56 48 81 EC 90 00 00 00";
  if(hooks->Hook_FindPattern(hornControlPattern)==base+0x9ea6a0)hooks->Hook_Register(kName,"ControllerHornBox","Combine player horn with controller box contact",reinterpret_cast<void*>(HornControlObserveStub),&gHornControlOriginal,hornControlPattern,true);else Log(SPF_LOG_ERROR,"HORN_BOX control signature mismatch.");
  signalLeftHook=hooks->Hook_Register(kName,"SignalLeftRequest","Delay player left toggle until stalk contact",reinterpret_cast<void*>(SignalLeftRequestStub),&gSignalLeftOriginal,kSignalLeftPattern,true);
@@ -777,6 +811,30 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  __try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));if(privateBody)hiddenBodyFrames.fetch_add(1);if(playerStock)hiddenStockFrames.fetch_add(1);if(privateHead)hiddenHeadFrames.fetch_add(1);}
  __except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}
 }
+bool EnsureRadioList(uintptr_t radio,uint64_t& count,uint64_t& current) {
+ return EnsureControllerRadioList(count,[&](){if(!nativeRadioInitialize)return false;nativeRadioInitialize(radio);Log(SPF_LOG_INFO,"RADIO_BOX initialized station list on controller request.");return true;},[&](){return SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));});
+}
+extern "C" void CaptureRadioInput(uintptr_t context) noexcept {
+ auto command=TakeControllerRadioCommand();if(!context || !enabled.load() || (!command.station && command.volume==0 && !command.toggle) || !nativeRadioStation || !nativeRadioVolume)return;
+ DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);auto now=GetTickCount64(),fresh=telemetryTick.load();if(foreground!=GetCurrentProcessId() || !fresh || now-fresh>250 || !core || !core->gameworld || core->gameworld->GW_IsGamePaused())return;
+ uintptr_t vtable=0,ready=0;if(!SafeRead(context,&vtable,sizeof(vtable)) || !SafeRead(vtable+0x90,&ready,sizeof(ready)) || !ready)return;
+ using Ready=bool(__fastcall*)(uintptr_t);if(!reinterpret_cast<Ready>(ready)(context))return;
+ if(command.station){
+ auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t manager=0,radio=0,table=0;uint64_t count=0,current=0;
+ bool valid=nativeRadioSelect && SafeRead(base+0x36b8ed8,&manager,sizeof(manager)) && manager && SafeRead(manager+8,&radio,sizeof(radio)) && radio && SafeRead(radio,&table,sizeof(table)) && table==base+0x22c7e10 && SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));
+ if(valid)valid=EnsureRadioList(radio,count,current);
+ int next=valid?NextControllerRadioStation(current,count,command.station):-1;
+ if(next>=0){nativeRadioSelect(radio,static_cast<uint64_t>(next));uint64_t after=~uint64_t{};SafeRead(radio+0xe0,&after,sizeof(after));if(after==static_cast<uint64_t>(next))QueueControllerRadioTuneSound();char message[192];std::snprintf(message,sizeof(message),"RADIO_BOX select before=%llu requested=%d after=%llu stations=%llu",static_cast<unsigned long long>(current),next,static_cast<unsigned long long>(after),static_cast<unsigned long long>(count));Log(SPF_LOG_INFO,message);}else Log(SPF_LOG_WARN,"RADIO_BOX station list unavailable; selection deferred.");
+ }
+ if(command.toggle){
+ auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t manager=0,radio=0,table=0,stream=0;uint64_t count=0,current=0;
+ bool valid=nativeRadioPause && nativeRadioSelect && SafeRead(base+0x36b8ed8,&manager,sizeof(manager)) && manager && SafeRead(manager+8,&radio,sizeof(radio)) && radio && SafeRead(radio,&table,sizeof(table)) && table==base+0x22c7e10 && SafeRead(radio+0xe8,&stream,sizeof(stream)) && SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));
+ if(valid && !stream)valid=EnsureRadioList(radio,count,current);
+ int action=valid?ControllerRadioPlaybackAction(stream!=0,current,count):-1;
+ if(action==-2){nativeRadioPause(radio);QueueControllerRadioClickSound();Log(SPF_LOG_INFO,"RADIO_BOX play/pause toggled on current station.");}else if(action>=0){nativeRadioSelect(radio,static_cast<uint64_t>(action));QueueControllerRadioClickSound();Log(SPF_LOG_INFO,"RADIO_BOX playback started on selected station.");}else Log(SPF_LOG_WARN,"RADIO_BOX play/pause unavailable until station list loads.");
+ }
+ if(command.volume!=0)nativeRadioVolume(context,command.volume);
+}
 extern "C" void CaptureNativeRecenter(uintptr_t inputOwner,uint32_t requested) noexcept {
  if(!enabled.load() || !(requested&255u) || !inputOwner)return;
  uintptr_t input=0;if(!SafeRead(inputOwner+0xbd8,&input,sizeof(input)) || !input)return;
@@ -796,6 +854,8 @@ extern "C" unsigned char CaptureSignalRequest(uintptr_t vehicle,uint32_t side,ui
  unsigned char flags=0;if(!SafeRead(vehicle+0x248,&flags,1))return edge;
  const auto now=GetTickCount64(),tick=telemetryTick.load(),body=privateBodyTick.load();
  const bool fresh=tick && now-tick<=250 && body && now-body<=250;
+ if(side==3 || side==4){bool pending=side==3?ConsumeControllerLightsRequest():ConsumeControllerWipersRequest();DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);bool allowed=fresh && foreground==GetCurrentProcessId() && core && core->gameworld && !core->gameworld->GW_IsGamePaused();if(pending && allowed){if(side==4){if(edge)return edge;uint32_t current=0;if(!nativeWiperCount || !nativeWiperSet || !SafeRead(vehicle+0x230,&current,sizeof(current)))return edge;auto count=nativeWiperCount(vehicle);if(ApplyControllerWiperCycle(vehicle,current,count,nativeWiperSet)){char message[160];std::snprintf(message,sizeof(message),"WIPERS_BOX cycle current=%u next=%d states=%llu",current,NextControllerWiperState(current,count),static_cast<unsigned long long>(count));Log(SPF_LOG_INFO,message);}return edge;}Log(SPF_LOG_INFO,"LIGHTS_BOX native cycle trigger released.");return 1;}return edge;}
+
  int outcome=0;uint64_t delay=0;bool wasPending=false;
  {std::lock_guard lock(signalGateMutex);
   wasPending=signalGate.vehicle!=0;delay=wasPending?now-signalGate.created:0;

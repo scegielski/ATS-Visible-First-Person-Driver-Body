@@ -17,6 +17,7 @@
 #include <mmsystem.h>
 #pragma comment(lib,"winmm.lib")
 namespace {
+bool radioClickPending=false;bool radioTunePending=false;ControllerRadioStick radioStick;ControllerRadioCommand radioCommand;uint64_t radioTick=0;float windowRequests[2]{};uint64_t windowRequestTick=0;
 int mirrorContact[2]{-1,-1};uint64_t mirrorContactTick=0;int mirrorBridgeStatus=5;
 void SendMirrorInput(int mirror,float x,float y){auto module=GetModuleHandleW(L"SPF_MirrorControls.dll");using Send=int (__cdecl*)(int,float,float);auto send=module?reinterpret_cast<Send>(GetProcAddress(module,"SPF_SetControllerMirrorInput")):nullptr;mirrorBridgeStatus=send?send(MirrorPhysicalSlot(mirror),x,y):5;}
 std::mutex guard;HMODULE library=nullptr;vr::IVRSystem* systemVR=nullptr;bool initialized=false;
@@ -26,7 +27,7 @@ using Shutdown=void (__cdecl*)();Shutdown shutdownVR=nullptr;
 struct Tracked {DriverIK::V point{};DriverIK::Q rotation{1,0,0,0};bool valid=false;};
 LiveControllerFingerPose liveFingers[2]{LiveControllerFingerPose(false),LiveControllerFingerPose(true)};
 ControllerFingerMode fingerMode[2];
-DriverIK::V hornTarget{},hornBoxOffset{},leftHandBoxOffset{.14f,0,0};uint64_t hornTargetTick=0,hornBoxTick=0;bool hornBoxHeld=false;float hornBoxScale=1.25f;InteractionBoxEditor boxEditor;std::string previousBoxPlacement;uint64_t placementPoll=0;IgnitionTriggerGate ignitionTrigger;DriverIK::V ignitionTarget{},ignitionBoxOffset{},handBoxOffset{-.08f,0,0};uint64_t ignitionTargetTick=0,interactionRequestTick=0;ControllerSceneFrame actualSceneFrame{};uint64_t sceneXRFrameTick=0,sceneCameraTick=0;DriverPalette sceneMarkers{};uint64_t sceneMarkerTick=0;bool markerCalibrated=false;DriverIK::V markerOrigin{},markerAnchor{};DriverIK::Q markerBasis{1,0,0,0};
+DriverIK::V hornTarget{},hornBoxOffset{},leftHandBoxOffset{.14f,0,0};uint64_t hornTargetTick=0,hornBoxTick=0;bool hornBoxHeld=false;float hornBoxScale=1.25f;InteractionBoxEditor boxEditor;std::string previousBoxPlacement;uint64_t placementPoll=0;IgnitionTriggerGate radioTriggers[2];IgnitionTriggerGate wiperTriggers[2];uint64_t wiperRequestTick=0;IgnitionTriggerGate lightTriggers[2];uint64_t lightRequestTick=0;IgnitionTriggerGate ignitionTrigger;DriverIK::V ignitionTarget{},ignitionBoxOffset{},handBoxOffset{-.08f,0,0};uint64_t ignitionTargetTick=0,interactionRequestTick=0;ControllerSceneFrame actualSceneFrame{};uint64_t sceneXRFrameTick=0,sceneCameraTick=0;DriverPalette sceneMarkers{};uint64_t sceneMarkerTick=0;bool markerCalibrated=false;DriverIK::V markerOrigin{},markerAnchor{};DriverIK::Q markerBasis{1,0,0,0};
 vr::IVROverlay* markerOverlay=nullptr;vr::VROverlayHandle_t markers[2][6]{};int markerError=0;
 void HideMarkers(){if(markerOverlay)for(auto& side:markers)for(auto handle:side)if(handle)markerOverlay->HideOverlay(handle);}
 void CreateMarkers(){
@@ -71,12 +72,14 @@ bool Connect(){
 void PollControllers(bool active,uint64_t generation){
  PollFingerFiles();
  std::lock_guard lock(guard);uint64_t now=GetTickCount64();float dt=tick?std::min(.05f,(now-tick)*.001f):0;tick=now;
- if(generationSeen!=generation){generationSeen=generation;boxEditor.Release();boxEditor.enabled=false;markerCalibrated=false;ignitionTrigger={};interactionRequestTick=ignitionTargetTick=0;for(unsigned i=0;i<2;++i){controls[i]={};fingerMode[i]={};weights[i]=0;fingerGrip[i]=fingerTrigger[i]=fingerThumb[i]=0;lastSolveTick[i]=0;}}
+ if(generationSeen!=generation){generationSeen=generation;radioClickPending=false;radioTunePending=false;radioStick={};radioCommand={};radioTick=0;radioTriggers[0]=radioTriggers[1]={};boxEditor.Release();boxEditor.enabled=false;markerCalibrated=false;ignitionTrigger={};lightTriggers[0]=lightTriggers[1]={};wiperTriggers[0]=wiperTriggers[1]={};wiperRequestTick=0;lightRequestTick=0;interactionRequestTick=ignitionTargetTick=0;for(unsigned i=0;i<2;++i){controls[i]={};fingerMode[i]={};weights[i]=0;fingerGrip[i]=fingerTrigger[i]=fingerThumb[i]=0;lastSolveTick[i]=0;}}
  if(!systemVR && now-attempt>=5000){attempt=now;Connect();}
  if(!guideFile.empty() && now-guidePoll>=500){guidePoll=now;std::ifstream input(guideFile);if(input){std::string text((std::istreambuf_iterator<char>(input)),{});ControllerElbowGuides parsed;if(ParseControllerElbowGuides(text,parsed))elbowGuides=parsed;}std::ifstream twistInput(twistFile);float value;std::string extra;if(twistInput>>value && !(twistInput>>extra) && std::isfinite(value) && value>=0 && value<=1)twistShare=value;std::ifstream boxInput(guideFile.parent_path()/"ignition_box_offset.txt");DriverIK::V boxOffset{};if(boxInput>>boxOffset[0]>>boxOffset[1]>>boxOffset[2] && !(boxInput>>extra) && std::isfinite(boxOffset[0]) && std::isfinite(boxOffset[1]) && std::isfinite(boxOffset[2]))ignitionBoxOffset=boxOffset;std::ifstream leftBoxInput(guideFile.parent_path()/"horn_left_hand_box_offset.txt");DriverIK::V leftOffset{};if(leftBoxInput>>leftOffset[0]>>leftOffset[1]>>leftOffset[2] && !(leftBoxInput>>extra) && std::isfinite(leftOffset[0]) && std::isfinite(leftOffset[1]) && std::isfinite(leftOffset[2]))leftHandBoxOffset=leftOffset;std::ifstream hornScaleInput(guideFile.parent_path()/"horn_box_scale.txt");float scaleValue=0;if(hornScaleInput>>scaleValue && !(hornScaleInput>>extra) && std::isfinite(scaleValue) && scaleValue>0)hornBoxScale=scaleValue;std::ifstream hornBoxInput(guideFile.parent_path()/"horn_box_offset.txt");DriverIK::V hornOffset{};if(hornBoxInput>>hornOffset[0]>>hornOffset[1]>>hornOffset[2] && !(hornBoxInput>>extra) && std::isfinite(hornOffset[0]) && std::isfinite(hornOffset[1]) && std::isfinite(hornOffset[2]))hornBoxOffset=hornOffset;std::ifstream handBoxInput(guideFile.parent_path()/"ignition_hand_box_offset.txt");DriverIK::V handOffset{};if(handBoxInput>>handOffset[0]>>handOffset[1]>>handOffset[2] && !(handBoxInput>>extra) && std::isfinite(handOffset[0]) && std::isfinite(handOffset[1]) && std::isfinite(handOffset[2]))handBoxOffset=handOffset;std::ifstream blendInput(modeBlendFile);if(blendInput>>value && !(blendInput>>extra) && std::isfinite(value) && value>0)modeBlendSeconds=value;}
 
  if(!guideFile.empty() && now-placementPoll>=500){placementPoll=now;std::ifstream input(guideFile.parent_path()/"interaction_boxes.txt");if(input && boxEditor.selected<0){std::string text((std::istreambuf_iterator<char>(input)),{});if(text!=previousBoxPlacement && text.size()<4096){if(ParseInteractionBoxes(text,boxEditor))previousBoxPlacement=text;}}}
- bool nativePressed[2]{},modePressed[2]{},thumbPressed[2]{};float grips[2]{},triggers[2]{},inward[2]{};bool nativeValid=active && PollNativeControllerButtons(nativePressed,grips,triggers,modePressed,thumbPressed,inward);float sticks[4]{};bool sticksValid=nativeValid && ReadControllerStickAxes(sticks);bool mirrorFresh=active && mirrorContactTick && now-mirrorContactTick<150 && !boxEditor.enabled;int mirrorOwner=-1;for(unsigned side=0;side<2;++side)if(mirrorFresh && mirrorContact[side]>=0){inward[side]=0;if(sticksValid && (mirrorOwner<0 || std::hypot(sticks[side*2],sticks[side*2+1])>std::hypot(sticks[mirrorOwner*2],sticks[mirrorOwner*2+1])))mirrorOwner=side;}SendMirrorInput(mirrorOwner<0?-1:mirrorContact[mirrorOwner],mirrorOwner<0?0:sticks[mirrorOwner*2],mirrorOwner<0?0:sticks[mirrorOwner*2+1]);
+ if(radioClickPending && !guideFile.empty()){radioClickPending=false;PlaySoundW((guideFile.parent_path()/"controller_radio_click.wav").c_str(),nullptr,SND_FILENAME|SND_ASYNC|SND_NODEFAULT);}
+ if(radioTunePending && !guideFile.empty()){radioTunePending=false;PlaySoundW((guideFile.parent_path()/"controller_radio_tune.wav").c_str(),nullptr,SND_FILENAME|SND_ASYNC|SND_NODEFAULT);}
+ bool nativePressed[2]{},modePressed[2]{},thumbPressed[2]{};float grips[2]{},triggers[2]{},inward[2]{};bool nativeValid=active && PollNativeControllerButtons(nativePressed,grips,triggers,modePressed,thumbPressed,inward);float sticks[4]{};bool sticksValid=nativeValid && ReadControllerStickAxes(sticks);bool mirrorFresh=active && mirrorContactTick && now-mirrorContactTick<150 && !boxEditor.enabled;windowRequests[0]=windowRequests[1]=0;windowRequestTick=now;int radioOwner=-1;int mirrorOwner=-1;for(unsigned side=0;side<2;++side)if(mirrorFresh && mirrorContact[side]>=0){inward[side]=0;if(mirrorContact[side]==9 && sticksValid && (radioOwner<0 || std::hypot(sticks[side*2],sticks[side*2+1])>std::hypot(sticks[radioOwner*2],sticks[radioOwner*2+1])))radioOwner=side;if(mirrorContact[side]>=7)continue;if(mirrorContact[side]>=4 && mirrorContact[side]<=5){if(sticksValid){auto& value=windowRequests[mirrorContact[side]-4];if(std::abs(sticks[side*2+1])>std::abs(value))value=sticks[side*2+1];}continue;}if(sticksValid && (mirrorOwner<0 || std::hypot(sticks[side*2],sticks[side*2+1])>std::hypot(sticks[mirrorOwner*2],sticks[mirrorOwner*2+1])))mirrorOwner=side;}if(radioOwner<0)radioCommand.station=0;auto radioInput=radioStick.Step(radioOwner<0?0:sticks[radioOwner*2],radioOwner<0?0:sticks[radioOwner*2+1],radioOwner>=0);if(radioInput.station)radioCommand.station=radioInput.station;radioCommand.volume=radioInput.volume;radioTick=now;SendMirrorInput(mirrorOwner<0?-1:mirrorContact[mirrorOwner],mirrorOwner<0?0:sticks[mirrorOwner*2],mirrorOwner<0?0:sticks[mirrorOwner*2+1]);
  if(!active)HideMarkers();head.valid=false;for(auto& h:hands)h.valid=false;
  if(systemVR && active){vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);auto observedHead=Convert(poses[0]);if(observedHead.valid)head=observedHead;
   for(unsigned i=0;i<2;++i){auto index=systemVR->GetTrackedDeviceIndexForControllerRole(i?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand);bool pressed=false;
@@ -108,9 +111,11 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
  sceneMarkers={};sceneMarkerTick=GetTickCount64();mirrorContact[0]=mirrorContact[1]=-1;mirrorContactTick=sceneMarkerTick;hornBoxHeld=false;hornBoxTick=sceneMarkerTick;
  if(!boxEditor.authored[0]){boxEditor.boxes[0].center=ignitionTarget;boxEditor.boxes[0].scale=1;}
  if(!boxEditor.authored[1]){boxEditor.boxes[1].center=hornTarget;boxEditor.boxes[1].scale=hornBoxScale;}
+ if(!boxEditor.authored[9]){boxEditor.boxes[9].center=boxEditor.boxes[0].center;boxEditor.boxes[9].center[0]-=.12f;}
+ if(!boxEditor.authored[10]){boxEditor.boxes[10].center=boxEditor.boxes[9].center;boxEditor.boxes[10].center[1]+=.10f;}
  auto keyBox=boxEditor.boxes[0],hornBox=boxEditor.boxes[1];
  auto drawBox=[&](unsigned bone,const InteractionBox& box){auto& m=sceneMarkers[bone];for(unsigned col=0;col<3;++col){DriverIK::V axis{};axis[col]=box.scale*box.stretch[col];auto v=DriverIK::Rotate(box.rotation,axis);for(unsigned row=0;row<3;++row)m[row*4+col]=v[row];}m[3]=box.center[0];m[7]=box.center[1];m[11]=box.center[2];m[15]=1;};
- if(boxEditor.enabled){drawBox(44,keyBox);for(unsigned j=2;j<InteractionBoxCount;++j)drawBox(j==5?55:48+j,boxEditor.boxes[j]);}
+ if(boxEditor.enabled){drawBox(44,keyBox);for(unsigned j=2;j<InteractionBoxCount;++j)drawBox(j==11?46:j>=5?50+j:48+j,boxEditor.boxes[j]);}
  auto handWorld=DriverIK::FK(pose,positions);bool keyFresh=ignitionTargetTick && sceneMarkerTick-ignitionTargetTick<250;
  bool sceneFresh=head.valid && sceneXRFrameTick && sceneMarkerTick-sceneXRFrameTick<250 && sceneCameraTick && sceneMarkerTick-sceneCameraTick<250;
  bool hornFresh=hornTargetTick && sceneMarkerTick-hornTargetTick<250;
@@ -119,12 +124,18 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
  for(unsigned side=0;side<2;++side){unsigned wrist=side?28:7;auto offset=side?handBoxOffset:leftHandBoxOffset;auto palm=DriverIK::Add(handWorld.p[wrist],DriverIK::Rotate(handWorld.q[wrist],offset));
   auto raw=actualSceneFrame.Position(hands[side].point,head.point,head.rotation);auto rawQ=actualSceneFrame.Orientation(hands[side].rotation,head.rotation);
   auto& volume=volumes[side];volume=ControllerInteractionVolume(controls[side].enabled,hands[side].valid,sceneFresh,(mask&(1u<<side))!=0,palm,handWorld.q[wrist],raw,rawQ);
-  if(!volume.valid)continue;
+  if(!volume.valid){lightTriggers[side].Step(0,false,false);wiperTriggers[side].Step(0,false,false);radioTriggers[side].Step(0,false,false);continue;}
   if(boxEditor.enabled){InteractionBox display{volume.center,{.04f,.035f,.055f},volume.rotation};drawBox(side?48:45,display);}
   if(!controls[side].enabled){
    auto direction=DriverIK::Rotate(rawQ,{0,0,-1});rayHits[side]=RayInteractionBoxes(boxEditor,raw,direction);
    InteractionBox laser{DriverIK::Add(raw,DriverIK::Mul(direction,rayHits[side].distance*.5f)),{.0015f,.0015f,.5f},rawQ,1,{1,1,std::max(.001f,rayHits[side].distance)}};drawBox(53+side,laser);
   }
+  const auto& lightsBox=boxEditor.boxes[9];bool lightsHit=controls[side].enabled?IgnitionBoxesOverlap(lightsBox.center,DriverIK::V{lightsBox.half[0]*lightsBox.scale*lightsBox.stretch[0],lightsBox.half[1]*lightsBox.scale*lightsBox.stretch[1],lightsBox.half[2]*lightsBox.scale*lightsBox.stretch[2]},volume.center,volume.rotation,{.04f,.035f,.055f},lightsBox.rotation):rayHits[side].box==9;
+  if(lightTriggers[side].Step(fingerTrigger[side],!boxEditor.enabled && volume.valid,lightsHit)){lightRequestTick=sceneMarkerTick;ControllerToggleFeedback(side);}
+  const auto& wipersBox=boxEditor.boxes[10];bool wipersHit=controls[side].enabled?IgnitionBoxesOverlap(wipersBox.center,DriverIK::V{wipersBox.half[0]*wipersBox.scale*wipersBox.stretch[0],wipersBox.half[1]*wipersBox.scale*wipersBox.stretch[1],wipersBox.half[2]*wipersBox.scale*wipersBox.stretch[2]},volume.center,volume.rotation,{.04f,.035f,.055f},wipersBox.rotation):rayHits[side].box==10;
+  if(wiperTriggers[side].Step(fingerTrigger[side],!boxEditor.enabled && volume.valid,wipersHit)){wiperRequestTick=sceneMarkerTick;ControllerToggleFeedback(side);}
+  const auto& radioBox=boxEditor.boxes[11];bool radioHit=controls[side].enabled?IgnitionBoxesOverlap(radioBox.center,DriverIK::V{radioBox.half[0]*radioBox.scale*radioBox.stretch[0],radioBox.half[1]*radioBox.scale*radioBox.stretch[1],radioBox.half[2]*radioBox.scale*radioBox.stretch[2]},volume.center,volume.rotation,{.04f,.035f,.055f},radioBox.rotation):rayHits[side].box==11;
+  if(radioTriggers[side].Step(fingerTrigger[side],!boxEditor.enabled && volume.valid,radioHit)){radioCommand.toggle=true;radioTick=sceneMarkerTick;ControllerToggleFeedback(side);}
   if(!boxEditor.enabled)mirrorContact[side]=controls[side].enabled?MirrorContact(boxEditor,volume.center,volume.rotation):(rayHits[side].box>=2?rayHits[side].box-2:-1);
   if(ControllerHornPressed(!boxEditor.enabled && hornFresh && (controls[side].enabled?IgnitionBoxesOverlap(hornBox.center,DriverIK::V{hornBox.half[0]*hornBox.scale*hornBox.stretch[0],hornBox.half[1]*hornBox.scale*hornBox.stretch[1],hornBox.half[2]*hornBox.scale*hornBox.stretch[2]},volume.center,volume.rotation,{.04f,.035f,.055f},hornBox.rotation):rayHits[side].box==1),volume.valid,fingerTrigger[side]))hornBoxHeld=true;
  }
@@ -155,3 +166,17 @@ void SetHornInteractionTarget(DriverIK::V point){for(float v:point)if(!std::isfi
 bool ControllerHornBoxHeld(){std::lock_guard lock(guard);return hornBoxHeld && hornBoxTick && GetTickCount64()-hornBoxTick<250;}
 
 int ControllerBoxSetupKey(bool held){std::lock_guard lock(guard);return boxEditor.Key(held);}
+
+float ControllerWindowDirection(unsigned side){std::lock_guard lock(guard);return side<2 && windowRequestTick && GetTickCount64()-windowRequestTick<150 && !boxEditor.enabled?windowRequests[side]:0;}
+
+bool ConsumeControllerLightsRequest(){std::lock_guard lock(guard);auto event=lightRequestTick;lightRequestTick=0;return event && GetTickCount64()-event<250;}
+
+bool ConsumeControllerWipersRequest(){std::lock_guard lock(guard);auto event=wiperRequestTick;wiperRequestTick=0;return event && GetTickCount64()-event<250;}
+
+
+ControllerRadioCommand TakeControllerRadioCommand(){std::lock_guard lock(guard);auto out=radioCommand;radioCommand.station=0;radioCommand.toggle=false;if(!radioTick || GetTickCount64()-radioTick>150 || boxEditor.enabled)return {};return out;}
+
+
+void QueueControllerRadioTuneSound(){std::lock_guard lock(guard);radioTunePending=true;}
+
+void QueueControllerRadioClickSound(){std::lock_guard lock(guard);radioClickPending=true;}

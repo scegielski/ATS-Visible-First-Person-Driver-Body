@@ -5,7 +5,7 @@ inline int MirrorContact(const InteractionBoxEditor& editor,DriverIK::V center,D
  int found=-1;float nearest=1e9f;
  for(unsigned i=2;i<InteractionBoxCount;++i){const auto& b=editor.boxes[i];DriverIK::V half{};for(unsigned j=0;j<3;++j)half[j]=b.half[j]*b.scale*b.stretch[j];if(IgnitionBoxesOverlap(b.center,half,center,rotation,{.04f,.035f,.055f},b.rotation)){float d=DriverIK::Length(DriverIK::Sub(center,b.center));if(d<nearest){nearest=d;found=static_cast<int>(i-2);}}}return found;
 }
-inline int MirrorPhysicalSlot(int mirror){constexpr int slots[4]{0,4,2,6};return mirror>=0 && mirror<4?slots[mirror]:-1;}
+inline int MirrorPhysicalSlot(int mirror){constexpr int slots[7]{0,4,2,6,-1,-1,9};return mirror>=0 && mirror<7?slots[mirror]:-1;}
 
 struct ControllerContactVolume {DriverIK::V center{};DriverIK::Q rotation{1,0,0,0};bool valid=false;};
 inline ControllerContactVolume ControllerInteractionVolume(bool enabled,bool tracked,bool sceneFresh,bool solved,DriverIK::V palm,DriverIK::Q palmQ,DriverIK::V controller,DriverIK::Q controllerQ){

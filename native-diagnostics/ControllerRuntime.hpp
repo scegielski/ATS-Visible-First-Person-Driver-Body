@@ -20,3 +20,16 @@ void SetHornInteractionTarget(DriverIK::V point);
 bool ControllerHornBoxHeld();
 
 int ControllerBoxSetupKey(bool held);
+
+float ControllerWindowDirection(unsigned side);
+
+bool ConsumeControllerLightsRequest();
+
+bool ConsumeControllerWipersRequest();
+
+#include "RadioInteraction.hpp"
+ControllerRadioCommand TakeControllerRadioCommand();
+
+void QueueControllerRadioTuneSound();
+
+void QueueControllerRadioClickSound();
