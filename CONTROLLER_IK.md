@@ -124,3 +124,9 @@ Thumbstick click state changes request a vibration pulse on that hand plus an as
 
 ### Validated hand-toggle feedback checkpoint
 User confirmed engagement/disengagement tones and controller vibration work in game and requested commit/push. Final plugin 0.18.30 and both sound assets match installed files. Calibration axes hide while each hand is enabled. Both regression suites pass.
+
+### Plugin rename (0.19.0)
+Build DLL and SPF identity renamed to SPF_DriverVRBody. Existing plugin directory, settings identity, calibrated pose/sound files, OpenXR registry manifest path, and desktop launcher are migrated together. Controller API layer identity remains unchanged for existing SteamVR bindings.
+
+### Validated rename checkpoint
+User confirmed controller buttons and the renamed plugin still work after migration. SPF logs identify SPF_DriverVRBody. Installed DLL matches releases/SPF_DriverVRBody.dll; regression tests pass. For normal launches use the ATS VR Controller Hands desktop shortcut, which sets XR_ENABLE_API_LAYERS before creating ATS.

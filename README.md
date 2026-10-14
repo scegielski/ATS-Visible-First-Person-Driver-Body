@@ -1,5 +1,8 @@
 # ATS Visible First Person Driver Body
 
+Plugin output and SPF identity: `SPF_DriverVRBody` (SPF Driver VR Body), version 0.19.0. Renaming an existing installation requires moving its calibrated config files, enabled setting, and early OpenXR bridge registration to the new plugin directory. The ATS VR Controller Hands shortcut uses the migrated launcher.
+
+
 Current validated release: **0.18.9 plugin + 0.7.0 body archive**. The user confirmed the intact head works in first-person VR without collapse or offset. Our animated body replaces only the player's stock exterior driver, leaving traffic instances outside the hide guard.
 
 The original 61-bone driver mesh supports live steering and re-grabs, accelerator/brake/clutch motion, game-bound horn and turn signals, ignition with torso lean, runtime arm IK and engine starting delayed until the hand reaches the key, and independent hand gestures. Live OpenXR head tracking drives seated torso lean in interior and exterior views, with arm IK retaining hand targets and neck/head rotation following the headset in both camera views. Pose files, elbow offsets, turn-signal timing, tracking strength and lean limits are editable live. The head is restored from the original installed game mesh; the default interior head remains intact and tracked with zero offset. Optional collapse/offset controls use the corrected row-major render palette. Materials and textures remain references to installed game assets. The Mustang is the validated vehicle; broader calibrations remain planned.
