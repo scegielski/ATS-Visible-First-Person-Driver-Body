@@ -1,0 +1,12 @@
+{
+  "change": "Use game-owned OpenXR action synchronization; controller polls no longer issue extra xrSyncActions calls.",
+  "automated_validation": [
+    "DriverDiagnosticRegression passed",
+    "ControllerLayerRegression passed",
+    "Repeated button, analog and stick reads preserve a single native synchronization call.",
+    "Loss of focus returns cleared button input."
+  ],
+  "user_validation": "User confirmed left-eye whole-scene lag fixed with controllers enabled.",
+  "installed_bridge_sha256": "81a0605c6d4865e1440bf094c10b735896efea76c2f81896636a4a3e2731e583",
+  "installation": "Updated controller bridge installed and controller-enabled launch tested; main plugin unchanged."
+}

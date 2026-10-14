@@ -36,13 +36,14 @@ int main(){
  Check(SPF_TestControllerAttach(session,&attach)==XR_SUCCESS && attachCount==1 && attach.countActionSets==1 && attach.actionSets==&stock);
  XrActiveActionSet stockActive{stock,XR_NULL_PATH};XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&stockActive;
  Check(SPF_TestControllerSync(session,&sync)==XR_SUCCESS && sync.countActiveActionSets==1);
- unsigned char left=0,right=0;Check(SPF_ReadControllerButtons(&left,&right)==0 && left==1 && right==0 && syncCount==2);
+ unsigned char left=0,right=0;Check(SPF_ReadControllerButtons(&left,&right)==0 && left==1 && right==0 && syncCount==1);
  float curls[4]{};Check(SPF_ReadControllerInput(&left,&right,curls)==0 && curls[0]==.25f && curls[1]==.5f && curls[2]==.75f && curls[3]==1.f);
  unsigned char leftMode=0,rightMode=0;Check(SPF_ReadControllerInputWithModes(&left,&right,curls,&leftMode,&rightMode)==0 && leftMode==1 && rightMode==0);
  unsigned char lt=0,rt=0;Check(SPF_ReadControllerInputWithThumbs(&left,&right,curls,&leftMode,&rightMode,&lt,&rt)==0 && lt==0 && rt==1);
  float axes[4]{};Check(SPF_ReadControllerStickAxes(axes)==0 && axes[0]==.8f && axes[1]==.6f && axes[2]==-.9f && axes[3]==.6f);
  Check(SPF_ControllerToggleFeedback(0)==0 && SPF_ControllerToggleFeedback(1)==0 && hapticCount==2);Check(SPF_ControllerToggleFeedback(2)==5);
- syncResult=XR_SESSION_NOT_FOCUSED;Check(SPF_ReadControllerButtons(&left,&right)==XR_SESSION_NOT_FOCUSED && left==0 && right==0);
+ Check(syncCount==1); // Reads must never resynchronize the runtime.
+ syncResult=XR_SESSION_NOT_FOCUSED;Check(SPF_TestControllerSync(session,&sync)==XR_SESSION_NOT_FOCUSED);Check(SPF_ReadControllerButtons(&left,&right)==XR_SESSION_NOT_FOCUSED && left==0 && right==0);
  puts("Controller layer attachment, game-input preservation, per-hand states and focus checks passed.");
 }
 
