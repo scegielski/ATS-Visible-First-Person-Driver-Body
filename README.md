@@ -1,6 +1,6 @@
 # ATS Visible First Person Driver Body
 
-Plugin output and SPF identity: `SPF_DriverVRBody` (SPF Driver VR Body), version 0.19.0. Renaming an existing installation requires moving its calibrated config files, enabled setting, and early OpenXR bridge registration to the new plugin directory. The ATS VR Controller Hands shortcut uses the migrated launcher.
+Plugin output and SPF identity: `SPF_VisibleFirstPersonDriverBody` (SPF Visible First Person Driver Body), version 0.19.1. Renaming an existing installation requires moving its calibrated config files, enabled setting, and early OpenXR bridge registration to the new plugin directory. The ATS VR Controller Hands shortcut uses the migrated launcher.
 
 
 Current validated release: **0.18.9 plugin + 0.7.0 body archive**. The user confirmed the intact head works in first-person VR without collapse or offset. Our animated body replaces only the player's stock exterior driver, leaving traffic instances outside the hide guard.

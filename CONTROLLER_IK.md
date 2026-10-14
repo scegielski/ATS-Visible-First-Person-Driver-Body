@@ -130,3 +130,6 @@ Build DLL and SPF identity renamed to SPF_DriverVRBody. Existing plugin director
 
 ### Validated rename checkpoint
 User confirmed controller buttons and the renamed plugin still work after migration. SPF logs identify SPF_DriverVRBody. Installed DLL matches releases/SPF_DriverVRBody.dll; regression tests pass. For normal launches use the ATS VR Controller Hands desktop shortcut, which sets XR_ENABLE_API_LAYERS before creating ATS.
+
+### Repository-matching plugin name (0.19.1)
+Plugin output and SPF identity renamed to SPF_VisibleFirstPersonDriverBody at user request. Existing configuration, enabled state, controller bridge manifest registration, and desktop shortcut migrate from SPF_DriverVRBody.
