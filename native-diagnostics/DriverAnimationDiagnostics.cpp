@@ -57,6 +57,7 @@ void DriverObserveStub();
 void AdvanceObserveStub();
 }
 namespace {
+thread_local bool controllerIgnitionCycle=false;
 constexpr char kName[]="SPF_VisibleFirstPersonDriverBody";
 constexpr char kHash[]="5d3b4e343154de6b25dd366b6048c5bc5c452a4daa50bc38b33fd2e571d54257";
 constexpr char kDriverPattern[]="40 53 48 83 EC 50 48 83 79 08 00 48 8B D9 0F 84 43 01 00 00 83 79 10 FF 0F 84 39 01 00 00 80 79";
@@ -260,7 +261,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.19.1");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.20.4");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -496,6 +497,14 @@ void Update() {
  if(engineValid){const int value=static_cast<int>(engineState);if(priorEngineSample>=0 && priorEngineSample!=1 && value==1){if(!skipNextEngineStartEvent.exchange(false))engineStartSequence.fetch_add(1);}priorEngineSample=value;}else priorEngineSample=-1;
  engineStarting.store(engineValid && engineState==PlayerEngineState::Starting);engineTick.store(engineValid?GetTickCount64():0);
  PollDeferredEngineStart(engineValid,engineState);
+ if(ConsumeControllerIgnitionRequest() && engineValid && (engineState==PlayerEngineState::Off || engineState==PlayerEngineState::Running)){
+  auto controller=expectedPlayerDriverController.load();auto fresh=telemetryTick.load();auto entry=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))+0x5e1a70;const unsigned char expectedCode[]={0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x48};unsigned char actualCode[sizeof(expectedCode)]{};
+  if(controller && fresh && GetTickCount64()-fresh<250 && SafeRead(entry,actualCode,sizeof(actualCode)) && !std::memcmp(expectedCode,actualCode,sizeof(actualCode))){
+   skipNextEngineStartEvent.store(true);controllerIgnitionCycle=true;using NativeIgnitionCycle=void(*)(uintptr_t);reinterpret_cast<NativeIgnitionCycle>(entry)(controller-0x1df0);controllerIgnitionCycle=false;
+   uint32_t result=99;unsigned char electric=0;SafeRead(controller-0x1df0+0x1b8,&result,4);SafeRead(controller-0x1df0+0x1bc,&electric,1);if(result!=1)skipNextEngineStartEvent.store(false);char message[160];std::snprintf(message,sizeof(message),"IGNITION_INTERACTION native ignition cycle state_after=%u electricity=%u",result,electric);Log(SPF_LOG_INFO,message);
+  }
+ }
+
  static int priorEngine=-2;const int engineValue=engineValid?static_cast<int>(engineState):-1;
  if(engineValue!=priorEngine){char message[128];std::snprintf(message,sizeof(message),"ENGINE_STATE valid=%d state=%d (0=off 1=starting 2=running 3=stopping)",engineValid?1:0,engineValue);Log(SPF_LOG_INFO,message);priorEngine=engineValue;}
  bool held=false;
@@ -578,6 +587,13 @@ void Unload() { enabled.store(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.
+void UpdateIgnitionInteractionTarget(const DriverIK::Pose& rotations,uintptr_t positionPointer,uint64_t generation) {
+  {
+   static uint64_t keyGeneration=UINT64_MAX;static DriverIK::V keyPoint{};DriverIK::Positions keyPositions{};
+   if(keyGeneration!=generation && SafeRead(positionPointer,keyPositions.data(),sizeof(keyPositions))){auto keyPose=rotations;WindowGestureMotion arrival{1,1,0};BlendWindowGesture(keyPose,arrival,*liveIgnitionPose.Snapshot());auto keyWorld=DriverIK::FK(keyPose,keyPositions);keyPoint=DriverIK::Add(keyWorld.p[43],DriverIK::V{0,0,-.1524f});keyGeneration=generation;}
+   if(keyGeneration==generation)SetIgnitionInteractionTarget(keyPoint);
+  }
+}
 extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) noexcept {
  if(!enabled.load() || count!=61 || bounds<0x1e0)return;
  const uintptr_t model=bounds-0x1e0;char path[192]{};
@@ -646,6 +662,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
     if(accepted)gestureHeadFollowUpdates.fetch_add(1);else gestureHeadFollowRejected.fetch_add(1);
    }else gestureHeadFollowRejected.fetch_add(1);
   }
+  UpdateIgnitionInteractionTarget(rotations,pointers[3],generation);
   DriverIK::Pose unturned{};
   if(ignition.reach>0)BlendLiveIgnition(rotations,unturned,ignition);
   DriverIK::Positions headPositions{};DriverIK::Q headNeutralWorld{1,0,0,0};
@@ -800,6 +817,7 @@ extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t
   return false;
  }
  const auto now=GetTickCount64(),tick=telemetryTick.load(),bodyTick=privateBodyTick.load();
+ if(controllerIgnitionCycle)return false;
  if(!manual || !valid || state!=0 || (immediate&255u) || !electric || !tick || now-tick>250 || !bodyTick || now-bodyTick>250)return false;
  bool queued=false;
  {std::lock_guard lock(engineGateMutex);

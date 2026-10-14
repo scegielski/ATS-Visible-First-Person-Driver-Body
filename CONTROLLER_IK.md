@@ -133,3 +133,20 @@ User confirmed controller buttons and the renamed plugin still work after migrat
 
 ### Repository-matching plugin name (0.19.1)
 Plugin output and SPF identity renamed to SPF_VisibleFirstPersonDriverBody at user request. Existing configuration, enabled state, controller bridge manifest registration, and desktop shortcut migrate from SPF_DriverVRBody.
+
+### Controller ignition overlap prototype (0.20.0 / archive 0.9.0)
+Adds a visible red 8 cm ignition wireframe at the live ignition arrival thumb target plus the existing 15.24 cm forward correction. A blue oriented box follows the solved right wrist (8 x 7 x 11 cm). Exact oriented-box SAT overlap plus a fresh right trigger squeeze requests one engine start on the plugin update thread when player identity, telemetry, and off state are valid. Uses the existing original engine routine and suppresses automatic reach playback because the tracked hand is already at the key. Held trigger outside then entering does not start; release and squeeze inside. Requires right controller hand enabled. Visible alignment and engine interaction pending VR test.
+
+Live ignition box adjustment: config/ignition_box_offset.txt contains three finite metre offsets (X right, Y up, Z rearward) from the generated key target. Polled every 500 ms outside the animation hook; incomplete or invalid edits retain the previous position. The same position drives both the wireframe and overlap test. Initial values 0 0 0.
+
+### Hand collision box toward fingertips (0.20.1 test)
+Stock bind transforms show the middle-finger base at approximately -9.5 cm on the wrist local X axis. Move the blue hand box 8 cm along that direction, keeping its rotation attached to the wrist and using the same center for collision. New live config/ignition_hand_box_offset.txt accepts three finite hand-local metre offsets, defaults -0.08 0 0, polled every 500 ms with last-valid retention. Requires one plugin restart for initial support.
+
+### Native ignition/electricity cycle (0.20.2 test)
+Overlap trigger now invokes the game combined engine/electricity control at validated entry 0x1405e1a70 rather than always requesting engine start. This honors normal game configuration: electricity-on first, start next, and shutdown while running. A signature guard and fresh player/state checks gate calls. The existing reach delay is bypassed only for this synchronous controller-originated invocation because the hand already contacts the ignition. Running/Off states accepted, transition states ignored. Right hand box final live offset -0.14 -0.02 0 accepted visually by user. Native multi-click sequence still needs runtime validation.
+
+### Native ignition signature correction (0.20.3)
+User reports no response on native-cycle prototype. Executable byte verification found a leading 0x40 REX prefix before push RBX; the 0.20.2 signature omitted it, rejecting all calls. Guard corrected against actual executable bytes. Other overlap and state logic unchanged; runtime multi-click validation pending.
+
+### Ignition interaction checkpoint (0.20.4)
+Native-cycle logs confirm starting, shutdown, and electricity-only transitions from overlap trigger presses. User calibrated the hand box to -0.14 -0.02 0 and ignition box to -0.01 0 0, then requested hiding the red ignition wireframe and commit/push. Only rendering is hidden; SAT collision and live position offset remain active.

@@ -12,3 +12,6 @@ void ResetControllerMarkerFrame();
 
 void SetControllerSceneXRFrame(const float* reference,const float* current);
 void SetControllerSceneCamera(float x,float y,float z);
+
+void SetIgnitionInteractionTarget(DriverIK::V point);
+bool ConsumeControllerIgnitionRequest();

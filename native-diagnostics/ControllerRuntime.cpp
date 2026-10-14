@@ -4,6 +4,7 @@
 #include "LiveControllerFingers.hpp"
 #include "ControllerFingerMode.hpp"
 #include "ControllerSceneFrame.hpp"
+#include "IgnitionInteraction.hpp"
 #include "NativeControllerInput.hpp"
 #include "vendor/openvr.h"
 #include <mutex>
@@ -21,7 +22,7 @@ using Shutdown=void (__cdecl*)();Shutdown shutdownVR=nullptr;
 struct Tracked {DriverIK::V point{};DriverIK::Q rotation{1,0,0,0};bool valid=false;};
 LiveControllerFingerPose liveFingers[2]{LiveControllerFingerPose(false),LiveControllerFingerPose(true)};
 ControllerFingerMode fingerMode[2];
-ControllerSceneFrame actualSceneFrame{};uint64_t sceneXRFrameTick=0,sceneCameraTick=0;DriverPalette sceneMarkers{};uint64_t sceneMarkerTick=0;bool markerCalibrated=false;DriverIK::V markerOrigin{},markerAnchor{};DriverIK::Q markerBasis{1,0,0,0};
+IgnitionTriggerGate ignitionTrigger;DriverIK::V ignitionTarget{},ignitionBoxOffset{},handBoxOffset{-.08f,0,0};uint64_t ignitionTargetTick=0,interactionRequestTick=0;ControllerSceneFrame actualSceneFrame{};uint64_t sceneXRFrameTick=0,sceneCameraTick=0;DriverPalette sceneMarkers{};uint64_t sceneMarkerTick=0;bool markerCalibrated=false;DriverIK::V markerOrigin{},markerAnchor{};DriverIK::Q markerBasis{1,0,0,0};
 vr::IVROverlay* markerOverlay=nullptr;vr::VROverlayHandle_t markers[2][6]{};int markerError=0;
 void HideMarkers(){if(markerOverlay)for(auto& side:markers)for(auto handle:side)if(handle)markerOverlay->HideOverlay(handle);}
 void CreateMarkers(){
@@ -66,9 +67,9 @@ bool Connect(){
 void PollControllers(bool active,uint64_t generation){
  PollFingerFiles();
  std::lock_guard lock(guard);uint64_t now=GetTickCount64();float dt=tick?std::min(.05f,(now-tick)*.001f):0;tick=now;
- if(generationSeen!=generation){generationSeen=generation;markerCalibrated=false;for(unsigned i=0;i<2;++i){controls[i]={};fingerMode[i]={};weights[i]=0;fingerGrip[i]=fingerTrigger[i]=fingerThumb[i]=0;lastSolveTick[i]=0;}}
+ if(generationSeen!=generation){generationSeen=generation;markerCalibrated=false;ignitionTrigger={};interactionRequestTick=ignitionTargetTick=0;for(unsigned i=0;i<2;++i){controls[i]={};fingerMode[i]={};weights[i]=0;fingerGrip[i]=fingerTrigger[i]=fingerThumb[i]=0;lastSolveTick[i]=0;}}
  if(!systemVR && now-attempt>=5000){attempt=now;Connect();}
- if(!guideFile.empty() && now-guidePoll>=500){guidePoll=now;std::ifstream input(guideFile);if(input){std::string text((std::istreambuf_iterator<char>(input)),{});ControllerElbowGuides parsed;if(ParseControllerElbowGuides(text,parsed))elbowGuides=parsed;}std::ifstream twistInput(twistFile);float value;std::string extra;if(twistInput>>value && !(twistInput>>extra) && std::isfinite(value) && value>=0 && value<=1)twistShare=value;std::ifstream blendInput(modeBlendFile);if(blendInput>>value && !(blendInput>>extra) && std::isfinite(value) && value>0)modeBlendSeconds=value;}
+ if(!guideFile.empty() && now-guidePoll>=500){guidePoll=now;std::ifstream input(guideFile);if(input){std::string text((std::istreambuf_iterator<char>(input)),{});ControllerElbowGuides parsed;if(ParseControllerElbowGuides(text,parsed))elbowGuides=parsed;}std::ifstream twistInput(twistFile);float value;std::string extra;if(twistInput>>value && !(twistInput>>extra) && std::isfinite(value) && value>=0 && value<=1)twistShare=value;std::ifstream boxInput(guideFile.parent_path()/"ignition_box_offset.txt");DriverIK::V boxOffset{};if(boxInput>>boxOffset[0]>>boxOffset[1]>>boxOffset[2] && !(boxInput>>extra) && std::isfinite(boxOffset[0]) && std::isfinite(boxOffset[1]) && std::isfinite(boxOffset[2]))ignitionBoxOffset=boxOffset;std::ifstream handBoxInput(guideFile.parent_path()/"ignition_hand_box_offset.txt");DriverIK::V handOffset{};if(handBoxInput>>handOffset[0]>>handOffset[1]>>handOffset[2] && !(handBoxInput>>extra) && std::isfinite(handOffset[0]) && std::isfinite(handOffset[1]) && std::isfinite(handOffset[2]))handBoxOffset=handOffset;std::ifstream blendInput(modeBlendFile);if(blendInput>>value && !(blendInput>>extra) && std::isfinite(value) && value>0)modeBlendSeconds=value;}
 
  bool nativePressed[2]{},modePressed[2]{},thumbPressed[2]{};float grips[2]{},triggers[2]{},inward[2]{};bool nativeValid=active && PollNativeControllerButtons(nativePressed,grips,triggers,modePressed,thumbPressed,inward);
  if(!active)HideMarkers();head.valid=false;for(auto& h:hands)h.valid=false;
@@ -92,6 +93,13 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
   if(ApplyControllerHand(pose,positions,i!=0,temporary,controllerPoint,controllerRotation,{1,0,0,0},weights[i],seconds,elbowGuides.values[i],twistShare,true)){auto fingers=liveFingers[i].Snapshot();auto selected=fingerMode[i].Targets(*fingers);BlendControllerFingers(pose,i!=0,fingerGrip[i],fingerTrigger[i],weights[i],&selected,&fingerMode[i].weights,fingerThumb[i],static_cast<int>(fingerMode[i].finger),std::sin(3.14159265f*std::clamp(fingerMode[i].previewSeconds/.35f,0.f,1.f)));controls[i].origin=temporary.origin;controls[i].originRotation=temporary.originRotation;controls[i].anchor=temporary.anchor;controls[i].anchorRotation=temporary.anchorRotation;controls[i].basis=temporary.basis;controls[i].calibrate=temporary.calibrate;controls[i].bodyOrientation=temporary.bodyOrientation;controls[i].priorDirection=temporary.priorDirection;controls[i].priorBend=temporary.priorBend;controls[i].haveBend=temporary.haveBend;controls[i].neutralWrist=temporary.neutralWrist;controls[i].previousTwist=temporary.previousTwist;controls[i].haveTwist=temporary.haveTwist;lastSolveTick[i]=now;mask|=1u<<i;++solves[i];if(calibration)++calibrations[i];}else ++rejects[i];
  }
  sceneMarkers={};sceneMarkerTick=GetTickCount64();
+ auto handWorld=DriverIK::FK(pose,positions);bool keyFresh=ignitionTargetTick && sceneMarkerTick-ignitionTargetTick<250;
+ bool activeRight=controls[1].enabled && hands[1].valid && head.valid && (mask&2);
+ auto handBoxCenter=DriverIK::Add(handWorld.p[28],DriverIK::Rotate(handWorld.q[28],handBoxOffset));
+ if(activeRight){auto& m=sceneMarkers[48];for(unsigned col=0;col<3;++col){DriverIK::V a{};a[col]=1;auto v=DriverIK::Rotate(handWorld.q[28],a);for(unsigned row=0;row<3;++row)m[row*4+col]=v[row];}m[3]=handBoxCenter[0];m[7]=handBoxCenter[1];m[11]=handBoxCenter[2];m[15]=1;}
+ bool overlap=activeRight && keyFresh && IgnitionBoxesOverlap(ignitionTarget,{.04f,.04f,.04f},handBoxCenter,handWorld.q[28],{.04f,.035f,.055f});
+ if(ignitionTrigger.Step(fingerTrigger[1],activeRight && keyFresh,overlap)){interactionRequestTick=sceneMarkerTick;ControllerToggleFeedback(1);}
+
  if(head.valid && sceneXRFrameTick && sceneMarkerTick-sceneXRFrameTick<250 && sceneCameraTick && sceneMarkerTick-sceneCameraTick<250){
  for(unsigned side=0;side<2;++side)if(hands[side].valid && !controls[side].enabled){auto position=actualSceneFrame.Position(hands[side].point,head.point,head.rotation);auto rotation=actualSceneFrame.Orientation(hands[side].rotation,head.rotation);
   auto& m=sceneMarkers[side?28:7];for(unsigned col=0;col<3;++col){DriverIK::V axis{};axis[col]=1;auto v=DriverIK::Rotate(rotation,axis);for(unsigned row=0;row<3;++row)m[row*4+col]=v[row];}m[3]=position[0];m[7]=position[1];m[11]=position[2];m[15]=1;}
@@ -108,3 +116,6 @@ void ResetControllerMarkerFrame(){std::lock_guard lock(guard);markerCalibrated=f
 
 void SetControllerSceneXRFrame(const float* reference,const float* current){std::lock_guard lock(guard);actualSceneFrame.neutral={reference[0],reference[1],reference[2]};actualSceneFrame.neutralQ={reference[4],reference[5],reference[6],reference[7]};actualSceneFrame.xrHead={current[0],current[1],current[2]};actualSceneFrame.xrHeadQ={current[4],current[5],current[6],current[7]};sceneXRFrameTick=GetTickCount64();}
 void SetControllerSceneCamera(float x,float y,float z){if(!std::isfinite(x)||!std::isfinite(y)||!std::isfinite(z))return;std::lock_guard lock(guard);actualSceneFrame.camera={-.3847368658f+x,1.066045642f+y,.1469421685f+z};sceneCameraTick=GetTickCount64();}
+
+void SetIgnitionInteractionTarget(DriverIK::V point){for(float v:point)if(!std::isfinite(v))return;std::lock_guard lock(guard);ignitionTarget=DriverIK::Add(point,ignitionBoxOffset);ignitionTargetTick=GetTickCount64();}
+bool ConsumeControllerIgnitionRequest(){std::lock_guard lock(guard);auto event=interactionRequestTick;interactionRequestTick=0;return event && GetTickCount64()-event<250;}

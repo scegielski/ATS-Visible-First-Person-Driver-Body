@@ -21,6 +21,7 @@
 #include "LiveControllerFingers.hpp"
 #include "ControllerFingerMode.hpp"
 #include "ControllerSceneFrame.hpp"
+#include "IgnitionInteraction.hpp"
 #include "ControllerActionAttach.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
@@ -124,6 +125,8 @@ int main() {
  originalInfo.countActionSets=17;Check(!CombineControllerActionSets(originalInfo,extraAction,combinedInfo,attached),"unexpected attachment layout rejected");
 
  ControllerElbowGuides guides;Check(ParseControllerElbowGuides("left -.12 -.35 .12\nright .12 -.35 .12",guides),"live controller elbow guides parse");Check(!ParseControllerElbowGuides("left 0 0 0 right 1 0 0",guides),"zero elbow guide rejected without replacing valid settings");
+ Check(IgnitionBoxesOverlap({0,0,0},{.04f,.04f,.04f},{.05f,0,0},{1,0,0,0},{.04f,.035f,.055f}),"ignition oriented boxes overlap");Check(!IgnitionBoxesOverlap({0,0,0},{.04f,.04f,.04f},{.2f,0,0},{1,0,0,0},{.04f,.035f,.055f}),"separated ignition boxes reject contact");
+ IgnitionTriggerGate triggerBox;Check(!triggerBox.Step(1,true,true),"held trigger on activation cannot start");triggerBox.Step(0,true,false);Check(!triggerBox.Step(1,true,false),"outside press does not start");Check(!triggerBox.Step(1,true,true),"moving inside with held trigger does not start");triggerBox.Step(0,true,true);Check(triggerBox.Step(1,true,true),"fresh overlap press starts once");Check(!triggerBox.Step(1,true,true),"held trigger cannot repeat start");
  ControllerSceneFrame sceneFrame;sceneFrame.camera={0,1,0};sceneFrame.neutral={2,0,3};sceneFrame.xrHead={2,0,3};auto physical=DriverIK::V{.3f,1.1f,-.4f};auto initialMarker=sceneFrame.Position(physical,{0,1,0},{1,0,0,0});
  sceneFrame.xrHead={2.2f,.1f,3};auto movedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{1,0,0,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,movedMarker))<.00001f,"stationary controller marker stays fixed during head translation across tracking spaces");
  sceneFrame.xrHeadQ={.70710678f,0,.70710678f,0};auto turnedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{.70710678f,0,.70710678f,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,turnedMarker))<.00001f,"stationary marker stays fixed during matching head rotation");
