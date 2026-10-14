@@ -150,3 +150,33 @@ User reports no response on native-cycle prototype. Executable byte verification
 
 ### Ignition interaction checkpoint (0.20.4)
 Native-cycle logs confirm starting, shutdown, and electricity-only transitions from overlap trigger presses. User calibrated the hand box to -0.14 -0.02 0 and ignition box to -0.01 0 0, then requested hiding the red ignition wireframe and commit/push. Only rendering is hidden; SAT collision and live position offset remain active.
+
+### Horn contact prototype (0.21.0 / archive 0.10.0)
+Adds a visible green wireframe near the compiled horn press wrist position. With the right tracked hand enabled, its blue hand box overlapping the horn box and trigger held combines native horn input for the exact player horn object only. Release, leaving contact, disabling tracking, or stale samples stops the override. Existing keyboard/wheel input is preserved. The automatic left-arm horn reach is suppressed during controller contact. New horn_box_offset.txt allows live position tuning. Forwarding regression preserves receiver and other input arguments. Runtime horn playback and placement validation pending.
+
+### Live horn box scale (0.21.1 test)
+Horn box size increased by 25% on every dimension, from 12x10x10 cm to 15x12.5x12.5 cm. New horn_box_scale.txt defaults to 1.25, reads a positive finite multiplier live every 500 ms, retaining last valid value on bad input. Both rendered palette scale and SAT half extents use that multiplier. Existing tuned center retained at 0.01 0.07 -0.10 offset.
+
+### Explicit controller layer discovery in launcher
+A later desktop launch failed OpenXR initialization with XR_ERROR_API_LAYER_NOT_PRESENT despite valid VR arguments and an existing per-user registry manifest. Launcher now sets child-only XR_API_LAYER_PATH to the verified bridge manifest/DLL directory in addition to XR_ENABLE_API_LAYERS. Installed and repository launcher locations are supported. Runtime confirmation pending.
+
+### Contact horn from either hand (0.21.2 / archive 0.10.1)
+Removes trigger requirement from horn interaction. Either enabled tracked hand box overlapping the horn box holds the native horn input; both clear, tracking loss, or disabling hands releases it. Adds a left-hand visible collision box with mirrored fingertip-axis offset (left local +X versus right -X, verified from stock bind transforms). Ignition retains right-trigger click behavior. Includes pending 25% horn size enlargement and live size file. Runtime validation pending.
+
+### Independent left hand collision box (0.21.3 test)
+Moves left box 2 cm along local +Y relative to its previous 0.14 -0.02 0 position, toward palm for visual comparison. New live horn_left_hand_box_offset.txt defaults 0.14 0 0, independent of right-hand ignition box. Both left visible mesh and horn overlap use its center. Requires one restart to add file support; subsequent offsets apply live.
+
+### Controller box setup mode (0.22.0)
+F9 toggles SPF Setup.EditInteractionBoxes (remappable). Both target wireframes show while editing and ignition/horn interaction is disabled. Grip near a box acquires it using physical controller position; one grip moves/rotates, both grips scale from controller separation and rotate from their connecting axis. Releasing a grip transfers to the remaining hand without jumping; releasing both saves. Tracking loss ends/transfers a grab using the last valid box pose. Placement writes atomically to config/interaction_boxes.txt outside the animation hook on release/exit. Strict parser retains last valid placement on partial/invalid edits. Authored placements override the earlier pose-relative offset/scale files; initial positions still derive from those until grabbed. Tests cover drag/rotation/scaling/handoff/serialization/hotkey edges. VR interaction check pending.
+
+### Nonuniform two-hand box resizing (0.22.1 test)
+At two-hand acquisition, the editor picks the box-local axis most aligned with hand separation. Spreading or closing changes only that dimension; release/regrab along another direction to edit another axis. One-hand rotation remains available; two-hand resizing keeps box rotation fixed for predictable axis scaling. Version 2 placement files persist per-axis stretch factors and retain compatibility with version 1 uniform-scale files. Rendered column scales, collision half extents, and grab hit tests all use per-axis factors.
+
+### Setup-only interaction wireframes (0.22.2 test)
+Ignition, horn, and both hand collision box meshes render only while box setup mode is enabled. Outside setup their palettes collapse while collision/trigger behavior remains active. Disabled-hand controller calibration axes retain their existing visibility rule.
+
+### Setup target labels (archive 0.10.2)
+Adds IGNITION and HORN geometry labels above their target wireframes, weighted to the same target bones. Labels inherit position, rotation, per-axis scale, and setup-only visibility; collision half extents unchanged. Text is formed from double-sided mesh quads using an embedded 5x7 font and private existing target materials. VR legibility pending.
+
+### Setup editor and horn checkpoint
+User requested commit and push after the labeled-box build. Installed plugin 0.22.2 and scene archive 0.10.2 match final release binaries. Current live horn offsets/scales and saved box placements (if present) are included. Regression tests cover forwarding, overlap, grip editing, rotation, axis-specific scaling, handoff and persistence. Detailed per-feature VR test results beyond user acceptance are not claimed. Launcher explicit bridge search path is included.

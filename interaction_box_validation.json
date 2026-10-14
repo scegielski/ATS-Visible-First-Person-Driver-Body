@@ -1,0 +1,21 @@
+{
+  "plugin_version": "0.22.2",
+  "archive_version": "0.10.2",
+  "plugin_sha256": "3c130d0f122ab134af78a6fa092f159622de4104ab6322045d553608c2b6216d",
+  "archive_sha256": "c398d680a1a2e61c5e61a51fd639365dea5f4218067faf137ffc587c58a5e11e",
+  "setup_hotkey": "F9",
+  "horn_contact": "either enabled hand; trigger not required",
+  "setup_operations": [
+    "one-hand position and rotation",
+    "axis-specific two-hand resize",
+    "atomic persistence"
+  ],
+  "labels": [
+    "IGNITION",
+    "HORN"
+  ],
+  "interaction_meshes_hidden_outside_setup": true,
+  "automated_regressions_pass": true,
+  "user_requested_commit_after_label_test": true,
+  "explicit_detailed_horn_and_setup_visual_validation_not_recorded": true
+}

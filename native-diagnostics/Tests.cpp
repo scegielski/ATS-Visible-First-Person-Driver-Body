@@ -22,6 +22,7 @@
 #include "ControllerFingerMode.hpp"
 #include "ControllerSceneFrame.hpp"
 #include "IgnitionInteraction.hpp"
+#include "InteractionBoxEditor.hpp"
 #include "ControllerActionAttach.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
@@ -109,7 +110,11 @@ extern "C" void CaptureXRContext(uintptr_t) noexcept {}
 extern "C" uintptr_t PrepareControllerActionAttach(uintptr_t owner,uintptr_t info) noexcept {Check(owner==123 && info==456,"XR attach observer receives owner and original info");return 789;}
 extern "C" uintptr_t XRActionAttachTest(uintptr_t,uintptr_t);
 extern "C" void XRActionAttachContinuation();
+extern "C" {extern void* gHornControlOriginal;uint64_t HornControlObserveStub(uintptr_t,uint64_t,uint64_t,uint64_t);}
+extern "C" uint64_t HornControlTestContinuation(uintptr_t object,uint64_t held,uint64_t air,uint64_t transform){Check(object==123 && air==456 && transform==789,"horn observer preserves receiver and other arguments");return held;}
 int main() {
+ gHornControlOriginal=reinterpret_cast<void*>(HornControlTestContinuation);Check(HornControlObserveStub(123,0x1122334455667701ull,456,789)==0x1122334455667701ull,"horn observer forwards full register with native held state intact");
+
  std::ifstream fingerFile("../../releases/controller_left_fingers.txt");std::string fingerText((std::istreambuf_iterator<char>(fingerFile)),{}),fingerError;LiveControllerFingerPose liveFingerLeft(false),liveFingerRight(true);
  Check(liveFingerLeft.Replace(fingerText,fingerError) && liveFingerLeft.Revision()==1,"live controller finger file loads all open closed joints");auto retained=liveFingerLeft.Snapshot();
  Check(!liveFingerLeft.Replace("SPF_CONTROLLER_FINGERS 1\nbone 8 1 0 0 0 1 0 0 0",fingerError) && liveFingerLeft.Snapshot()==retained && liveFingerLeft.Revision()==1,"incomplete live finger edit retains last valid pose");
@@ -127,6 +132,11 @@ int main() {
  ControllerElbowGuides guides;Check(ParseControllerElbowGuides("left -.12 -.35 .12\nright .12 -.35 .12",guides),"live controller elbow guides parse");Check(!ParseControllerElbowGuides("left 0 0 0 right 1 0 0",guides),"zero elbow guide rejected without replacing valid settings");
  Check(IgnitionBoxesOverlap({0,0,0},{.04f,.04f,.04f},{.05f,0,0},{1,0,0,0},{.04f,.035f,.055f}),"ignition oriented boxes overlap");Check(!IgnitionBoxesOverlap({0,0,0},{.04f,.04f,.04f},{.2f,0,0},{1,0,0,0},{.04f,.035f,.055f}),"separated ignition boxes reject contact");
  IgnitionTriggerGate triggerBox;Check(!triggerBox.Step(1,true,true),"held trigger on activation cannot start");triggerBox.Step(0,true,false);Check(!triggerBox.Step(1,true,false),"outside press does not start");Check(!triggerBox.Step(1,true,true),"moving inside with held trigger does not start");triggerBox.Step(0,true,true);Check(triggerBox.Step(1,true,true),"fresh overlap press starts once");Check(!triggerBox.Step(1,true,true),"held trigger cannot repeat start");
+ InteractionBoxEditor editor;editor.boxes[0].center={0,0,0};editor.boxes[1].center={5,0,0};Check(editor.Key(true)==1,"setup hotkey enters once");Check(editor.Key(true)==0,"held setup hotkey does not repeat");editor.Key(false);
+ BoxGrabInput grab[2]{};grab[0].valid=grab[1].valid=true;editor.Step(grab);grab[0].grip=1;editor.Step(grab);Check(editor.selected==0,"grip acquires nearby box");grab[0].position={.1f,0,0};editor.Step(grab);Check(std::abs(editor.boxes[0].center[0]-.1f)<.0001f,"one hand moves box");
+ grab[0].rotation={.70710678f,0,.70710678f,0};editor.Step(grab);Check(std::abs(editor.boxes[0].rotation[2]-.70710678f)<.0001f,"one hand rotates box");grab[1].position={.3f,0,0};grab[1].grip=1;editor.Step(grab);grab[1].position={.5f,0,0};editor.Step(grab);Check(std::abs(editor.boxes[0].stretch[2]-2)<.001f && editor.boxes[0].stretch[0]==1 && editor.boxes[0].stretch[1]==1,"two hand separation scales only selected local axis");
+ auto beforeHandoff=editor.boxes[0];grab[1].grip=0;editor.Step(grab);Check(DriverIK::Length(DriverIK::Sub(editor.boxes[0].center,beforeHandoff.center))<.0001f,"two to one hand transfer does not jump");grab[0].grip=0;editor.Step(grab);Check(editor.dirty && editor.selected<0,"release requests persistent save");
+ auto savedBoxes=SerializeInteractionBoxes(editor);InteractionBoxEditor loadedEditor;Check(ParseInteractionBoxes(savedBoxes,loadedEditor) && std::abs(loadedEditor.boxes[0].stretch[2]-2)<.001f,"box placements round trip including rotation and scale");Check(!ParseInteractionBoxes("SPF_INTERACTION_BOXES 1 ignition 0 0",loadedEditor),"partial edit does not replace saved boxes");Check(editor.Key(true)==2,"setup hotkey exits");
  ControllerSceneFrame sceneFrame;sceneFrame.camera={0,1,0};sceneFrame.neutral={2,0,3};sceneFrame.xrHead={2,0,3};auto physical=DriverIK::V{.3f,1.1f,-.4f};auto initialMarker=sceneFrame.Position(physical,{0,1,0},{1,0,0,0});
  sceneFrame.xrHead={2.2f,.1f,3};auto movedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{1,0,0,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,movedMarker))<.00001f,"stationary controller marker stays fixed during head translation across tracking spaces");
  sceneFrame.xrHeadQ={.70710678f,0,.70710678f,0};auto turnedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{.70710678f,0,.70710678f,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,turnedMarker))<.00001f,"stationary marker stays fixed during matching head rotation");
@@ -692,3 +702,5 @@ int main() {
  ledger={};Check(!ledger.slots[0].controller && !ledger.dropped,"world reset clears ledger");
  std::puts("PASS: observer forwarding, integer/float/stack arguments, return values, bounded samples, invalid-data rejection and reset");
 }
+
+extern "C" {void* gHornControlOriginal=nullptr;unsigned char CaptureHornBox(uintptr_t,uint32_t held) noexcept{return static_cast<unsigned char>(held);}}

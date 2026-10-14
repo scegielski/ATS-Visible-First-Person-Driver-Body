@@ -43,7 +43,7 @@
 
 extern "C" {
 void* gDriverOriginal=nullptr;
-void* gEngineOriginal=nullptr;
+void* gEngineOriginal=nullptr;void* gHornControlOriginal=nullptr;void HornControlObserveStub();
 void* gRecenterOriginal=nullptr;void NativeRecenterObserveStub();
 void* gHeadOriginal=nullptr;void HeadObserveStub();
 void* gXRActionAttachOriginal=nullptr;void XRActionAttachStub();
@@ -261,7 +261,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.20.4");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.22.2");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -271,6 +271,7 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
  api->Policy_AddConfigurableSystem(h,"keybinds");
  api->Defaults_AddKeybind(h,"Gestures","LeftWindowBird","keyboard","KEY_F10","always");
  api->Defaults_AddKeybind(h,"Gestures","RightHandBird","keyboard","KEY_F11","always");
+ api->Defaults_AddKeybind(h,"Setup","EditInteractionBoxes","keyboard","KEY_F9","always");
 
 }
 void OnLoad(const SPF_Load_API* api) {
@@ -305,6 +306,8 @@ void Activated(const SPF_Core_API* api) {
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
  boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
  engineRequestHook=hooks->Hook_Register(kName,"EngineRequest","Observe player engine start/stop request",reinterpret_cast<void*>(EngineRequestObserveStub),&gEngineOriginal,kEngineRequestPattern,true);
+ constexpr char hornControlPattern[]="4C 8B DC 49 89 5B 08 49 89 6B 10 49 89 73 18 49 89 7B 20 41 56 48 81 EC 90 00 00 00";
+ if(hooks->Hook_FindPattern(hornControlPattern)==base+0x9ea6a0)hooks->Hook_Register(kName,"ControllerHornBox","Combine player horn with controller box contact",reinterpret_cast<void*>(HornControlObserveStub),&gHornControlOriginal,hornControlPattern,true);else Log(SPF_LOG_ERROR,"HORN_BOX control signature mismatch.");
  signalLeftHook=hooks->Hook_Register(kName,"SignalLeftRequest","Delay player left toggle until stalk contact",reinterpret_cast<void*>(SignalLeftRequestStub),&gSignalLeftOriginal,kSignalLeftPattern,true);
  signalRightHook=hooks->Hook_Register(kName,"SignalRightRequest","Delay player right toggle until stalk contact",reinterpret_cast<void*>(SignalRightRequestStub),&gSignalRightOriginal,kSignalRightPattern,true);
  if(!driverHook || !advanceHook || !boneHook || !engineRequestHook || !signalLeftHook || !signalRightHook) {
@@ -510,6 +513,7 @@ void Update() {
  bool held=false;
  const bool valid=ReadPlayerHorn(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,held);
  gameHornValid.store(valid);hornHeld.store(valid && held);hornTick.store(valid?GetTickCount64():0);
+ if(gestureKeys){int setup=ControllerBoxSetupKey(core->keybinds->Kbind_GetActionValue(gestureKeys,"Setup.EditInteractionBoxes")>.5f);if(setup)Log(SPF_LOG_INFO,setup==1?"BOX_SETUP enabled: grip to move/rotate; both grips to scale.":"BOX_SETUP disabled: placements saved.");}
  if(gestureKeys){windowGestureHeld.store(core->keybinds->Kbind_GetActionValue(gestureKeys,"Gestures.LeftWindowBird")>.5f);windowGestureTick.store(GetTickCount64());rightGestureHeld.store(core->keybinds->Kbind_GetActionValue(gestureKeys,"Gestures.RightHandBird")>.5f);rightGestureTick.store(GetTickCount64());}
  static bool installed=false;
  if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook) && core->hooks->Hook_IsInstalled(boneHook) && core->hooks->Hook_IsInstalled(engineRequestHook)) {
@@ -592,6 +596,9 @@ void UpdateIgnitionInteractionTarget(const DriverIK::Pose& rotations,uintptr_t p
    static uint64_t keyGeneration=UINT64_MAX;static DriverIK::V keyPoint{};DriverIK::Positions keyPositions{};
    if(keyGeneration!=generation && SafeRead(positionPointer,keyPositions.data(),sizeof(keyPositions))){auto keyPose=rotations;WindowGestureMotion arrival{1,1,0};BlendWindowGesture(keyPose,arrival,*liveIgnitionPose.Snapshot());auto keyWorld=DriverIK::FK(keyPose,keyPositions);keyPoint=DriverIK::Add(keyWorld.p[43],DriverIK::V{0,0,-.1524f});keyGeneration=generation;}
    if(keyGeneration==generation)SetIgnitionInteractionTarget(keyPoint);
+   static uint64_t hornGeneration=UINT64_MAX;static DriverIK::V hornPoint{};
+   if(hornGeneration!=generation && SafeRead(positionPointer,keyPositions.data(),sizeof(keyPositions))){auto hornPose=rotations;HornMotion press;press.reach=press.press=1;BlendHornPose(hornPose,press);hornPoint=DriverIK::FK(hornPose,keyPositions).p[7];hornGeneration=generation;}
+   if(hornGeneration==generation)SetHornInteractionTarget(hornPoint);
   }
 }
 extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) noexcept {
@@ -616,7 +623,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  if(priorModel!=model || priorGeneration!=generation){gestures={};rightMotion={};ignition={};signal={};seenSignal=signalSequence.load();seenEngineStart=engineStartSequence.load();priorTick=now;priorModel=model;priorGeneration=generation;}
  const float dt=std::clamp(static_cast<float>(now-priorTick)/1000.f,0.f,.05f);priorTick=now;
  const auto inputTick=hornTick.load(),telTick=telemetryTick.load();
- const bool held=hornHeld.load() && inputTick && now-inputTick<=250 && telTick && now-telTick<=250;
+ const bool held=hornHeld.load() && !ControllerHornBoxHeld() && inputTick && now-inputTick<=250 && telTick && now-telTick<=250;
  const auto gestureTick=windowGestureTick.load();
  const bool windowHeld=windowGestureHeld.load() && gestureTick && now-gestureTick<=250 && telTick && now-telTick<=250;
  const auto sigSequence=signalSequence.load(),sigTick=signalTick.load(),sigEvent=signalEventTick.load();
@@ -941,4 +948,10 @@ extern "C" void ObserveMarkerXRFrame(uintptr_t owner) noexcept {
  for(float v:reference)if(!std::isfinite(v))return;for(float v:current)if(!std::isfinite(v))return;
  SetControllerSceneXRFrame(reference,current);if(now-last.load()<1000)return;last.store(now);
  char text[512];std::snprintf(text,sizeof(text),"MARKER_XR_FRAME neutral_pos=%.4f,%.4f,%.4f neutral_q=%.5f,%.5f,%.5f,%.5f current_pos=%.4f,%.4f,%.4f current_q=%.5f,%.5f,%.5f,%.5f",reference[0],reference[1],reference[2],reference[4],reference[5],reference[6],reference[7],current[0],current[1],current[2],current[4],current[5],current[6],current[7]);Log(SPF_LOG_INFO,text);
+}
+
+extern "C" unsigned char CaptureHornBox(uintptr_t object,uint32_t nativeHeld) noexcept {
+ if(!enabled.load())return static_cast<unsigned char>(nativeHeld);auto controller=expectedPlayerDriverController.load();uintptr_t horn=0;
+ if(controller && SafeRead(controller-0x1df0+0x1d38,&horn,8) && horn==object && ControllerHornBoxHeld())return 1;
+ return static_cast<unsigned char>(nativeHeld);
 }

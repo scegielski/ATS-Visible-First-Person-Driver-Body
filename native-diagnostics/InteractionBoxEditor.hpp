@@ -1,0 +1,29 @@
+#pragma once
+#include "RuntimeArmIK.hpp"
+#include <sstream>
+#include <iomanip>
+struct InteractionBox {
+ DriverIK::V center{},half{.04f,.04f,.04f};DriverIK::Q rotation{1,0,0,0};float scale=1;DriverIK::V stretch{1,1,1};
+};
+struct BoxGrabInput {DriverIK::V position{};DriverIK::Q rotation{1,0,0,0};bool valid=false;float grip=0;};
+struct InteractionBoxEditor {
+ InteractionBox boxes[2]{{},{ {},{.06f,.05f,.05f},{1,0,0,0},1.25f }};bool authored[2]{},enabled=false,keyDown=false,dirty=false;bool down[2]{true,true};int selected=-1,owner=-1;bool two=false;DriverIK::V localOffset{},startMid{},startVector{};DriverIK::Q localRotation{1,0,0,0};InteractionBox startBox{};unsigned resizeAxis=0;float startSpan=0;
+ void Release(){if(selected>=0)dirty=true;selected=owner=-1;two=false;}
+ int Key(bool held){int result=0;if(held&&!keyDown){enabled=!enabled;Release();down[0]=down[1]=true;result=enabled?1:2;}keyDown=held;return result;}
+ void Anchor(unsigned side,const BoxGrabInput& in){owner=side;two=false;localOffset=DriverIK::Rotate(DriverIK::Inverse(in.rotation),DriverIK::Sub(boxes[selected].center,in.position));localRotation=DriverIK::Product(DriverIK::Inverse(in.rotation),boxes[selected].rotation);}
+ void Step(const BoxGrabInput (&in)[2]){
+  bool held[2]{},edge[2]{};for(unsigned i=0;i<2;++i){held[i]=in[i].valid && in[i].grip>(down[i]?.3f:.65f);edge[i]=held[i]&&!down[i];if(!in[i].valid)down[i]=true;else if(in[i].grip<.3f)down[i]=false;else if(held[i])down[i]=true;}
+  if(!enabled){Release();return;}
+  if(selected<0){float nearest=1e9f;for(unsigned side=0;side<2;++side)if(edge[side])for(unsigned box=0;box<2;++box){auto local=DriverIK::Rotate(DriverIK::Inverse(boxes[box].rotation),DriverIK::Sub(in[side].position,boxes[box].center));bool isNear=true;for(unsigned j=0;j<3;++j)isNear=isNear && std::abs(local[j])<=boxes[box].half[j]*boxes[box].scale*boxes[box].stretch[j]+.08f;float d=DriverIK::Length(local);if(isNear && d<nearest){nearest=d;selected=box;owner=side;}}if(selected>=0)Anchor(owner,in[owner]);}
+  if(selected<0)return;
+  if(!held[0]&&!held[1]){Release();return;}
+  if(held[0]&&held[1]){
+   auto mid=DriverIK::Mul(DriverIK::Add(in[0].position,in[1].position),.5f);auto axis=DriverIK::Sub(in[1].position,in[0].position);float length=DriverIK::Length(axis);
+   if(!two){if(length<.02f)return;two=true;startMid=mid;startVector=axis;startBox=boxes[selected];auto local=DriverIK::Rotate(DriverIK::Inverse(startBox.rotation),axis);resizeAxis=0;for(unsigned j=1;j<3;++j)if(std::abs(local[j])>std::abs(local[resizeAxis]))resizeAxis=j;startSpan=local[resizeAxis];}
+   auto local=DriverIK::Rotate(DriverIK::Inverse(startBox.rotation),axis);float ratio=std::abs(local[resizeAxis]/startSpan);if(!std::isfinite(ratio))return;auto candidate=startBox;candidate.stretch[resizeAxis]=std::max(.01f,startBox.stretch[resizeAxis]*ratio);auto offset=DriverIK::Rotate(DriverIK::Inverse(startBox.rotation),DriverIK::Sub(startBox.center,startMid));offset[resizeAxis]*=ratio;candidate.center=DriverIK::Add(mid,DriverIK::Rotate(startBox.rotation,offset));if(!std::isfinite(candidate.stretch[resizeAxis]))return;for(float v:candidate.center)if(!std::isfinite(v))return;boxes[selected]=candidate;authored[selected]=true;return;
+  }
+  unsigned side=held[0]?0:1;if(two || owner!=static_cast<int>(side))Anchor(side,in[side]);boxes[selected].center=DriverIK::Add(in[side].position,DriverIK::Rotate(in[side].rotation,localOffset));boxes[selected].rotation=DriverIK::Product(in[side].rotation,localRotation);authored[selected]=true;
+ }
+};
+inline std::string SerializeInteractionBoxes(const InteractionBoxEditor& editor){std::ostringstream out;out<<std::setprecision(9)<<"SPF_INTERACTION_BOXES 2\n";for(unsigned i=0;i<2;++i){out<<(i?"horn":"ignition");for(float v:editor.boxes[i].center)out<<' '<<v;for(float v:editor.boxes[i].rotation)out<<' '<<v;out<<' '<<editor.boxes[i].scale;for(float v:editor.boxes[i].stretch)out<<' '<<v;out<<'\n';}return out.str();}
+inline bool ParseInteractionBoxes(const std::string& text,InteractionBoxEditor& editor){std::istringstream in(text);std::string tag;unsigned version=0;if(!(in>>tag>>version)||tag!="SPF_INTERACTION_BOXES"||(version!=1 && version!=2))return false;auto candidate=editor;bool seen[2]{};for(unsigned row=0;row<2;++row){if(!(in>>tag))return false;int i=tag=="ignition"?0:tag=="horn"?1:-1;if(i<0||seen[i])return false;seen[i]=true;auto& box=candidate.boxes[i];for(float& v:box.center)if(!(in>>v)||!std::isfinite(v))return false;float norm=0;for(float& v:box.rotation){if(!(in>>v)||!std::isfinite(v))return false;norm+=v*v;}if(norm<.81f||norm>1.21f)return false;for(float& v:box.rotation)v/=std::sqrt(norm);if(!(in>>box.scale)||!std::isfinite(box.scale)||box.scale<=0)return false;box.stretch={1,1,1};if(version==2)for(float& v:box.stretch)if(!(in>>v)||!std::isfinite(v)||v<=0)return false;candidate.authored[i]=true;}if(in>>tag)return false;candidate.Release();candidate.dirty=false;editor=candidate;return true;}

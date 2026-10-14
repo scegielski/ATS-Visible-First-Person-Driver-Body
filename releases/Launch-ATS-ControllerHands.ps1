@@ -12,5 +12,16 @@ $taskStart.CreateNoWindow = $true
 $taskStart.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
 $taskStart.EnvironmentVariables['SteamAppId'] = '270880'
 $taskStart.EnvironmentVariables['SteamGameId'] = '270880'
+$taskLayerCandidates = @(
+    $PSScriptRoot,
+    (Join-Path $PSScriptRoot 'controller-layer'),
+    (Join-Path $ATSDirectory 'plugins/spfPlugins/SPF_VisibleFirstPersonDriverBody')
+)
+$taskLayerDirectory = $taskLayerCandidates | Where-Object {
+    (Test-Path -LiteralPath (Join-Path $_ 'spf_controller_xr_layer.json')) -and
+    (Test-Path -LiteralPath (Join-Path $_ 'spf_controller_xr_layer.dll'))
+} | Select-Object -First 1
+if (!$taskLayerDirectory) { throw 'Controller input bridge manifest and DLL were not found.' }
+$taskStart.EnvironmentVariables['XR_API_LAYER_PATH'] = [IO.Path]::GetFullPath($taskLayerDirectory)
 $taskStart.EnvironmentVariables['XR_ENABLE_API_LAYERS'] = 'XR_APILAYER_SPF_driver_controller_input'
 [System.Diagnostics.Process]::Start($taskStart) | Out-Null

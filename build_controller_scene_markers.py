@@ -3,12 +3,12 @@ from pathlib import Path
 import struct,zipfile,json,re
 root=Path(__file__).resolve().parent
 source=Path('C:/Users/scegi/OneDrive/Documents/American Truck Simulator/mod/ATS-VisibleDriverBody-Mustang-0.1.0.scs')
-destination=root/'releases/ATS-VisibleDriverBody-Mustang-0.9.0-ignition-interaction-test.scs'
+destination=root/'releases/ATS-VisibleDriverBody-Mustang-0.10.2-labeled-interaction-boxes-test.scs'
 chars='\x000123456789abcdefghijklmnopqrstuvwxyz_'
 def token(s):return sum(chars.index(c)*38**i for i,c in enumerate(s))
 with zipfile.ZipFile(source) as z:
  mesh=bytearray(z.read('model/spf_stock_driver/driver.pmg'));descriptor=z.read('model/spf_stock_driver/driver.pmd')
- for bone in (7,28,44,48):struct.pack_into('<16f',mesh,112+bone*200+72,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)
+ for bone in (7,28,44,45,48,49):struct.pack_into('<16f',mesh,112+bone*200+72,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)
  for axis in range(3):
   o=12384+axis*100;ic,vc=struct.unpack_from('<2I',mesh,o);vo=struct.unpack_from('<I',mesh,o+64)[0];io=struct.unpack_from('<I',mesh,o+96)[0];assert vc>=16 and ic>=72
   mesh[io:io+ic*2]=bytes(ic*2)
@@ -21,20 +21,41 @@ with zipfile.ZipFile(source) as z:
    indices.extend(side*8+i for i in [0,2,3,0,3,1,4,5,7,4,7,6,0,1,5,0,5,4,2,6,7,2,7,3,0,4,6,0,6,2,1,3,7,1,7,5])
   struct.pack_into('<72H',mesh,io,*indices)
  # Visible ignition and right-hand collision wireframes use private marker bones.
- for piece,bone,half in [(0,44,(.04,.04,.04)),(2,48,(.04,.035,.055))]:
-  o=12384+piece*100;ic,vc=struct.unpack_from('<2I',mesh,o);vo=struct.unpack_from('<I',mesh,o+64)[0];io=struct.unpack_from('<I',mesh,o+96)[0];vertices=[];faces=[]
+ usedVertices={};usedIndices={}
+ for piece,bone,half in [(0,44,(.04,.04,.04)),(1,49,(.06,.05,.05)),(2,48,(.04,.035,.055)),(2,45,(.04,.035,.055))]:
+  o=12384+piece*100;ic,vc=struct.unpack_from('<2I',mesh,o);vo=struct.unpack_from('<I',mesh,o+64)[0];io=struct.unpack_from('<I',mesh,o+96)[0];vertices=[];faces=[];vertexStart=usedVertices.get(piece,16);indexStart=usedIndices.get(piece,72)
   for axis in range(3):
    others=[d for d in range(3) if d!=axis]
    for signs in range(4):
     center=[0.,0.,0.]
     for k,d in enumerate(others):center[d]=half[d]*(1 if signs&(1<<k) else -1)
-    base=16+len(vertices)
+    base=vertexStart+len(vertices)
     for corner in range(8):
      point=[center[d]+(.0015 if corner&(1<<d) else -.0015) for d in range(3)];point[axis]=half[axis]*(1 if corner&(1<<axis) else -1);vertices.append(point)
     faces.extend(base+i for i in [0,2,3,0,3,1,4,5,7,4,7,6,0,1,5,0,5,4,2,6,7,2,7,3,0,4,6,0,6,2,1,3,7,1,7,5])
-  assert vc>=16+len(vertices) and ic>=72+len(faces)
-  for k,point in enumerate(vertices):v=16+k;struct.pack_into('<3f',mesh,vo+v*60,*point);struct.pack_into('<3f',mesh,vo+v*60+12,0,1,0);mesh[vo+v*60+52:vo+v*60+60]=bytes([bone,0,0,0,255,0,0,0])
-  struct.pack_into('<'+str(len(faces))+'H',mesh,io+72*2,*faces)
+  assert vc>=vertexStart+len(vertices) and ic>=indexStart+len(faces)
+  for k,point in enumerate(vertices):v=vertexStart+k;struct.pack_into('<3f',mesh,vo+v*60,*point);struct.pack_into('<3f',mesh,vo+v*60+12,0,1,0);mesh[vo+v*60+52:vo+v*60+60]=bytes([bone,0,0,0,255,0,0,0])
+  struct.pack_into('<'+str(len(faces))+'H',mesh,io+indexStart*2,*faces)
+  usedVertices[piece]=vertexStart+len(vertices);usedIndices[piece]=indexStart+len(faces)
+ # Geometry labels share each target bone, so visibility and transforms stay identical.
+ font={
+ 'H':['10001','10001','10001','11111','10001','10001','10001'],
+ 'O':['01110','10001','10001','10001','10001','10001','01110'],
+ 'R':['11110','10001','10001','11110','10100','10010','10001'],
+ 'N':['10001','11001','11001','10101','10011','10011','10001'],
+ 'I':['11111','00100','00100','00100','00100','00100','11111'],
+ 'G':['01110','10001','10000','10111','10001','10001','01110'],
+ 'T':['11111','00100','00100','00100','00100','00100','00100']}
+ for piece,bone,word,halfY,halfZ in [(0,44,'IGNITION',.04,.04),(1,49,'HORN',.05,.05)]:
+  o=12384+piece*100;ic,vc=struct.unpack_from('<2I',mesh,o);vo=struct.unpack_from('<I',mesh,o+64)[0];io=struct.unpack_from('<I',mesh,o+96)[0];vertexStart=usedVertices[piece];indexStart=usedIndices[piece];vertices=[];faces=[];pixel=.0035
+  for letter,char in enumerate(word):
+   for row,line in enumerate(font[char]):
+    for col,value in enumerate(line):
+     if value!='1':continue
+     x=(letter*6+col-len(word)*3)*pixel;y=halfY+.015+(6-row)*pixel;labelZ=halfZ+.002;start=vertexStart+len(vertices);vertices.extend([(x,y,labelZ),(x+pixel*.9,y,labelZ),(x+pixel*.9,y+pixel*.9,labelZ),(x,y+pixel*.9,labelZ)]);faces.extend(start+i for i in [0,1,2,0,2,3,2,1,0,3,2,0])
+  assert vc>=vertexStart+len(vertices) and ic>=indexStart+len(faces)
+  for k,point in enumerate(vertices):v=vertexStart+k;struct.pack_into('<3f',mesh,vo+v*60,*point);struct.pack_into('<3f',mesh,vo+v*60+12,0,0,1);mesh[vo+v*60+52:vo+v*60+60]=bytes([bone,0,0,0,255,0,0,0])
+  struct.pack_into('<'+str(len(faces))+'H',mesh,io+indexStart*2,*faces)
  struct.pack_into('<6f',mesh,48,-2,-2,-2,2,2,2)
  old=z.read('model/spf_stock_driver/mount.pmg');position=struct.unpack_from('<8f',old,144)
  text1=b'spf.stock_driver\0';text2=b'spf.ctrl_markers\0';texts=text1+text2;texts+=bytes((-len(texts))%4)

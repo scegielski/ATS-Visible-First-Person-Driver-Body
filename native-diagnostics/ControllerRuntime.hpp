@@ -15,3 +15,8 @@ void SetControllerSceneCamera(float x,float y,float z);
 
 void SetIgnitionInteractionTarget(DriverIK::V point);
 bool ConsumeControllerIgnitionRequest();
+
+void SetHornInteractionTarget(DriverIK::V point);
+bool ControllerHornBoxHeld();
+
+int ControllerBoxSetupKey(bool held);

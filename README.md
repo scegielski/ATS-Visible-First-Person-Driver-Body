@@ -1,6 +1,6 @@
 # ATS Visible First Person Driver Body
 
-Plugin output and SPF identity: `SPF_VisibleFirstPersonDriverBody` (SPF Visible First Person Driver Body), version 0.19.1. Renaming an existing installation requires moving its calibrated config files, enabled setting, and early OpenXR bridge registration to the new plugin directory. The ATS VR Controller Hands shortcut uses the migrated launcher.
+Plugin output and SPF identity: `SPF_VisibleFirstPersonDriverBody` (SPF Visible First Person Driver Body), version 0.22.2. Renaming an existing installation requires moving its calibrated config files, enabled setting, and early OpenXR bridge registration to the new plugin directory. The ATS VR Controller Hands shortcut uses the migrated launcher.
 
 
 Current validated release: **0.18.9 plugin + 0.7.0 body archive**. The user confirmed the intact head works in first-person VR without collapse or offset. Our animated body replaces only the player's stock exterior driver, leaving traffic instances outside the hide guard.
@@ -16,6 +16,10 @@ With ATS closed, install `releases/SPF_DriverAnimationDiagnostics-0.18.9-live-fi
 Copy the current `signal_left_pose.txt`, `signal_right_pose.txt`, `signal_activation_delay.txt` and `signal_actuation_seconds.txt` from releases into the plugin config folder. Also copy `head_tracking_gain.txt`, `head_tracking_limits.txt`, `interior_head_mode.txt` and `interior_head_backshift.txt` into config. The approved head settings are `visible` and `0.00`. Keep the existing gesture, ignition and elbow files. Calibrate in the normal seated position using your usual ATS reset-head-tracking control, then switch views as desired. Forward/side range and spine-angle settings have no arbitrary upper caps; physical arm reach still constrains the resulting pose. Add `body_visibility.txt`: `replace-exterior` shows our full body outside and hides only the confirmed player stock driver; `interior` shows our body only in the interior camera. This setting reloads live.
 
 See [NATIVE_RECENTER.md](NATIVE_RECENTER.md), [HEAD_TRACKING.md](HEAD_TRACKING.md), [TURN_SIGNAL_DELAY.md](TURN_SIGNAL_DELAY.md), [ENGINE_START_DELAY.md](ENGINE_START_DELAY.md), [BODY_VISIBILITY.md](BODY_VISIBILITY.md), [EXTERIOR_HEAD.md](EXTERIOR_HEAD.md), [IGNITION.md](IGNITION.md), [TURN_SIGNALS.md](TURN_SIGNALS.md), and [LEFT_ELBOW.md](LEFT_ELBOW.md). Earlier release sections below are historical checkpoints; the 0.6.1 pedal alignment archive remains an uninstalled checkpoint.
+
+## Interaction setup
+
+Use the controller-enabled launcher. Press F9 to edit the labeled ignition and horn volumes; grip near a box to move and rotate it. Both grips resize the local axis closest to controller separation. Release and regrab from another direction to edit a different dimension. Releasing saves config/interaction_boxes.txt; F9 exits. Interaction boxes hide and normal horn/ignition actions resume outside setup. Either tracked hand contact honks; ignition requires a right-trigger click. Current paired archive: releases/ATS-VisibleDriverBody-Mustang-0.10.2-labeled-interaction-boxes-test.scs.
 
 ## Source and validation
 
