@@ -1,3 +1,4 @@
+extern "C" int SPF_ReadControllerStickAxes(float*);
 #define XR_NO_PROTOTYPES
 #include "vendor/openxr.h"
 #include <cstring>
@@ -22,7 +23,7 @@ XrResult XRAPI_CALL Attach(XrSession,const XrSessionActionSetsAttachInfo* info){
 XrResult XRAPI_CALL Sync(XrSession,const XrActionsSyncInfo* info){++syncCount;Check(info->countActiveActionSets==2 && info->activeActionSets[0].actionSet==stock && info->activeActionSets[1].actionSet==extra);return syncResult;}
 XrResult XRAPI_CALL Boolean(XrSession,const XrActionStateGetInfo* info,XrActionStateBoolean* state){state->isActive=XR_TRUE;state->currentState=info->action==reinterpret_cast<XrAction>(1) || info->action==reinterpret_cast<XrAction>(7) || info->action==reinterpret_cast<XrAction>(10);return XR_SUCCESS;}
 XrResult XRAPI_CALL Analog(XrSession,const XrActionStateGetInfo* info,XrActionStateFloat* state){state->isActive=XR_TRUE;state->currentState=static_cast<float>(reinterpret_cast<uintptr_t>(info->action)-2)*.25f;return XR_SUCCESS;}
-XrResult XRAPI_CALL Vector(XrSession,const XrActionStateGetInfo* info,XrActionStateVector2f* state){state->isActive=XR_TRUE;state->currentState.x=info->action==reinterpret_cast<XrAction>(11)?.8f:-.9f;return XR_SUCCESS;}
+XrResult XRAPI_CALL Vector(XrSession,const XrActionStateGetInfo* info,XrActionStateVector2f* state){state->isActive=XR_TRUE;state->currentState.x=info->action==reinterpret_cast<XrAction>(11)?.8f:-.9f;state->currentState.y=.6f;return XR_SUCCESS;}
 XrResult XRAPI_CALL Haptic(XrSession,const XrHapticActionInfo* info,const XrHapticBaseHeader* base){Check(info->action==reinterpret_cast<XrAction>(13+hapticCount));auto pulse=reinterpret_cast<const XrHapticVibration*>(base);Check(pulse->duration==60000000 && pulse->amplitude==.6f);++hapticCount;return XR_SUCCESS;}
 XrResult XRAPI_CALL Unused(){return XR_SUCCESS;}
 XrResult XRAPI_CALL Get(XrInstance,const char* name,PFN_xrVoidFunction* out){
@@ -39,7 +40,9 @@ int main(){
  float curls[4]{};Check(SPF_ReadControllerInput(&left,&right,curls)==0 && curls[0]==.25f && curls[1]==.5f && curls[2]==.75f && curls[3]==1.f);
  unsigned char leftMode=0,rightMode=0;Check(SPF_ReadControllerInputWithModes(&left,&right,curls,&leftMode,&rightMode)==0 && leftMode==1 && rightMode==0);
  unsigned char lt=0,rt=0;Check(SPF_ReadControllerInputWithThumbs(&left,&right,curls,&leftMode,&rightMode,&lt,&rt)==0 && lt==0 && rt==1);
+ float axes[4]{};Check(SPF_ReadControllerStickAxes(axes)==0 && axes[0]==.8f && axes[1]==.6f && axes[2]==-.9f && axes[3]==.6f);
  Check(SPF_ControllerToggleFeedback(0)==0 && SPF_ControllerToggleFeedback(1)==0 && hapticCount==2);Check(SPF_ControllerToggleFeedback(2)==5);
  syncResult=XR_SESSION_NOT_FOCUSED;Check(SPF_ReadControllerButtons(&left,&right)==XR_SESSION_NOT_FOCUSED && left==0 && right==0);
  puts("Controller layer attachment, game-input preservation, per-hand states and focus checks passed.");
 }
+

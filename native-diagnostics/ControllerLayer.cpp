@@ -75,6 +75,12 @@ extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerInputWithSelectio
  for(unsigned side=0;side<2;++side){XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};gi.action=c->stick[side];XrActionStateVector2f state{XR_TYPE_ACTION_STATE_VECTOR2F};result=c->vector(activeSession,&gi,&state);if(XR_FAILED(result))return result;valid=valid&&state.isActive&&std::isfinite(state.currentState.x);if(state.isActive&&std::isfinite(state.currentState.x))inward[side]=(side?-1.f:1.f)*state.currentState.x;}
  return valid?0:4;
 }
+// Full axes share the existing synced action set; preserve older exports.
+extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerStickAxes(float* axes){
+ if(!axes)return 5;for(unsigned i=0;i<4;++i)axes[i]=0;
+ std::lock_guard lock(mutex);if(!activeSession || !sessions.count(activeSession))return 5;auto c=sessions.at(activeSession);if(c->status<0)return c->status;
+ for(unsigned side=0;side<2;++side){XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};gi.action=c->stick[side];XrActionStateVector2f state{XR_TYPE_ACTION_STATE_VECTOR2F};auto result=c->vector(activeSession,&gi,&state);if(XR_FAILED(result))return result;if(!state.isActive || !std::isfinite(state.currentState.x)||!std::isfinite(state.currentState.y))return 4;axes[side*2]=std::clamp(state.currentState.x,-1.f,1.f);axes[side*2+1]=std::clamp(state.currentState.y,-1.f,1.f);}return 0;
+}
 extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerInputWithThumbs(unsigned char* l,unsigned char* r,float* c,unsigned char* lm,unsigned char* rm,unsigned char* lt,unsigned char* rt){float inward[2]{};return SPF_ReadControllerInputWithSelection(l,r,c,lm,rm,lt,rt,inward);}
 extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerInputWithModes(unsigned char* left,unsigned char* right,float* curls,unsigned char* leftMode,unsigned char* rightMode){unsigned char lt=0,rt=0;return SPF_ReadControllerInputWithThumbs(left,right,curls,leftMode,rightMode,&lt,&rt);}
 extern "C" __declspec(dllexport) int __cdecl SPF_ReadControllerInput(unsigned char* left,unsigned char* right,float* curls){unsigned char leftMode=0,rightMode=0;return SPF_ReadControllerInputWithModes(left,right,curls,&leftMode,&rightMode);}

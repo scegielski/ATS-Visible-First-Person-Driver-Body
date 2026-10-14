@@ -23,6 +23,7 @@
 #include "ControllerSceneFrame.hpp"
 #include "IgnitionInteraction.hpp"
 #include "InteractionBoxEditor.hpp"
+#include "MirrorInteraction.hpp"
 #include "ControllerActionAttach.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
@@ -136,6 +137,22 @@ int main() {
  BoxGrabInput grab[2]{};grab[0].valid=grab[1].valid=true;editor.Step(grab);grab[0].grip=1;editor.Step(grab);Check(editor.selected==0,"grip acquires nearby box");grab[0].position={.1f,0,0};editor.Step(grab);Check(std::abs(editor.boxes[0].center[0]-.1f)<.0001f,"one hand moves box");
  grab[0].rotation={.70710678f,0,.70710678f,0};editor.Step(grab);Check(std::abs(editor.boxes[0].rotation[2]-.70710678f)<.0001f,"one hand rotates box");grab[1].position={.3f,0,0};grab[1].grip=1;editor.Step(grab);grab[1].position={.5f,0,0};editor.Step(grab);Check(std::abs(editor.boxes[0].stretch[2]-2)<.001f && editor.boxes[0].stretch[0]==1 && editor.boxes[0].stretch[1]==1,"two hand separation scales only selected local axis");
  auto beforeHandoff=editor.boxes[0];grab[1].grip=0;editor.Step(grab);Check(DriverIK::Length(DriverIK::Sub(editor.boxes[0].center,beforeHandoff.center))<.0001f,"two to one hand transfer does not jump");grab[0].grip=0;editor.Step(grab);Check(editor.dirty && editor.selected<0,"release requests persistent save");
+ Check(ControllerHornPressed(true,true,1) && !ControllerHornPressed(true,true,0) && !ControllerHornPressed(false,true,1) && !ControllerHornPressed(true,false,1) && !ControllerHornPressed(true,true,std::numeric_limits<float>::quiet_NaN()),"horn requires target plus valid held trigger and stops on release or target loss");
+ InteractionBoxEditor rayEditor;for(unsigned j=0;j<InteractionBoxCount;++j)rayEditor.boxes[j].center={20.f+static_cast<float>(j),0,0};rayEditor.boxes[2].center={0,0,-1};rayEditor.boxes[3].center={0,0,-1.5f};
+ auto ray=RayInteractionBoxes(rayEditor,{0,0,0},{0,0,-1});Check(ray.box==2 && std::abs(ray.distance-.95f)<.001f,"laser chooses nearest mirror box along controller forward");
+ Check(RayInteractionBoxes(rayEditor,{0,0,0},{0,0,1}).box==-1 && RayInteractionBoxes(rayEditor,{1,0,0},{0,0,-1}).box==-1,"laser rejects behind origin and parallel misses");
+ Check(RayInteractionBoxes(rayEditor,{0,0,-1},{0,0,-1}).distance==0,"laser origin inside box hits immediately");
+ rayEditor.boxes[2].rotation=DriverIK::Q{.70710678118f,0,.70710678118f,0};rayEditor.boxes[2].stretch={3,1,1};ray=RayInteractionBoxes(rayEditor,{0,0,0},{0,0,-1});Check(ray.box==2 && std::abs(ray.distance-.79f)<.001f,"laser respects box local rotation and nonuniform scale");
+ Check(MirrorPhysicalSlot(3)==6,"seat box routes native seat mode");
+ InteractionBoxEditor seatEditor;seatEditor.boxes[5].center={2,3,4};Check(MirrorContact(seatEditor,{2,3,4},{1,0,0,0})==3,"seat contact recognized separately from mirrors");Check(ParseInteractionBoxes(SerializeInteractionBoxes(seatEditor),seatEditor) && seatEditor.authored[5] && seatEditor.boxes[5].center==DriverIK::V{2,3,4},"six-box placements retain seat transform");
+ auto rawVolume=ControllerInteractionVolume(false,true,true,false,{9,9,9},{1,0,0,0},{1,2,3},{1,0,0,0});Check(rawVolume.valid && rawVolume.center==DriverIK::V{1,2,3},"disabled hand uses controller-axis collision origin without calibration");
+ auto palmVolume=ControllerInteractionVolume(true,true,true,true,{9,9,9},{1,0,0,0},{1,2,3},{1,0,0,0});Check(palmVolume.valid && palmVolume.center==DriverIK::V{9,9,9},"enabled hand retains calibrated palm contact");
+ Check(!ControllerInteractionVolume(false,false,true,false,{},{1,0,0,0},{},{1,0,0,0}).valid && !ControllerInteractionVolume(false,true,false,false,{},{1,0,0,0},{},{1,0,0,0}).valid && !ControllerInteractionVolume(true,true,true,false,{},{1,0,0,0},{},{1,0,0,0}).valid,"tracking loss stale scene and failed enabled IK reject interaction");
+ InteractionBoxEditor mirrors;mirrors.boxes[2].center={1,2,3};mirrors.boxes[3].center={4,2,3};mirrors.boxes[4].center={7,2,3};
+ Check(MirrorContact(mirrors,{1,2,3},{1,0,0,0})==0 && MirrorContact(mirrors,{4,2,3},{1,0,0,0})==1 && MirrorContact(mirrors,{7,2,3},{1,0,0,0})==2,"mirror contact identifies left center right");
+ Check(MirrorContact(mirrors,{10,2,3},{1,0,0,0})==-1 && MirrorPhysicalSlot(0)==0 && MirrorPhysicalSlot(1)==4 && MirrorPhysicalSlot(2)==2,"mirror slot routing and no-contact release");
+ auto legacy=std::string("SPF_INTERACTION_BOXES 2\nignition 0 0 0 1 0 0 0 1 1 1 1\nhorn 1 0 0 1 0 0 0 1 1 1 1\n");Check(ParseInteractionBoxes(legacy,mirrors) && mirrors.boxes[2].center[0]==1 && !mirrors.authored[2],"legacy placements preserve mirror defaults");
+ Check(ParseInteractionBoxes(SerializeInteractionBoxes(mirrors),mirrors) && mirrors.authored[4],"all five box placements round trip");
  auto savedBoxes=SerializeInteractionBoxes(editor);InteractionBoxEditor loadedEditor;Check(ParseInteractionBoxes(savedBoxes,loadedEditor) && std::abs(loadedEditor.boxes[0].stretch[2]-2)<.001f,"box placements round trip including rotation and scale");Check(!ParseInteractionBoxes("SPF_INTERACTION_BOXES 1 ignition 0 0",loadedEditor),"partial edit does not replace saved boxes");Check(editor.Key(true)==2,"setup hotkey exits");
  ControllerSceneFrame sceneFrame;sceneFrame.camera={0,1,0};sceneFrame.neutral={2,0,3};sceneFrame.xrHead={2,0,3};auto physical=DriverIK::V{.3f,1.1f,-.4f};auto initialMarker=sceneFrame.Position(physical,{0,1,0},{1,0,0,0});
  sceneFrame.xrHead={2.2f,.1f,3};auto movedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{1,0,0,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,movedMarker))<.00001f,"stationary controller marker stays fixed during head translation across tracking spaces");
@@ -704,3 +721,4 @@ int main() {
 }
 
 extern "C" {void* gHornControlOriginal=nullptr;unsigned char CaptureHornBox(uintptr_t,uint32_t held) noexcept{return static_cast<unsigned char>(held);}}
+

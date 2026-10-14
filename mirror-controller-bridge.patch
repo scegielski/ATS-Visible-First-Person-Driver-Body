@@ -1,0 +1,91 @@
+diff --git a/MirrorControls.cpp b/MirrorControls.cpp
+index ca395fe..f49ffbb 100644
+--- a/MirrorControls.cpp
++++ b/MirrorControls.cpp
+@@ -1,4 +1,5 @@
+ #include <Windows.h>
++#include <algorithm>
+ #include <bcrypt.h>
+ #include <mmsystem.h>
+ #include <filesystem>
+@@ -97,6 +98,7 @@ std::atomic<unsigned char> inputMask{0};
+ std::array<SPF_Hook_Handle*,5> inputHooks{};
+ std::atomic<bool> movementAllowed{false};
+ std::mutex updateMutex;
++#include "MirrorControllerBridge.hpp"
+ void Log(SPF_LogLevel,const char*);
+ bool SeatReady();
+ void ClearSeatCalibration();
+@@ -309,14 +311,15 @@ void DetourUpdate(void* context,float dt) {
+   currentContext.store(reinterpret_cast<uintptr_t>(context)); ++contextCalls;
+   MapContext(reinterpret_cast<uintptr_t>(context));
+  }
+- const int slot=selectedSlot.load();
++ int slot=selectedSlot.load();unsigned char directions=inputMask.load();
++ if(movementAllowed.load())controllerMirrorLease.Get(GetTickCount64(),slot,directions);
+  bool enabled=CanOverride(reinterpret_cast<uintptr_t>(context),slot);
+  if (enabled && std::isfinite(dt) && dt>=0 && dt<=0.1f)
+-  { gOverrideSlot=static_cast<unsigned int>(slot); gInputMask=inputMask.load(); gOverrideContext=reinterpret_cast<uintptr_t>(context); }
++  { gOverrideSlot=static_cast<unsigned int>(slot); gInputMask=directions; gOverrideContext=reinterpret_cast<uintptr_t>(context); }
+  else gOverrideContext=0;
+  originalUpdate(context,dt); // Exactly one call; native getter, setter and camera refresh.
+  gOverrideContext=0; gInputMask=0;
+- if(slot>=6 && movementAllowed.load()) MoveNativeSeat(dt,inputMask.load(),slot);
++ if(slot>=6 && movementAllowed.load()) MoveNativeSeat(dt,directions,slot);
+ }
+ void DetourSetRotation(void* object, const float* angles) {
+     int slot=-1; uint64_t generation=0;
+@@ -504,8 +507,10 @@ void OnUpdate() {
+     }
+     inputMask.store(mask);
+     servoEnabled=!core->config || !config || core->config->Cfg_GetBool(config,"settings.servo_sound",true);
+-    servo.SetMirror(selectedSlot.load()>=6?4:selectedSlot.load());
+-    servo.SetPlaying(ServoMovement(selectedSlot.load(),mask,servoEnabled,movementAllowed.load()));
++    int servoSlot=selectedSlot.load();unsigned char servoMask=mask;
++    if(movementAllowed.load())controllerMirrorLease.Get(GetTickCount64(),servoSlot,servoMask);
++    servo.SetMirror(servoSlot>=6?4:servoSlot);
++    servo.SetPlaying(ServoMovement(servoSlot,servoMask,servoEnabled,movementAllowed.load()));
+     static bool reported=false;
+     if (!reported && HooksReady()) {
+         Log(SPF_LOG_INFO,"DIAG: all nine hooks installed and enabled. Mirror controls ready when driving."); reported=true;
+@@ -543,6 +548,13 @@ void OnUnload() {
+ }
+ }
+ extern "C" {
++SPF_PLUGIN_EXPORT int __cdecl SPF_SetControllerMirrorInput(int slot,float x,float y){
++ if(slot!=-1 && slot!=0 && slot!=2 && slot!=4 && slot!=6)return 2;
++ if(!std::isfinite(x)||!std::isfinite(y))return 2;
++ if(slot>=0 && (!movementAllowed.load() || !HooksReady()))return 1;
++ if(slot==6 && !SeatReady())return 3;
++ controllerMirrorLease.Put(slot,std::clamp(x,-1.f,1.f),std::clamp(y,-1.f,1.f),GetTickCount64());return 0;
++}
+ SPF_PLUGIN_EXPORT bool SPF_GetManifestAPI(SPF_Manifest_API* api) {
+     if (!api) return false;
+     api->BuildManifest=BuildManifest; return true;
+diff --git a/Tests.cpp b/Tests.cpp
+index 364d949..7cda489 100644
+--- a/Tests.cpp
++++ b/Tests.cpp
+@@ -12,8 +12,8 @@ int cueCalls=0; std::wstring lastCue; DWORD cueFlags=0;
+ int clickCalls=0; int lastClickSlot=-1;
+ void StubClick(int slot) { ++clickCalls; lastClickSlot=slot; }
+ BOOL WINAPI StubCue(LPCWSTR path,HMODULE,DWORD flags) { ++cueCalls; lastCue=path?path:L""; cueFlags=flags; return TRUE; }
+-int calls=0; void* passed=nullptr; float passedDt=0; uintptr_t scoped=0;
+-void __fastcall StubUpdate(void* context,float dt) { ++calls; passed=context; passedDt=dt; scoped=gOverrideContext; }
++int calls=0; void* passed=nullptr; float passedDt=0; uintptr_t scoped=0;unsigned scopedSlot=0;unsigned char scopedMask=0;
++void __fastcall StubUpdate(void* context,float dt) { ++calls; passed=context; passedDt=dt; scoped=gOverrideContext;scopedSlot=gOverrideSlot;scopedMask=gInputMask; }
+ template<class T,size_t N> void Put(std::array<unsigned char,N>& bytes,size_t off,T value) { std::memcpy(bytes.data()+off,&value,sizeof(value)); }
+ }
+ extern "C" int RunSeatUiStub(uintptr_t,unsigned char*);
+@@ -193,6 +193,11 @@ int main(int argc,char** argv) {
+  Put(mirrors,0x1d8,uint64_t{3}); DetourUpdate(context.data(),0.016f); CHECK(calls==5 && scoped==0);
+  Put(mirrors,0x1d8,uint64_t{9});
+  CHECK(context==beforeContext && actor==beforeActor && mirrors==beforeMirrors && entries==beforeEntries);
++ selectedSlot=-1;controllerMirrorLease.Put(2,.8f,-.9f,GetTickCount64());DetourUpdate(context.data(),.016f);CHECK(calls==6 && scoped==reinterpret_cast<uintptr_t>(context.data()) && scopedSlot==2 && scopedMask==10 && gOverrideContext==0 && gInputMask==0);
++ int audioSlot=-1;unsigned char audioMask=0;CHECK(controllerMirrorLease.Get(GetTickCount64(),audioSlot,audioMask) && audioSlot==2 && ServoMovement(audioSlot,audioMask,true,true) && ServoChannelVolume(audioSlot)==0x40000000);
++ controllerMirrorLease.Put(0,0,0,GetTickCount64());CHECK(controllerMirrorLease.Get(GetTickCount64(),audioSlot,audioMask) && !ServoMovement(audioSlot,audioMask,true,true));
++ controllerMirrorLease.Put(-1,0,0,GetTickCount64());DetourUpdate(context.data(),.016f);CHECK(calls==7 && scoped==0);
++ int leaseSlot=-1;unsigned char leaseMask=0;controllerMirrorLease.Put(4,-.8f,.9f,100);CHECK(controllerMirrorLease.Get(150,leaseSlot,leaseMask) && leaseSlot==4 && leaseMask==5);CHECK(!controllerMirrorLease.Get(251,leaseSlot,leaseMask));controllerMirrorLease.Put(-1,0,0,100);CHECK(!controllerMirrorLease.Get(101,leaseSlot,leaseMask));
+  ExitCenter(); CHECK(selectedSlot.load()==-1); CHECK(!HooksReady()); ToggleCenter(); CHECK(selectedSlot.load()==-1);
+  std::cout<<"PASS: real assembly stubs select all mirror slots only for matching scoped context; flags preserved; side/default pass-through; one native call with unchanged arguments; override cleared; input override masks, toggle/switch and hold/release/overlap and cycle transitions, voice cue mapping and no-repeat/mute/asynchronous playback, persisted assigned/cleared bindings across reloads, servo movement/mute/cancel guards and WAV validation and left/center/right channel mapping, disallowed/large-dt/short-array guards; host metadata and rotations untouched by wrapper.\n";
+ }

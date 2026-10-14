@@ -6,6 +6,7 @@
 #include "ControllerSceneFrame.hpp"
 #include "IgnitionInteraction.hpp"
 #include "InteractionBoxEditor.hpp"
+#include "MirrorInteraction.hpp"
 #include "NativeControllerInput.hpp"
 #include "vendor/openvr.h"
 #include <mutex>
@@ -16,6 +17,8 @@
 #include <mmsystem.h>
 #pragma comment(lib,"winmm.lib")
 namespace {
+int mirrorContact[2]{-1,-1};uint64_t mirrorContactTick=0;int mirrorBridgeStatus=5;
+void SendMirrorInput(int mirror,float x,float y){auto module=GetModuleHandleW(L"SPF_MirrorControls.dll");using Send=int (__cdecl*)(int,float,float);auto send=module?reinterpret_cast<Send>(GetProcAddress(module,"SPF_SetControllerMirrorInput")):nullptr;mirrorBridgeStatus=send?send(MirrorPhysicalSlot(mirror),x,y):5;}
 std::mutex guard;HMODULE library=nullptr;vr::IVRSystem* systemVR=nullptr;bool initialized=false;
 using Init=uint32_t (__cdecl*)(vr::EVRInitError*,vr::EVRApplicationType,const char*);
 using Interface=void* (__cdecl*)(const char*,vr::EVRInitError*);
@@ -73,7 +76,7 @@ void PollControllers(bool active,uint64_t generation){
  if(!guideFile.empty() && now-guidePoll>=500){guidePoll=now;std::ifstream input(guideFile);if(input){std::string text((std::istreambuf_iterator<char>(input)),{});ControllerElbowGuides parsed;if(ParseControllerElbowGuides(text,parsed))elbowGuides=parsed;}std::ifstream twistInput(twistFile);float value;std::string extra;if(twistInput>>value && !(twistInput>>extra) && std::isfinite(value) && value>=0 && value<=1)twistShare=value;std::ifstream boxInput(guideFile.parent_path()/"ignition_box_offset.txt");DriverIK::V boxOffset{};if(boxInput>>boxOffset[0]>>boxOffset[1]>>boxOffset[2] && !(boxInput>>extra) && std::isfinite(boxOffset[0]) && std::isfinite(boxOffset[1]) && std::isfinite(boxOffset[2]))ignitionBoxOffset=boxOffset;std::ifstream leftBoxInput(guideFile.parent_path()/"horn_left_hand_box_offset.txt");DriverIK::V leftOffset{};if(leftBoxInput>>leftOffset[0]>>leftOffset[1]>>leftOffset[2] && !(leftBoxInput>>extra) && std::isfinite(leftOffset[0]) && std::isfinite(leftOffset[1]) && std::isfinite(leftOffset[2]))leftHandBoxOffset=leftOffset;std::ifstream hornScaleInput(guideFile.parent_path()/"horn_box_scale.txt");float scaleValue=0;if(hornScaleInput>>scaleValue && !(hornScaleInput>>extra) && std::isfinite(scaleValue) && scaleValue>0)hornBoxScale=scaleValue;std::ifstream hornBoxInput(guideFile.parent_path()/"horn_box_offset.txt");DriverIK::V hornOffset{};if(hornBoxInput>>hornOffset[0]>>hornOffset[1]>>hornOffset[2] && !(hornBoxInput>>extra) && std::isfinite(hornOffset[0]) && std::isfinite(hornOffset[1]) && std::isfinite(hornOffset[2]))hornBoxOffset=hornOffset;std::ifstream handBoxInput(guideFile.parent_path()/"ignition_hand_box_offset.txt");DriverIK::V handOffset{};if(handBoxInput>>handOffset[0]>>handOffset[1]>>handOffset[2] && !(handBoxInput>>extra) && std::isfinite(handOffset[0]) && std::isfinite(handOffset[1]) && std::isfinite(handOffset[2]))handBoxOffset=handOffset;std::ifstream blendInput(modeBlendFile);if(blendInput>>value && !(blendInput>>extra) && std::isfinite(value) && value>0)modeBlendSeconds=value;}
 
  if(!guideFile.empty() && now-placementPoll>=500){placementPoll=now;std::ifstream input(guideFile.parent_path()/"interaction_boxes.txt");if(input && boxEditor.selected<0){std::string text((std::istreambuf_iterator<char>(input)),{});if(text!=previousBoxPlacement && text.size()<4096){if(ParseInteractionBoxes(text,boxEditor))previousBoxPlacement=text;}}}
- bool nativePressed[2]{},modePressed[2]{},thumbPressed[2]{};float grips[2]{},triggers[2]{},inward[2]{};bool nativeValid=active && PollNativeControllerButtons(nativePressed,grips,triggers,modePressed,thumbPressed,inward);
+ bool nativePressed[2]{},modePressed[2]{},thumbPressed[2]{};float grips[2]{},triggers[2]{},inward[2]{};bool nativeValid=active && PollNativeControllerButtons(nativePressed,grips,triggers,modePressed,thumbPressed,inward);float sticks[4]{};bool sticksValid=nativeValid && ReadControllerStickAxes(sticks);bool mirrorFresh=active && mirrorContactTick && now-mirrorContactTick<150 && !boxEditor.enabled;int mirrorOwner=-1;for(unsigned side=0;side<2;++side)if(mirrorFresh && mirrorContact[side]>=0){inward[side]=0;if(sticksValid && (mirrorOwner<0 || std::hypot(sticks[side*2],sticks[side*2+1])>std::hypot(sticks[mirrorOwner*2],sticks[mirrorOwner*2+1])))mirrorOwner=side;}SendMirrorInput(mirrorOwner<0?-1:mirrorContact[mirrorOwner],mirrorOwner<0?0:sticks[mirrorOwner*2],mirrorOwner<0?0:sticks[mirrorOwner*2+1]);
  if(!active)HideMarkers();head.valid=false;for(auto& h:hands)h.valid=false;
  if(systemVR && active){vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);auto observedHead=Convert(poses[0]);if(observedHead.valid)head=observedHead;
   for(unsigned i=0;i<2;++i){auto index=systemVR->GetTrackedDeviceIndexForControllerRole(i?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand);bool pressed=false;
@@ -102,24 +105,31 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
   auto controllerPoint=actualSceneFrame.Position(hands[i].point,head.point,head.rotation);auto controllerRotation=actualSceneFrame.Orientation(hands[i].rotation,head.rotation);
   if(ApplyControllerHand(pose,positions,i!=0,temporary,controllerPoint,controllerRotation,{1,0,0,0},weights[i],seconds,elbowGuides.values[i],twistShare,true)){auto fingers=liveFingers[i].Snapshot();auto selected=fingerMode[i].Targets(*fingers);BlendControllerFingers(pose,i!=0,fingerGrip[i],fingerTrigger[i],weights[i],&selected,&fingerMode[i].weights,fingerThumb[i],static_cast<int>(fingerMode[i].finger),std::sin(3.14159265f*std::clamp(fingerMode[i].previewSeconds/.35f,0.f,1.f)));controls[i].origin=temporary.origin;controls[i].originRotation=temporary.originRotation;controls[i].anchor=temporary.anchor;controls[i].anchorRotation=temporary.anchorRotation;controls[i].basis=temporary.basis;controls[i].calibrate=temporary.calibrate;controls[i].bodyOrientation=temporary.bodyOrientation;controls[i].priorDirection=temporary.priorDirection;controls[i].priorBend=temporary.priorBend;controls[i].haveBend=temporary.haveBend;controls[i].neutralWrist=temporary.neutralWrist;controls[i].previousTwist=temporary.previousTwist;controls[i].haveTwist=temporary.haveTwist;lastSolveTick[i]=now;mask|=1u<<i;++solves[i];if(calibration)++calibrations[i];}else ++rejects[i];
  }
- sceneMarkers={};sceneMarkerTick=GetTickCount64();hornBoxHeld=false;hornBoxTick=sceneMarkerTick;
+ sceneMarkers={};sceneMarkerTick=GetTickCount64();mirrorContact[0]=mirrorContact[1]=-1;mirrorContactTick=sceneMarkerTick;hornBoxHeld=false;hornBoxTick=sceneMarkerTick;
  if(!boxEditor.authored[0]){boxEditor.boxes[0].center=ignitionTarget;boxEditor.boxes[0].scale=1;}
  if(!boxEditor.authored[1]){boxEditor.boxes[1].center=hornTarget;boxEditor.boxes[1].scale=hornBoxScale;}
  auto keyBox=boxEditor.boxes[0],hornBox=boxEditor.boxes[1];
  auto drawBox=[&](unsigned bone,const InteractionBox& box){auto& m=sceneMarkers[bone];for(unsigned col=0;col<3;++col){DriverIK::V axis{};axis[col]=box.scale*box.stretch[col];auto v=DriverIK::Rotate(box.rotation,axis);for(unsigned row=0;row<3;++row)m[row*4+col]=v[row];}m[3]=box.center[0];m[7]=box.center[1];m[11]=box.center[2];m[15]=1;};
- if(boxEditor.enabled)drawBox(44,keyBox);
+ if(boxEditor.enabled){drawBox(44,keyBox);for(unsigned j=2;j<InteractionBoxCount;++j)drawBox(j==5?55:48+j,boxEditor.boxes[j]);}
  auto handWorld=DriverIK::FK(pose,positions);bool keyFresh=ignitionTargetTick && sceneMarkerTick-ignitionTargetTick<250;
- bool activeRight=controls[1].enabled && hands[1].valid && head.valid && (mask&2);
- auto handBoxCenter=DriverIK::Add(handWorld.p[28],DriverIK::Rotate(handWorld.q[28],handBoxOffset));
- if(boxEditor.enabled && activeRight){auto& m=sceneMarkers[48];for(unsigned col=0;col<3;++col){DriverIK::V a{};a[col]=1;auto v=DriverIK::Rotate(handWorld.q[28],a);for(unsigned row=0;row<3;++row)m[row*4+col]=v[row];}m[3]=handBoxCenter[0];m[7]=handBoxCenter[1];m[11]=handBoxCenter[2];m[15]=1;}
+ bool sceneFresh=head.valid && sceneXRFrameTick && sceneMarkerTick-sceneXRFrameTick<250 && sceneCameraTick && sceneMarkerTick-sceneCameraTick<250;
  bool hornFresh=hornTargetTick && sceneMarkerTick-hornTargetTick<250;
  if(boxEditor.enabled)drawBox(49,hornBox);
- for(unsigned side=0;side<2;++side){unsigned wrist=side?28:7;bool active=controls[side].enabled && hands[side].valid && head.valid && (mask&(1u<<side));auto offset=side?handBoxOffset:leftHandBoxOffset;auto center=DriverIK::Add(handWorld.p[wrist],DriverIK::Rotate(handWorld.q[wrist],offset));
-  if(boxEditor.enabled && !side && active){auto& m=sceneMarkers[45];for(unsigned col=0;col<3;++col){DriverIK::V a{};a[col]=1;auto v=DriverIK::Rotate(handWorld.q[wrist],a);for(unsigned row=0;row<3;++row)m[row*4+col]=v[row];}m[3]=center[0];m[7]=center[1];m[11]=center[2];m[15]=1;}
-  if(!boxEditor.enabled && active && hornFresh && IgnitionBoxesOverlap(hornBox.center,DriverIK::V{hornBox.half[0]*hornBox.scale*hornBox.stretch[0],hornBox.half[1]*hornBox.scale*hornBox.stretch[1],hornBox.half[2]*hornBox.scale*hornBox.stretch[2]},center,handWorld.q[wrist],{.04f,.035f,.055f},hornBox.rotation))hornBoxHeld=true;
+ ControllerContactVolume volumes[2]{};InteractionRayHit rayHits[2]{};
+ for(unsigned side=0;side<2;++side){unsigned wrist=side?28:7;auto offset=side?handBoxOffset:leftHandBoxOffset;auto palm=DriverIK::Add(handWorld.p[wrist],DriverIK::Rotate(handWorld.q[wrist],offset));
+  auto raw=actualSceneFrame.Position(hands[side].point,head.point,head.rotation);auto rawQ=actualSceneFrame.Orientation(hands[side].rotation,head.rotation);
+  auto& volume=volumes[side];volume=ControllerInteractionVolume(controls[side].enabled,hands[side].valid,sceneFresh,(mask&(1u<<side))!=0,palm,handWorld.q[wrist],raw,rawQ);
+  if(!volume.valid)continue;
+  if(boxEditor.enabled){InteractionBox display{volume.center,{.04f,.035f,.055f},volume.rotation};drawBox(side?48:45,display);}
+  if(!controls[side].enabled){
+   auto direction=DriverIK::Rotate(rawQ,{0,0,-1});rayHits[side]=RayInteractionBoxes(boxEditor,raw,direction);
+   InteractionBox laser{DriverIK::Add(raw,DriverIK::Mul(direction,rayHits[side].distance*.5f)),{.0015f,.0015f,.5f},rawQ,1,{1,1,std::max(.001f,rayHits[side].distance)}};drawBox(53+side,laser);
+  }
+  if(!boxEditor.enabled)mirrorContact[side]=controls[side].enabled?MirrorContact(boxEditor,volume.center,volume.rotation):(rayHits[side].box>=2?rayHits[side].box-2:-1);
+  if(ControllerHornPressed(!boxEditor.enabled && hornFresh && (controls[side].enabled?IgnitionBoxesOverlap(hornBox.center,DriverIK::V{hornBox.half[0]*hornBox.scale*hornBox.stretch[0],hornBox.half[1]*hornBox.scale*hornBox.stretch[1],hornBox.half[2]*hornBox.scale*hornBox.stretch[2]},volume.center,volume.rotation,{.04f,.035f,.055f},hornBox.rotation):rayHits[side].box==1),volume.valid,fingerTrigger[side]))hornBoxHeld=true;
  }
- bool overlap=activeRight && keyFresh && IgnitionBoxesOverlap(keyBox.center,DriverIK::V{keyBox.half[0]*keyBox.scale*keyBox.stretch[0],keyBox.half[1]*keyBox.scale*keyBox.stretch[1],keyBox.half[2]*keyBox.scale*keyBox.stretch[2]},handBoxCenter,handWorld.q[28],{.04f,.035f,.055f},keyBox.rotation);
- if(ignitionTrigger.Step(fingerTrigger[1],activeRight && keyFresh && !boxEditor.enabled,overlap)){interactionRequestTick=sceneMarkerTick;ControllerToggleFeedback(1);}
+ bool overlap=volumes[1].valid && keyFresh && (controls[1].enabled?IgnitionBoxesOverlap(keyBox.center,DriverIK::V{keyBox.half[0]*keyBox.scale*keyBox.stretch[0],keyBox.half[1]*keyBox.scale*keyBox.stretch[1],keyBox.half[2]*keyBox.scale*keyBox.stretch[2]},volumes[1].center,volumes[1].rotation,{.04f,.035f,.055f},keyBox.rotation):rayHits[1].box==0);
+ if(ignitionTrigger.Step(fingerTrigger[1],volumes[1].valid && keyFresh && !boxEditor.enabled,overlap)){interactionRequestTick=sceneMarkerTick;ControllerToggleFeedback(1);}
 
  if(head.valid && sceneXRFrameTick && sceneMarkerTick-sceneXRFrameTick<250 && sceneCameraTick && sceneMarkerTick-sceneCameraTick<250){
  for(unsigned side=0;side<2;++side)if(hands[side].valid && !controls[side].enabled){auto position=actualSceneFrame.Position(hands[side].point,head.point,head.rotation);auto rotation=actualSceneFrame.Orientation(hands[side].rotation,head.rotation);
@@ -128,7 +138,7 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
 
  return mask;
 }
-void ControllerStatus(char* buffer,size_t length){std::lock_guard lock(guard);std::snprintf(buffer,length,"CONTROLLER_IK connected=%d error=%d marker_error=%d native_input=%d twist_share=%.3f grip=%.3f,%.3f trigger=%.3f,%.3f left_valid=%d right_valid=%d left_enabled=%d right_enabled=%d samples=%llu,%llu solves=%llu,%llu rejected=%llu,%llu calibrations=%llu,%llu finger_mode=%s,%s mode_switches=%llu,%llu finger_pose_revision=%llu,%llu finger_pose_rejected=%llu,%llu",systemVR?1:0,errorCode,markerError,NativeControllerInputStatus(),twistShare,fingerGrip[0],fingerGrip[1],fingerTrigger[0],fingerTrigger[1],hands[0].valid?1:0,hands[1].valid?1:0,controls[0].enabled?1:0,controls[1].enabled?1:0,samples[0],samples[1],solves[0],solves[1],rejects[0],rejects[1],calibrations[0],calibrations[1],fingerMode[0].Name(),fingerMode[1].Name(),fingerMode[0].switches,fingerMode[1].switches,liveFingers[0].Revision(),liveFingers[1].Revision(),liveFingers[0].Rejected(),liveFingers[1].Rejected());}
+void ControllerStatus(char* buffer,size_t length){std::lock_guard lock(guard);std::snprintf(buffer,length,"CONTROLLER_IK mirror_bridge=%d connected=%d error=%d marker_error=%d native_input=%d twist_share=%.3f grip=%.3f,%.3f trigger=%.3f,%.3f left_valid=%d right_valid=%d left_enabled=%d right_enabled=%d samples=%llu,%llu solves=%llu,%llu rejected=%llu,%llu calibrations=%llu,%llu finger_mode=%s,%s mode_switches=%llu,%llu finger_pose_revision=%llu,%llu finger_pose_rejected=%llu,%llu",mirrorBridgeStatus,systemVR?1:0,errorCode,markerError,NativeControllerInputStatus(),twistShare,fingerGrip[0],fingerGrip[1],fingerTrigger[0],fingerTrigger[1],hands[0].valid?1:0,hands[1].valid?1:0,controls[0].enabled?1:0,controls[1].enabled?1:0,samples[0],samples[1],solves[0],solves[1],rejects[0],rejects[1],calibrations[0],calibrations[1],fingerMode[0].Name(),fingerMode[1].Name(),fingerMode[0].switches,fingerMode[1].switches,liveFingers[0].Revision(),liveFingers[1].Revision(),liveFingers[0].Rejected(),liveFingers[1].Rejected());}
 void CloseControllers(){std::lock_guard lock(guard);HideMarkers();if(markerOverlay)for(auto& side:markers)for(auto handle:side)if(handle)markerOverlay->DestroyOverlay(handle);for(auto& side:markers)for(auto& handle:side)handle=0;markerOverlay=nullptr;systemVR=nullptr;if(initialized && shutdownVR)shutdownVR();initialized=false;if(library)FreeLibrary(library);library=nullptr;}
 
 bool ApplyControllerMarkerPalette(DriverPalette& palette){std::lock_guard lock(guard);palette={};if(sceneMarkerTick && GetTickCount64()-sceneMarkerTick<=250)palette=sceneMarkers;return true;}

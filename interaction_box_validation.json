@@ -1,21 +1,25 @@
 {
-  "plugin_version": "0.22.2",
-  "archive_version": "0.10.2",
-  "plugin_sha256": "3c130d0f122ab134af78a6fa092f159622de4104ab6322045d553608c2b6216d",
-  "archive_sha256": "c398d680a1a2e61c5e61a51fd639365dea5f4218067faf137ffc587c58a5e11e",
-  "setup_hotkey": "F9",
-  "horn_contact": "either enabled hand; trigger not required",
-  "setup_operations": [
-    "one-hand position and rotation",
-    "axis-specific two-hand resize",
-    "atomic persistence"
+  "plugin_version": "0.25.0",
+  "archive_version": "0.13.0",
+  "features": [
+    "six labeled setup boxes",
+    "mirror joystick adjustment",
+    "native seat adjustment",
+    "axis-mode laser targeting",
+    "mirror and seat servo",
+    "horn requires same-controller trigger"
   ],
-  "labels": [
-    "IGNITION",
-    "HORN"
+  "automated_regressions": [
+    "DriverDiagnosticRegression passed",
+    "ControllerLayerRegression passed",
+    "MirrorRegression passed"
   ],
-  "interaction_meshes_hidden_outside_setup": true,
-  "automated_regressions_pass": true,
-  "user_requested_commit_after_label_test": true,
-  "explicit_detailed_horn_and_setup_visual_validation_not_recorded": true
+  "user_confirmed_mirror_adjustment": true,
+  "seat_and_laser_visual_validation": "not explicitly recorded",
+  "installed_sha256": {
+    "releases/SPF_VisibleFirstPersonDriverBody.dll": "c60c1ff0e8fd2513893bc3c3144114c7463558b37c4f01007c503eced7d605f9",
+    "releases/SPF_MirrorControls-controller-bridge.dll": "557e65b2b56f073ae7b99cfc821ad2aa12f210ae8f6c131b372f74868032b8cb",
+    "releases/spf_controller_xr_layer.dll": "d3128775c4db4cf171110d3f0859bb36cc70d0d30abfd1b2b42b4062cce618e1",
+    "releases/ATS-VisibleDriverBody-Mustang-0.13.0-seat-interaction-box-test.scs": "831b25c52b32de4353c90f014a3ba7940afe32828b951c094948d405d2a1478d"
+  }
 }

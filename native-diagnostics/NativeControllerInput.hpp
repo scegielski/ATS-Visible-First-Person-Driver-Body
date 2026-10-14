@@ -6,3 +6,5 @@ bool PollNativeControllerButtons(bool (&pressed)[2],float (&grip)[2],float (&tri
 int NativeControllerInputStatus();
 
 int ControllerToggleFeedback(unsigned side);
+
+bool ReadControllerStickAxes(float (&axes)[4]);

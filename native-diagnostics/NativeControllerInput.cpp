@@ -13,3 +13,5 @@ bool PollNativeControllerButtons(bool (&pressed)[2],float (&grip)[2],float (&tri
 int NativeControllerInputStatus(){return status.load();}
 
 int ControllerToggleFeedback(unsigned side){auto module=GetModuleHandleW(L"spf_controller_xr_layer.dll");using Pulse=int (__cdecl*)(unsigned);auto pulse=module?reinterpret_cast<Pulse>(GetProcAddress(module,"SPF_ControllerToggleFeedback")):nullptr;return pulse?pulse(side):5;}
+
+bool ReadControllerStickAxes(float (&axes)[4]){for(auto& a:axes)a=0;auto module=GetModuleHandleW(L"spf_controller_xr_layer.dll");using Read=int (__cdecl*)(float*);auto read=module?reinterpret_cast<Read>(GetProcAddress(module,"SPF_ReadControllerStickAxes")):nullptr;return read && read(axes)==0;}
