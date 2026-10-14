@@ -267,7 +267,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.31.2");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.31.4");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -831,7 +831,7 @@ extern "C" void CaptureRadioInput(uintptr_t context) noexcept {
  bool valid=nativeRadioPause && nativeRadioSelect && SafeRead(base+0x36b8ed8,&manager,sizeof(manager)) && manager && SafeRead(manager+8,&radio,sizeof(radio)) && radio && SafeRead(radio,&table,sizeof(table)) && table==base+0x22c7e10 && SafeRead(radio+0xe8,&stream,sizeof(stream)) && SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));
  if(valid && !stream)valid=EnsureRadioList(radio,count,current);
  int action=valid?ControllerRadioPlaybackAction(stream!=0,current,count):-1;
- if(action==-2){nativeRadioPause(radio);QueueControllerRadioClickSound();Log(SPF_LOG_INFO,"RADIO_BOX play/pause toggled on current station.");}else if(action>=0){nativeRadioSelect(radio,static_cast<uint64_t>(action));QueueControllerRadioClickSound();Log(SPF_LOG_INFO,"RADIO_BOX playback started on selected station.");}else Log(SPF_LOG_WARN,"RADIO_BOX play/pause unavailable until station list loads.");
+ if(action==-2){nativeRadioPause(radio);uint32_t flags=0;if(SafeRead(radio+0xf0,&flags,sizeof(flags)))QueueControllerRadioClickSound((flags&1)==0);Log(SPF_LOG_INFO,"RADIO_BOX play/pause toggled on current station.");}else if(action>=0){nativeRadioSelect(radio,static_cast<uint64_t>(action));uintptr_t started=0;if(SafeRead(radio+0xe8,&started,sizeof(started)) && started)QueueControllerRadioClickSound(true);Log(SPF_LOG_INFO,"RADIO_BOX playback started on selected station.");}else Log(SPF_LOG_WARN,"RADIO_BOX play/pause unavailable until station list loads.");
  }
  if(command.volume!=0)nativeRadioVolume(context,command.volume);
 }

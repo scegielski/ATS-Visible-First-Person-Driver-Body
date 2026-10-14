@@ -32,4 +32,4 @@ ControllerRadioCommand TakeControllerRadioCommand();
 
 void QueueControllerRadioTuneSound();
 
-void QueueControllerRadioClickSound();
+void QueueControllerRadioClickSound(bool playing);

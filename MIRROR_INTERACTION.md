@@ -47,3 +47,5 @@ An original synthesized short radio-tuning sound plays once after a native stati
 Radio trigger: a fresh press while touching/pointing at RADIO toggles the native pause bit on the existing stream, preserving the selected station. If no stream exists, it starts the selected station (first entry if none selected). Trigger hold does not repeat; setup, tracking validity, pause and focus guards apply. The native pause routine has its own unique signature check. Volume/station-stick controls remain unchanged. Runtime play/pause needs a visual/audio check.
 
 Radio first-use requests load the native station list before selecting a station or starting playback. Accepted trigger play/pause actions queue a short click (`controller_radio_click.wav`) outside the animation hook. The click build is packaged; installation and its audible check are pending.
+
+Ignition accepts independent fresh trigger presses from either hand or pointer. Radio trigger feedback uses `controller_radio_on.wav` for play/resume and `controller_radio_off.wav` for pause, based on native playback state. The directional-feedback build has passed regressions but is not installed yet.

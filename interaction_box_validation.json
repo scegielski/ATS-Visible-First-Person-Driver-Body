@@ -1,23 +1,27 @@
 {
-  "plugin_version": "0.31.2",
+  "plugin_version": "0.31.4",
   "archive_version": "0.18.0",
   "features": [
     "twelve labeled setup boxes",
     "windows, steering column, lights and wrapping wiper controls",
     "radio full-list station selection and volume",
     "radio trigger play/pause and accepted-action click",
-    "lazy native station-list initialization"
+    "lazy native station-list initialization",
+    "either hand or laser can operate ignition independently",
+    "rising play and falling pause feedback"
   ],
   "automated_regressions": [
     "DriverDiagnosticRegression passed",
     "ControllerLayerRegression passed"
   ],
-  "user_validation": "Radio station changes and volume confirmed; first-use initialization, trigger playback and click still require final runtime confirmation.",
-  "installation_status": "0.31.1 installed; 0.31.2 click build packaged but not installed at user request.",
+  "user_validation": "Radio station changes and volume confirmed; bilateral ignition and directional radio feedback require final runtime confirmation.",
+  "installation_status": "0.31.3 bilateral ignition installed; 0.31.4 directional radio sounds built and committed but not installed at user request.",
   "release_sha256": {
-    "releases/SPF_VisibleFirstPersonDriverBody.dll": "72f63d4158945685ef4cc55db0c3a877bae39ba8dad1de2c16c59c97ab16cbf8",
+    "releases/SPF_VisibleFirstPersonDriverBody.dll": "0cae142b00b0ccec06ffcecf9cda65e306ea59c73781f20d6c1952c69f33d627",
     "releases/ATS-VisibleDriverBody-Mustang-0.18.0-radio-interaction-box-test.scs": "72631fefd99b463081611a6fc2e2d4e47ec3eb32f75228c490a11a6856753dda",
     "releases/controller_radio_click.wav": "e18aa13074f49be11ca5c6f7fc9ff12e25da443e855bd8c622c5822de8185588",
-    "releases/controller_radio_tune.wav": "bb069f3842de1c6757da39797440fdfec625121f3e61842ea6b1ea9a14caf30d"
+    "releases/controller_radio_tune.wav": "bb069f3842de1c6757da39797440fdfec625121f3e61842ea6b1ea9a14caf30d",
+    "releases/controller_radio_on.wav": "6cebccb8101c64be11499cbd2b46bc75c4304121547a0fdb14f530a463b68502",
+    "releases/controller_radio_off.wav": "2d7607915bf3f85ad48a799ee6c72b75c5663aa356b71ba363140c655a0cd731"
   }
 }
