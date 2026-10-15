@@ -298,6 +298,10 @@ void OnLoad(const SPF_Load_API* api) {
  LoadIntegratedAdjustments(api);
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
 }
+extern "C" {void* gMapWidgetOriginal=nullptr;void MapWidgetObserveStub();}
+std::atomic<uint64_t> mapWidgetCalls{0},mapWidgetTick{0},worldMapWidgetTick{0};std::atomic<uintptr_t> mapWidgetVtable{0};
+extern "C" bool IsWorldMapMenuActive() noexcept {auto tick=worldMapWidgetTick.load();auto now=GetTickCount64();return enabled.load()&&tick&&now>=tick&&now-tick<=100;}
+extern "C" void CaptureMapWidget(uintptr_t object) noexcept {uintptr_t vt=0;if(SafeRead(object,&vt,8)){mapWidgetVtable.store(vt);mapWidgetCalls.fetch_add(1);mapWidgetTick.store(GetTickCount64());if(vt==reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))+0x239a150)worldMapWidgetTick.store(GetTickCount64());}}
 extern "C" {void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;void MenuModeObserveStub();void MenuSurfaceObserveStub();}
 extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept {char text[192];std::snprintf(text,sizeof(text),"MENU_LASER owner=%d hit=%d,%d trigger=%.3f,%.3f button=%d mouse_events=%u/%u",owner,leftHit,rightHit,leftTrigger,rightTrigger,button,sent,requested);Log(SPF_LOG_INFO,text);}
 std::atomic<bool> earlyMenuFocused{false};EarlyMenuCursor earlyCursor;thread_local bool earlyMenuWorker=false;
@@ -383,10 +387,12 @@ void Activated(const SPF_Core_API* api) {
  else Log(SPF_LOG_WARN,"HEAD_TRACKING: view-site signature mismatch; observer disabled.");
  if(hooks->Hook_FindPattern(kNativeRecenterPattern)==base+0x428852)nativeRecenterHook=hooks->Hook_Register(kName,"NativeHeadRecenter","Observe ATS head-reset input without consuming it",reinterpret_cast<void*>(NativeRecenterObserveStub),&gRecenterOriginal,kNativeRecenterPattern,true);
  else Log(SPF_LOG_WARN,"HEAD_RECENTER native input-site signature mismatch; observer disabled.");
+ constexpr char mapWidgetPattern[]="48 89 5C 24 10 55 57 41 56 48 8D 6C 24 B9 48 81 EC 00 01 00 00";
+ if(hooks->Hook_FindPattern(mapWidgetPattern)==base+0x1012ac0)hooks->Hook_Register(kName,"MapWidgetProbe","Observe map widget updates without changing input",reinterpret_cast<void*>(MapWidgetObserveStub),&gMapWidgetOriginal,mapWidgetPattern,true);
  constexpr char menuModePattern[]="0F 28 D8 48 8D 4D 8C 0F 57 C9 F3 0F 11 9D 00 09 00 00";
  constexpr char menuSurfacePattern[]="45 8B C6 48 8D 55 D4 48 8B CE E8 ?? ?? ?? ?? 48 8D 8D A0 03 00 00";
  if(earlyMenuOwned.load())Log(SPF_LOG_INFO,"MENU_EARLY reusing early-owned menu hooks; framework polling takes over on activation.");
- else if(hooks->Hook_FindPattern(menuModePattern)==base+0x42c826 && hooks->Hook_FindPattern(menuSurfacePattern)==base+0x42d144){hooks->Hook_Register(kName,"MenuMode","Observe VR menu context",reinterpret_cast<void*>(MenuModeObserveStub),&gMenuModeOriginal,menuModePattern,true);hooks->Hook_Register(kName,"MenuSurface","Observe final VR menu surface with eye translation removed",reinterpret_cast<void*>(MenuSurfaceObserveStub),&gMenuSurfaceOriginal,menuSurfacePattern,true);}else Log(SPF_LOG_WARN,"MENU_LASER surface signatures unavailable; air mouse retained.");
+ else if(hooks->Hook_FindPattern(menuModePattern)==base+0x42c826 && hooks->Hook_FindPattern(menuSurfacePattern)==base+0x42d144){hooks->Hook_Register(kName,"MenuMode","Observe VR menu context",reinterpret_cast<void*>(MenuModeObserveStub),&gMenuModeOriginal,menuModePattern,true);hooks->Hook_Register(kName,"MenuSurface","Observe final VR menu surface with eye translation removed",reinterpret_cast<void*>(MenuSurfaceObserveStub),&gMenuSurfaceOriginal,menuSurfacePattern,true);}else Log(SPF_LOG_WARN,"MENU_LASER surface signatures unavailable; menu laser input disabled.");
  constexpr char cursorEmitPattern[]="48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 56 48 83 EC 70 48 8D B1 98 00 00 00";
  if(hooks->Hook_FindPattern(cursorEmitPattern)==base+0x269650)nativeCursorEmit=reinterpret_cast<NativeCursorEmit>(base+0x269650);else Log(SPF_LOG_WARN,"MENU_NATIVE_CURSOR signature unavailable; relative input retained.");
  expectedReturn=base+0x9e2552;
@@ -607,6 +613,7 @@ void Update() {
  const bool menuMouse=core && core->gameworld && core->gameworld->GW_IsGamePaused && (core->gameworld->GW_IsGamePaused() || !cameraValid || !telemetryTick.load() || GetTickCount64()-telemetryTick.load()>250);
  PollControllers(!menuMouse && cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
  PollControllerMenuMouse(menuMouse);
+ {static uint64_t report=0,previous=0;auto now=GetTickCount64();if(now-report>=2000){report=now;auto calls=mapWidgetCalls.load();char msg[180];std::snprintf(msg,sizeof(msg),"MENU_MAP_PROBE menu=%d calls=%llu delta=%llu recent=%d widget_vtable_rva=%llx",menuMouse?1:0,calls,calls-previous,mapWidgetTick.load() && now-mapWidgetTick.load()<250?1:0,mapWidgetVtable.load()?mapWidgetVtable.load()-reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)):0);previous=calls;Log(SPF_LOG_INFO,msg);}}
  PollGesturePoseFile();PollGestureHeadFollowGain();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);

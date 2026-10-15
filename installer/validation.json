@@ -7,7 +7,7 @@
   "integrated_adjustment_vr_test": "pending",
   "installed_game_modified_by_installer": true,
   "committed": true,
-  "installer_sha256": "6bdc10498bb70dd47587a1a771b7498f475a888fe65c478e75474bf922f0af3b",
+  "installer_sha256": "33d0250ded9875bb4a3ee24ef08580888be7d4f619a2df4f9501a672e4e39e20",
   "payload_files": 39,
   "steam_policy": "Steam launch options are not read or modified; Steam may remain open; working OpenXR VR configuration is a prerequisite",
   "configuration": "General settings embedded in DLL; Mustang poses and boxes in separate live INIs; SPF-owned settings.json",
@@ -18,5 +18,7 @@
   "configuration_vr_test": "User confirmed split configuration layout works in VR",
   "menu_axes_flash": "Removed startup axes fallback; six native suites pass; installed; visual startup check pending",
   "asset_audit": "Clean package confirmed working in game by user",
-  "accessory_menu_drag": "User confirmed held-trigger dragging works in accessory preview; six native suites pass; revised DLL installed"
+  "accessory_menu_drag": "User confirmed held-trigger dragging works in accessory preview; six native suites pass; revised DLL installed",
+  "menu_right_drag": "Restored validated 150ms delay after 75ms caused missed left clicks. Same 8px threshold, click on release and right drag retained; six suites pass; restored DLL awaiting install while ATS runs",
+  "map_detection": "Runtime widget type observed on world map and absent on accessory screen; exact supported executable only"
 }

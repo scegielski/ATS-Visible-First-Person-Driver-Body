@@ -1,3 +1,4 @@
+#include "MenuButtonRoute.hpp"
 #include "DriverSettings.hpp"
 #include "IntegratedAdjustments.hpp"
 #include "ControllerModelData.hpp"
@@ -226,11 +227,12 @@ Tracked MenuAimPose(vr::TrackedDeviceIndex_t device,const vr::TrackedDevicePose_
 void UpdateCabinControllerModels(const vr::TrackedDevicePose_t* poses){
  std::array<ControllerMeshPose,64> modelPoses{};for(unsigned side=0;side<2;++side){cabinLaserReady[side]=false;auto index=systemVR?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;if(!head.valid || index>=vr::k_unMaxTrackedDeviceCount || !hands[side].valid || controls[side].enabled){HideControllerPointer(side);continue;}controllerAim[side]=MenuAimPose(index,poses[index]);cabinModelReady[side]=ShowMenuControllerModel(side,index,poses[index],head,modelPoses);bool fresh=GetTickCount64()-cabinLaserTick[side]<250;cabinLaserReady[side]=ShowControllerPointer(side,controllerAim[side],head,fresh?cabinLaserDistance[side]:2.f,fresh && cabinLaserHit[side]);}SubmitMenuModelPoses(modelPoses);
 }
+extern "C" bool IsWorldMapMenuActive() noexcept;
 bool PollMenuLaser(bool menu){
- using namespace DriverIK;static ControllerMenuMouse click;static MenuCursorMotion cursor;static IgnitionTriggerGate choose[2];static int owner=-1;static uint64_t last=0;auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
+ using namespace DriverIK;static ControllerMenuMouse click,rightClick;static MenuButtonRoute buttons;static MenuCursorMotion cursor;static IgnitionTriggerGate choose[2],chooseGrip[2];static int owner=-1;static uint64_t last=0;auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
  DWORD pid=0;auto window=GetForegroundWindow();GetWindowThreadProcessId(window,&pid);menu=menu && pid==GetCurrentProcessId();
  bool surfaceFresh=menuSurfaceTick && now-menuSurfaceTick<250;
- if(!menu || !surfaceFresh){if(!cabinModelsActive)HideMenuLasers();if(!cabinModelsActive)HideMenuControllerModels();auto out=click.Step(false,false,0,0,0,0,0);if(out.button<0){INPUT e{};e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_LEFTUP;SendInput(1,&e,sizeof(e));}owner=-1;cursor.Step(false,-1,0,0,0,0,0);choose[0]=choose[1]={};return false;}
+ if(!menu || !surfaceFresh){if(!cabinModelsActive)HideMenuLasers();if(!cabinModelsActive)HideMenuControllerModels();auto out=click.Step(false,false,0,0,0,0,0);auto rightOut=rightClick.Step(false,false,0,0,0,0,0);auto released=buttons.Cancel();INPUT release[2]{};unsigned count=0;for(auto button:{(released.released&1)?MOUSEEVENTF_LEFTUP:0,(released.released&2)?MOUSEEVENTF_RIGHTUP:0})if(button){release[count].type=INPUT_MOUSE;release[count++].mi.dwFlags=button;}if(count)SendInput(count,release,sizeof(INPUT));owner=-1;cursor.Step(false,-1,0,0,0,0,0);choose[0]=choose[1]={};chooseGrip[0]=chooseGrip[1]={};return false;}
  if(!systemVR && now-attempt>=5000){attempt=now;Connect();}
  bool pressed[2]{},mode[2]{},thumb[2]{};float grips[2]{},triggers[2]{},inward[2]{},sticks[4]{};bool valid=systemVR && PollNativeControllerButtons(pressed,grips,triggers,mode,thumb,inward);if(valid)ReadControllerStickAxes(sticks);
  vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};if(valid)systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);
@@ -241,40 +243,22 @@ bool PollMenuLaser(bool menu){
   ShowControllerPointer(side,hand,h,length,hits[side].hit);
  }
  SubmitMenuModelPoses(modelPoses);
- bool select[2]{};for(unsigned side=0;side<2;++side)select[side]=choose[side].Step(triggers[side],valid,hits[side].hit);
- bool hitFlags[2]{hits[0].hit,hits[1].hit};if(!click.down && (select[0]||select[1]))click.Step(true,true,0,0,0,0,0);owner=SelectMenuLaserOwner(owner,click.down,hitFlags,select);
- bool hit=owner>=0 && hits[owner].hit;auto output=click.Step(hit,hit,0,0,hit?triggers[owner]:0,hit?sticks[owner*2+1]:0,dt);INPUT events[3]{};UINT count=0;
+ bool select[2]{};for(unsigned side=0;side<2;++side){bool triggerPress=choose[side].Step(triggers[side],valid,hits[side].hit);bool gripPress=chooseGrip[side].Step(grips[side],valid,hits[side].hit);select[side]=triggerPress||gripPress;}
+ bool hitFlags[2]{hits[0].hit,hits[1].hit};if(!click.down && !rightClick.down && (select[0]||select[1])){click.Step(true,true,0,0,0,0,0);rightClick.Step(true,true,0,0,0,0,0);}owner=SelectMenuLaserOwner(owner,click.down||rightClick.down,hitFlags,select);
+ bool hit=owner>=0 && hits[owner].hit;auto output=click.Step(hit,hit,0,0,hit?triggers[owner]:0,hit?sticks[owner*2+1]:0,dt);auto rightOutput=rightClick.Step(hit,hit,0,0,hit?grips[owner]:0,0,dt);INPUT events[5]{};UINT count=0;
  static float gainX=1.5f,gainY=1.5f;static uint64_t gainPoll=0;if(now-gainPoll>=500 && !guideFile.empty()){gainPoll=now;auto gainFile=OpenDriverSetting(guideFile.parent_path()/"controller_menu_cursor_gain.txt");if(gainFile){std::string text((std::istreambuf_iterator<char>(gainFile)),{});ParseMenuCursorGain(text,gainX,gainY);}}
  RECT rect{};GetClientRect(window,&rect);auto motion=hit?cursor.Step(true,owner,hits[owner].u,hits[owner].v,rect.right,rect.bottom,dt,gainX,gainY):MenuCursorMotion::Output{};
+ auto routed=hit?buttons.Step(output.button,rightOutput.button,IsWorldMapMenuActive(),static_cast<float>(motion.dx),static_cast<float>(motion.dy),dt):buttons.Cancel();bool dragging=buttons.heldMask!=0;bool buttonPress=routed.pressed!=0;
  // Accessory preview orbit consumes relative mouse movement while captured.
  // Anchor on press, then avoid absolute warps until release.
- bool nativePositioned=hit && (!click.down || output.button>0) && ApplyNativeMenuCursor(hits[owner].u,hits[owner].v);
- if(!nativePositioned && motion.anchor && !click.down){POINT point{motion.x,motion.y};if(ClientToScreen(window,&point))SetCursorPos(point.x,point.y);}
+ bool nativePositioned=hit && (!dragging || buttonPress) && ApplyNativeMenuCursor(hits[owner].u,hits[owner].v);
+ if(!nativePositioned && motion.anchor && !dragging){POINT point{motion.x,motion.y};if(ClientToScreen(window,&point))SetCursorPos(point.x,point.y);}
 
- if(!nativePositioned && output.button!=1 && (motion.dx||motion.dy)){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dx=motion.dx;e.mi.dy=motion.dy;e.mi.dwFlags=MOUSEEVENTF_MOVE;}
- if(output.button){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=output.button>0?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP;}if(output.wheel){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_WHEEL;e.mi.mouseData=static_cast<DWORD>(output.wheel*WHEEL_DELTA);}unsigned sent=count?SendInput(count,events,sizeof(INPUT)):0;static uint64_t lastReport=0;if(output.button || now-lastReport>=2000){lastReport=now;ReportMenuLaser(owner,hits[0].hit?1:0,hits[1].hit?1:0,triggers[0],triggers[1],output.button,sent,count);}return true;
+ if(!nativePositioned && !buttonPress && (motion.dx||motion.dy)){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dx=motion.dx;e.mi.dy=motion.dy;e.mi.dwFlags=MOUSEEVENTF_MOVE;}
+ if(routed.pressed||routed.released){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=((routed.pressed&1)?MOUSEEVENTF_LEFTDOWN:0)|((routed.pressed&2)?MOUSEEVENTF_RIGHTDOWN:0)|((routed.released&1)?MOUSEEVENTF_LEFTUP:0)|((routed.released&2)?MOUSEEVENTF_RIGHTUP:0);}if(routed.tapped&1){auto& down=events[count++];down.type=INPUT_MOUSE;down.mi.dwFlags=MOUSEEVENTF_LEFTDOWN;auto& up=events[count++];up.type=INPUT_MOUSE;up.mi.dwFlags=MOUSEEVENTF_LEFTUP;}if(output.wheel){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_WHEEL;e.mi.mouseData=static_cast<DWORD>(output.wheel*WHEEL_DELTA);}unsigned sent=count?SendInput(count,events,sizeof(INPUT)):0;static uint64_t lastReport=0;if(output.button || now-lastReport>=2000){lastReport=now;ReportMenuLaser(owner,hits[0].hit?1:0,hits[1].hit?1:0,triggers[0],triggers[1],output.button,sent,count);}return true;
 }
 }
 void PublishControllerMenuSurface(const float* transform,const float* size,float radius){for(unsigned i=0;i<8;++i)if(!std::isfinite(transform[i]))return;float n=0;for(unsigned i=4;i<8;++i)n+=transform[i]*transform[i];if(n<.98f||n>1.02f||!std::isfinite(radius)||!std::isfinite(size[0])||!std::isfinite(size[1])||size[0]<=0||size[1]<=0||size[0]>20||size[1]>20)return;std::unique_lock lock(guard,std::try_to_lock);if(!lock.owns_lock())return;menuSurface={{transform[0],transform[1],transform[2]},{transform[4],transform[5],transform[6],transform[7]},size[0],size[1],radius};menuSurfaceTick=GetTickCount64();}
 
-// Menu cursor prototype: controller rotation acts as a relative air mouse.
-void PollControllerMenuMouse(bool menu){
- static ControllerMenuMouse mouse;static int owner=-1;static uint64_t last=0;static float remainderX=0,remainderY=0;
- std::lock_guard lock(guard);if(PollMenuLaser(menu)){auto release=mouse.Step(false,false,0,0,0,0,0);if(release.button<0){INPUT e{};e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_LEFTUP;SendInput(1,&e,sizeof(e));}owner=-1;return;}auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
- DWORD pid=0;GetWindowThreadProcessId(GetForegroundWindow(),&pid);menu=menu && pid==GetCurrentProcessId();
- bool pressed[2]{},mode[2]{},thumb[2]{};float grip[2]{},trigger[2]{},inward[2]{},axes[4]{};
- bool valid=menu && PollNativeControllerButtons(pressed,grip,trigger,mode,thumb,inward);
- if(valid)ReadControllerStickAxes(axes);
- if(!systemVR && menu && now-attempt>=5000){attempt=now;Connect();}
- vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};if(systemVR && valid)systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);
- if(owner<0 && valid){if(grip[1]>.6f)owner=1;else if(grip[0]>.6f)owner=0;}
- bool held=owner>=0 && valid && grip[owner]>.4f;float yaw=0,pitch=0;
- if(held && systemVR){auto index=systemVR->GetTrackedDeviceIndexForControllerRole(owner?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand);if(index>=vr::k_unMaxTrackedDeviceCount)held=false;else{auto pose=Convert(poses[index]);held=pose.valid;if(held){auto d=DriverIK::Rotate(pose.rotation,{0,0,-1});yaw=std::atan2(d[0],-d[2]);pitch=std::atan2(d[1],std::hypot(d[0],d[2]));}}}else held=false;
- auto output=mouse.Step(held,held,yaw,pitch,owner<0?0:trigger[owner],owner<0?0:axes[owner*2+1],dt);
- INPUT events[4]{};UINT count=0;
- if(held){remainderX+=output.dx;remainderY+=output.dy;LONG dx=static_cast<LONG>(remainderX),dy=static_cast<LONG>(remainderY);remainderX-=dx;remainderY-=dy;if(dx||dy){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dx=dx;e.mi.dy=dy;e.mi.dwFlags=MOUSEEVENTF_MOVE;}}
- if(output.button){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=output.button>0?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP;}
- if(output.wheel){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_WHEEL;e.mi.mouseData=static_cast<DWORD>(output.wheel*WHEEL_DELTA);}
- if(count)SendInput(count,events,sizeof(INPUT));
- if(!held){owner=-1;remainderX=remainderY=0;}
-}
+// Menu input is exclusively laser-based; grip is reserved for right click/drag.
+void PollControllerMenuMouse(bool menu){std::lock_guard lock(guard);PollMenuLaser(menu);}

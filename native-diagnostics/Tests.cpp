@@ -1,3 +1,4 @@
+#include "MenuButtonRoute.hpp"
 #include "ControllerModelData.hpp"
 #include "ControllerModelInput.hpp"
 #include "EarlyMenuCursor.hpp"
@@ -53,6 +54,7 @@ void* gEngineOriginal=nullptr;
 void* gHeadOriginal=nullptr;
 void* gXRActionAttachOriginal=nullptr;
 void* gRecenterOriginal=nullptr;
+void* gMapWidgetOriginal=nullptr;
 void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;
 void* gRadioInputOriginal=nullptr;
 void* gWipersOriginal=nullptr;
@@ -71,6 +73,7 @@ extern "C" uint64_t RadioInputTest(uintptr_t,uint64_t);
 extern "C" void RadioInputContinuation();
 extern "C" void CaptureMenuMode(uint32_t) noexcept {}
 extern "C" void CaptureMenuSurface(uintptr_t) noexcept {}
+extern "C" void CaptureMapWidget(uintptr_t) noexcept {}
 extern "C" void CaptureRadioInput(uintptr_t context) noexcept {if(context!=123)std::abort();}
 extern "C" uint64_t WipersTest(uintptr_t,uint64_t,uint64_t,uint64_t*);
 extern "C" uint64_t LightsTest(uintptr_t,uint64_t,uint64_t,uint64_t*);
@@ -164,6 +167,25 @@ int main() {
  Check(ControllerTextureBytes(4,4,0,1)==64 && ControllerTextureBytes(4,4,1,1)==16 && ControllerTextureBytes(4,4,2,1)==8 && ControllerTextureBytes(4,4,3,3)==48,"SteamVR texture formats and mip byte counts");Check(!ControllerTextureBytes(0,4,0,1) && !ControllerTextureBytes(4,4,99,1),"invalid model textures rejected");ControllerMeshVertex meshVertices[3]{};uint16_t meshIndices[3]{0,1,2};Check(ValidControllerMesh(meshVertices,3,meshIndices,3),"valid controller triangle accepted");meshIndices[2]=3;Check(!ValidControllerMesh(meshVertices,3,meshIndices,3),"out of range controller triangle rejected");auto modelProjection=ControllerModelProjection(-1,1,-1,1);Check(modelProjection[0]==1 && modelProjection[5]==1 && modelProjection[11]==-1,"controller projection uses forward negative Z");
  EarlyMenuCursor pendingCursor;float pendingU=0,pendingV=0;Check(pendingCursor.Publish(.7f,.3f,100) && pendingCursor.Take(pendingU,pendingV,120) && pendingU==.7f && pendingV==.3f,"early worker cursor transfers to game thread");Check(!pendingCursor.Take(pendingU,pendingV,121),"early cursor consumes each command once");pendingCursor.Publish(.2f,.8f,200);Check(!pendingCursor.Take(pendingU,pendingV,301),"stale early cursor command rejected");Check(!pendingCursor.Publish(-1,.5f,400),"invalid early cursor coordinates rejected");
  float nativeRect[4]{0,2880,1800,0};NativeMenuCursorEvent absoluteEvent;Check(BuildNativeMenuCursorEvent(.75f,.25f,nativeRect,absoluteEvent) && absoluteEvent.type==3 && absoluteEvent.x==2160 && absoluteEvent.y==450,"native cursor maps laser UV to native viewport independent of desktop mouse gain");Check(BuildNativeMenuCursorEvent(0,1,nativeRect,absoluteEvent) && absoluteEvent.x==0 && absoluteEvent.y==1800,"native cursor reaches both viewport edges");nativeRect[1]=0;Check(!BuildNativeMenuCursorEvent(.5f,.5f,nativeRect,absoluteEvent),"invalid native viewport rejects cursor event");
+ ControllerMenuMouse leftDrag,rightDrag;leftDrag.Step(true,true,0,0,0,0,.01f);rightDrag.Step(true,true,0,0,0,0,.01f);
+ Check(rightDrag.Step(true,true,0,0,1,0,.01f).button==1 && !leftDrag.down,"grip starts independent right mouse drag");
+ Check(rightDrag.Step(true,true,0,0,1,0,.01f).button==0 && rightDrag.down,"held grip keeps right drag without repeat");
+ Check(leftDrag.Step(true,true,0,0,1,0,.01f).button==1 && rightDrag.down,"left and right buttons can be held independently");
+ Check(rightDrag.Step(true,true,0,0,0,0,.01f).button==-1 && leftDrag.down,"grip release preserves held left button");
+ Check(leftDrag.Step(false,false,0,0,1,0,.01f).button==-1,"tracking loss releases captured left button");
+ rightDrag.Step(true,true,0,0,0,0,.01f);rightDrag.Step(true,true,0,0,1,0,.01f);Check(rightDrag.Step(false,false,0,0,1,0,.01f).button==-1,"tracking loss releases captured right button");
+ MenuButtonRoute route;auto routeOut=route.Step(1,0,true);Check(!routeOut.pressed&&!route.heldMask,"map trigger waits to distinguish click from drag");
+ routeOut=route.Step(0,0,true,2,1);Check(!routeOut.pressed,"small map pointer jitter stays a click");
+ routeOut=route.Step(-1,0,true);Check(routeOut.tapped==1&&!routeOut.pressed&&!routeOut.released,"stationary map trigger release emits only left tap");
+ route.Step(1,0,true);routeOut=route.Step(0,0,true,10,0,.05f);Check(!routeOut.pressed,"map movement waits for drag delay");route.Step(0,0,true,0,0,.05f);routeOut=route.Step(0,0,true,0,0,.05f);Check(routeOut.pressed==2&&route.heldMask==2,"map motion converts trigger to right drag");
+ routeOut=route.Step(0,0,false);Check(!routeOut.pressed&&!routeOut.released&&route.heldMask==2,"map exit cannot switch a held drag");
+ routeOut=route.Step(-1,0,false);Check(routeOut.released==2&&!routeOut.tapped,"right drag release never adds a left click");
+ routeOut=route.Step(1,0,false);Check(routeOut.pressed==1,"accessory trigger remains immediate left button");
+ routeOut=route.Step(0,0,true);Check(!routeOut.pressed&&route.heldMask==1,"opening map cannot change existing left drag");route.Step(-1,0,true);
+ route.Step(1,1,true);route.Step(0,0,true,10,0,.05f);route.Step(0,0,true,0,0,.05f);route.Step(0,0,true,0,0,.05f);routeOut=route.Step(-1,0,true);Check(!routeOut.released&&route.heldMask==2,"grip keeps right button held after trigger release");
+ routeOut=route.Step(0,-1,true);Check(routeOut.released==2,"last right-button source releases right drag");
+ route.Step(1,0,true);routeOut=route.Cancel();Check(!routeOut.tapped&&!routeOut.pressed&&!route.heldMask,"tracking loss cancels pending click without acting");
+ route.Step(1,1,false);routeOut=route.Cancel();Check(routeOut.released==3&&!route.heldMask,"focus loss releases both captured buttons");
  MenuCursorMotion laserCursor;auto cursorOut=laserCursor.Step(true,1,.5f,.5f,1920,1080,.01f);Check(cursorOut.anchor && cursorOut.dx==0,"menu cursor anchors only on acquisition");for(int i=0;i<20;++i){cursorOut=laserCursor.Step(true,1,.5f,.5f,1920,1080,.01f);Check(!cursorOut.anchor && cursorOut.dx==0 && cursorOut.dy==0,"stationary menu hit emits no cursor warps or relative motion");}cursorOut=laserCursor.Step(true,1,.6f,.5f,1920,1080,.01f);Check(!cursorOut.anchor && cursorOut.dx>0 && cursorOut.dx<192 && cursorOut.dy==0,"menu hit change restores filtered relative movement");
  MenuCursorMotion scaled;scaled.Step(true,0,.1f,.2f,1001,1001,.01f,1.5f,2.f);int totalX=0,totalY=0;for(int i=0;i<100;++i){auto o=scaled.Step(true,0,.9f,.8f,1001,1001,.01f,1.5f,2.f);totalX+=o.dx;totalY+=o.dy;}Check(std::abs(totalX-1200)<=1 && std::abs(totalY-1200)<=1,"independent menu gains preserve full accumulated travel");for(int i=0;i<100;++i){auto o=scaled.Step(true,0,.1f,.2f,1001,1001,.01f,1.5f,2.f);totalX+=o.dx;totalY+=o.dy;}Check(std::abs(totalX)<=1 && std::abs(totalY)<=1,"reversing laser motion returns without accumulating drift");float gx=1,gy=1;Check(ParseMenuCursorGain("1.5 2",gx,gy) && gx==1.5f && gy==2,"live cursor scale accepts independent axes");Check(!ParseMenuCursorGain("nan 2",gx,gy) && !ParseMenuCursorGain("-1 2",gx,gy) && !ParseMenuCursorGain("1 2 extra",gx,gy) && gx==1.5f && gy==2,"invalid live cursor scale preserves previous values");bool noMenuHits[2]{false,false},noMenuPress[2]{false,false};Check(SelectMenuLaserOwner(1,false,noMenuHits,noMenuPress)==1,"brief misses do not transfer menu pointer to resting controller");
  float leftFinalMenu[8]{.032f,-.5f,-.8f,0,1,0,0,0},rightFinalMenu[8]{-.032f,-.5f,-.8f,0,1,0,0,0};float leftEye[3]{-.032f,0,0},rightEye[3]{.032f,0,0};RemoveMenuEyeOffset(leftFinalMenu,leftEye);RemoveMenuEyeOffset(rightFinalMenu,rightEye);Check(std::abs(leftFinalMenu[0]-rightFinalMenu[0])<1e-6f && leftFinalMenu[4]==1 && leftFinalMenu[2]==-.8f,"final menu pose removes per-eye translation without altering final orientation");

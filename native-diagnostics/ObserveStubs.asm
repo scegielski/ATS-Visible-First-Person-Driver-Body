@@ -1,3 +1,5 @@
+EXTERN gMapWidgetOriginal:QWORD
+EXTERN CaptureMapWidget:PROC
 EXTERN gMenuModeOriginal:QWORD
 EXTERN gMenuSurfaceOriginal:QWORD
 EXTERN CaptureMenuMode:PROC
@@ -497,4 +499,11 @@ MenuSurfaceObserveStub PROC FRAME
  popfq
  jmp qword ptr [gMenuSurfaceOriginal]
 MenuSurfaceObserveStub ENDP
+MapWidgetObserveStub PROC FRAME
+ SAVE_STATE
+ call CaptureMapWidget
+ RESTORE_STATE
+ jmp qword ptr [gMapWidgetOriginal]
+MapWidgetObserveStub ENDP
+
 END

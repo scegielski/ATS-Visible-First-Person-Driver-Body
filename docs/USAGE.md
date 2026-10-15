@@ -23,7 +23,7 @@ Finger assignment changes blend smoothly. Cabin actions can also use the trigger
 
 ## Menu pointing
 
-Point either controller at the VR menu. The cursor follows the selected laser hit; trigger clicks or drags, and the thumbstick scrolls. A trigger press over the panel selects that controller. Menu support starts through the early OpenXR bridge before normal SPF activation.
+Point either controller at the VR menu. The cursor follows the selected laser hit; trigger left-clicks or left-drags outside the world map; on the detected world map, release without dragging to left-click, or hold and move to right-drag; grip right-clicks or right-drags, and the thumbstick scrolls. Either button over the panel selects that controller; ownership stays fixed during a drag. Hold trigger and move the controller to drag the world map; grip also supports right-drag. Map right-drag requires a 150 ms hold and an eight-pixel motion threshold. A completed drag does not emit a left click on release. Trigger routing is chosen on press and held until release. The former grip-activated fallback air mouse has been removed. Menu support starts through the early OpenXR bridge before normal SPF activation.
 
 ## Cabin controls
 
