@@ -246,10 +246,12 @@ bool PollMenuLaser(bool menu){
  bool hit=owner>=0 && hits[owner].hit;auto output=click.Step(hit,hit,0,0,hit?triggers[owner]:0,hit?sticks[owner*2+1]:0,dt);INPUT events[3]{};UINT count=0;
  static float gainX=1.5f,gainY=1.5f;static uint64_t gainPoll=0;if(now-gainPoll>=500 && !guideFile.empty()){gainPoll=now;auto gainFile=OpenDriverSetting(guideFile.parent_path()/"controller_menu_cursor_gain.txt");if(gainFile){std::string text((std::istreambuf_iterator<char>(gainFile)),{});ParseMenuCursorGain(text,gainX,gainY);}}
  RECT rect{};GetClientRect(window,&rect);auto motion=hit?cursor.Step(true,owner,hits[owner].u,hits[owner].v,rect.right,rect.bottom,dt,gainX,gainY):MenuCursorMotion::Output{};
- bool nativePositioned=hit && ApplyNativeMenuCursor(hits[owner].u,hits[owner].v);
- if(!nativePositioned && motion.anchor){POINT point{motion.x,motion.y};if(ClientToScreen(window,&point))SetCursorPos(point.x,point.y);}
+ // Accessory preview orbit consumes relative mouse movement while captured.
+ // Anchor on press, then avoid absolute warps until release.
+ bool nativePositioned=hit && (!click.down || output.button>0) && ApplyNativeMenuCursor(hits[owner].u,hits[owner].v);
+ if(!nativePositioned && motion.anchor && !click.down){POINT point{motion.x,motion.y};if(ClientToScreen(window,&point))SetCursorPos(point.x,point.y);}
 
- if(!nativePositioned && (motion.dx||motion.dy)){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dx=motion.dx;e.mi.dy=motion.dy;e.mi.dwFlags=MOUSEEVENTF_MOVE;}
+ if(!nativePositioned && output.button!=1 && (motion.dx||motion.dy)){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dx=motion.dx;e.mi.dy=motion.dy;e.mi.dwFlags=MOUSEEVENTF_MOVE;}
  if(output.button){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=output.button>0?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP;}if(output.wheel){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_WHEEL;e.mi.mouseData=static_cast<DWORD>(output.wheel*WHEEL_DELTA);}unsigned sent=count?SendInput(count,events,sizeof(INPUT)):0;static uint64_t lastReport=0;if(output.button || now-lastReport>=2000){lastReport=now;ReportMenuLaser(owner,hits[0].hit?1:0,hits[1].hit?1:0,triggers[0],triggers[1],output.button,sent,count);}return true;
 }
 }
