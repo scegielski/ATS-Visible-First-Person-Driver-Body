@@ -8,7 +8,9 @@
 #include <cstring>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 namespace {
+using EarlyMenuTick=void(__cdecl*)(int);EarlyMenuTick earlyMenuTick=nullptr;
 std::recursive_mutex mutex;PFN_xrGetInstanceProcAddr nextGet=nullptr;bool enabled=false;
 struct Context {
  XrInstance instance{};XrActionSet set{};XrAction actions[2]{},grip[2]{},trigger[2]{},mode[2]{},thumb[2]{},stick[2]{},haptic[2]{};XrPath touch{};int status=1;XrResult lastSync=XR_SESSION_NOT_FOCUSED;
@@ -45,8 +47,13 @@ XrResult XRAPI_CALL Attach(XrSession session,const XrSessionActionSetsAttachInfo
  std::vector<XrActionSet> sets;if(info->countActionSets)sets.assign(info->actionSets,info->actionSets+info->countActionSets);if(std::find(sets.begin(),sets.end(),c->set)==sets.end())sets.push_back(c->set);
  auto combined=*info;combined.countActionSets=static_cast<uint32_t>(sets.size());combined.actionSets=sets.data();auto result=c->attach(session,&combined);c->status=result;if(XR_SUCCEEDED(result))activeSession=session;return result;
 }
-XrResult XRAPI_CALL Sync(XrSession session,const XrActionsSyncInfo* info){std::lock_guard lock(mutex);auto c=sessions.at(session);if(!c->set || c->status<0)return c->sync(session,info);
- c->gameActive.clear();if(info->countActiveActionSets)c->gameActive.assign(info->activeActionSets,info->activeActionSets+info->countActiveActionSets);auto sets=c->gameActive;if(std::none_of(sets.begin(),sets.end(),[&](const auto& a){return a.actionSet==c->set;}))sets.push_back({c->set,XR_NULL_PATH});auto combined=*info;combined.countActiveActionSets=static_cast<uint32_t>(sets.size());combined.activeActionSets=sets.data();c->lastSync=c->sync(session,&combined);return c->lastSync;
+XrResult XRAPI_CALL Sync(XrSession session,const XrActionsSyncInfo* info){
+ XrResult result;{
+  std::lock_guard lock(mutex);auto c=sessions.at(session);if(!c->set || c->status<0)return c->sync(session,info);
+  c->gameActive.clear();if(info->countActiveActionSets)c->gameActive.assign(info->activeActionSets,info->activeActionSets+info->countActiveActionSets);auto sets=c->gameActive;if(std::none_of(sets.begin(),sets.end(),[&](const auto& a){return a.actionSet==c->set;}))sets.push_back({c->set,XR_NULL_PATH});auto combined=*info;combined.countActiveActionSets=static_cast<uint32_t>(sets.size());combined.activeActionSets=sets.data();result=c->lastSync=c->sync(session,&combined);
+ }
+ // Notify focus only; early controller work runs independently of the VR frame.
+ if(earlyMenuTick)earlyMenuTick(result==XR_SUCCESS?1:0);return result;
 }
 XrResult XRAPI_CALL GetProc(XrInstance instance,const char* name,PFN_xrVoidFunction* function){std::lock_guard lock(mutex);if(enabled && instance && instances.count(instance)){
  struct Entry {const char* name;PFN_xrVoidFunction function;};const Entry entries[]={{"xrCreateSession",reinterpret_cast<PFN_xrVoidFunction>(CreateSession)},{"xrDestroySession",reinterpret_cast<PFN_xrVoidFunction>(DestroySession)},{"xrDestroyInstance",reinterpret_cast<PFN_xrVoidFunction>(DestroyInstance)},{"xrAttachSessionActionSets",reinterpret_cast<PFN_xrVoidFunction>(Attach)},{"xrSyncActions",reinterpret_cast<PFN_xrVoidFunction>(Sync)},{"xrSuggestInteractionProfileBindings",reinterpret_cast<PFN_xrVoidFunction>(Suggest)}};
@@ -54,10 +61,22 @@ XrResult XRAPI_CALL GetProc(XrInstance instance,const char* name,PFN_xrVoidFunct
  return instances.at(instance)->get(instance,name,function);
  }return nextGet?nextGet(instance,name,function):XR_ERROR_FUNCTION_UNSUPPORTED;
 }
+void StartEarlyMenuHost(){
+#ifndef SPF_CONTROLLER_LAYER_TEST
+ static std::once_flag once;std::call_once(once,[]{
+  HMODULE self=nullptr;wchar_t path[MAX_PATH]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&StartEarlyMenuHost),&self)||!GetModuleFileNameW(self,path,MAX_PATH))return;
+  auto slash=wcsrchr(path,L'\\');if(!slash)return;wcscpy_s(slash+1,MAX_PATH-(slash+1-path),L"SPF_VisibleFirstPersonDriverBody.dll");
+  // Keep the module reference: the early menu trampolines live there even
+  // while SPF probes plugin manifests and temporarily unloads its own reference.
+  auto module=LoadLibraryExW(path,nullptr,LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR|LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);using Start=bool(__cdecl*)();auto start=module?reinterpret_cast<Start>(GetProcAddress(module,"SPF_StartEarlyMenuSupport")):nullptr;bool ready=start && start();if(ready)earlyMenuTick=reinterpret_cast<EarlyMenuTick>(GetProcAddress(module,"SPF_PollEarlyMenuSupport"));
+  slash=wcsrchr(path,L'\\');if(slash){wcscpy_s(slash+1,MAX_PATH-(slash+1-path),L"logs\\controller_menu_early.log");FILE* log=nullptr;if(!_wfopen_s(&log,path,L"a")){SYSTEMTIME t{};GetLocalTime(&t);std::fprintf(log,"%04u-%02u-%02u %02u:%02u:%02u early_menu_ready=%d\n",t.wYear,t.wMonth,t.wDay,t.wHour,t.wMinute,t.wSecond,ready?1:0);std::fclose(log);}}
+ });
+#endif
+}
 XrResult XRAPI_CALL CreateInstance(const XrInstanceCreateInfo* info,const XrApiLayerCreateInfo* layer,XrInstance* instance){
  if(!layer || !layer->nextInfo)return XR_ERROR_INITIALIZATION_FAILED;
  auto next=*layer;next.nextInfo=layer->nextInfo->next;nextGet=layer->nextInfo->nextGetInstanceProcAddr;auto result=layer->nextInfo->nextCreateApiLayerInstance(info,&next,instance);
- if(XR_SUCCEEDED(result)&&enabled){std::lock_guard lock(mutex);auto c=std::make_shared<Context>();c->instance=*instance;c->get=nextGet;if(c->Init())instances[*instance]=c;}
+ if(XR_SUCCEEDED(result)&&enabled){{std::lock_guard lock(mutex);auto c=std::make_shared<Context>();c->instance=*instance;c->get=nextGet;if(c->Init())instances[*instance]=c;}StartEarlyMenuHost();}
  return result;
 }
 }
@@ -90,6 +109,7 @@ extern "C" __declspec(dllexport) int __cdecl SPF_ControllerToggleFeedback(unsign
  XrHapticActionInfo info{XR_TYPE_HAPTIC_ACTION_INFO};info.action=c->haptic[side];XrHapticVibration pulse{XR_TYPE_HAPTIC_VIBRATION};pulse.duration=60000000;pulse.frequency=XR_FREQUENCY_UNSPECIFIED;pulse.amplitude=.6f;return c->vibrate(activeSession,&info,reinterpret_cast<const XrHapticBaseHeader*>(&pulse));
 }
 #ifdef SPF_CONTROLLER_LAYER_TEST
+extern "C" void SPF_TestSetEarlyMenuTick(EarlyMenuTick tick){earlyMenuTick=tick;}
 extern "C" void SPF_TestControllerLayer(PFN_xrGetInstanceProcAddr get,XrInstance instance,XrSession session){std::lock_guard lock(mutex);instances.clear();sessions.clear();auto c=std::make_shared<Context>();c->get=get;c->instance=instance;c->Init();instances[instance]=c;sessions[session]=c;enabled=true;}
 extern "C" XrResult SPF_TestControllerAttach(XrSession s,const XrSessionActionSetsAttachInfo* i){return Attach(s,i);}
 extern "C" XrResult SPF_TestControllerSync(XrSession s,const XrActionsSyncInfo* i){return Sync(s,i);}

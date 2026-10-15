@@ -17,3 +17,15 @@ Supported ATS builds now use the native input cursor and absolute-position event
 The curved panel follows the native mesh generator and renderer: angle is `2*(u-.5)/radius`, X is scaled by half width, Y by half height, and Z by full width. Its cross section is elliptical. Tests reconstruct rendered points across horizontal/vertical coordinates and several radii, then recover their UVs. The user confirmed alignment looks good in VR.
 
 Startup limitation: the observed launch began at 09:21:48; SPF preload finished at 09:22:19, SDK initialization began at 09:23:59, and our first menu surface appeared at 09:24:01. Native pointer updates followed within one second. Early menu startup is a separate follow-up.
+
+## Early menu startup (0.36.2)
+
+The existing in-process OpenXR bridge loads the adjacent driver DLL after successful instance creation, outside its input mutex. The DLL validates the executable hash and menu/cursor instruction bytes, then installs its two menu observation hooks using vendored MinHook 1.3.4. The bridge retains the DLL reference while SPF probes plugin manifests.
+
+Before SPF activation, a background thread handles controller poses, overlays, and menu input. The menu render callback only publishes the surface and consumes queued native cursor coordinates. Surface publication and cursor consumption do not wait on the worker. Cursor commands expire after 100ms. The sync callback only records focus, and input reads never add an OpenXR sync. SPF activation reuses the early-owned hooks and takes over polling; the worker exits. Explicit plugin unload stops early polling.
+
+The launcher prefers the installed bridge directory over development copies. Normal launch enables controller input. The diagnostic `-DisableControllerBridge` switch removes the explicit layer request and path and sets the manifest disable flag for that child process only.
+
+The user confirmed early pointers and clicks work and left-eye lag/tearing are absent after a full SteamVR restart with the latest paired binaries. Earlier comparisons without restarting SteamVR were inconclusive; one attempted bridge-disabled run still loaded the bridge because an explicit layer request remained. A corrected diagnostic run was verified bridge-free. The final enabled run was verified to load both DLLs from the installed directory. This establishes the tested working state, not a definitive cause for the previous stereo issue. If stereo timing remains disturbed across ATS restarts, fully exit and restart SteamVR before comparing builds.
+
+The early startup log is `logs/controller_menu_early.log`. In the final test, early host readiness, surface capture, and native cursor updates occurred before SPF plugin activation. All three regression suites pass, covering native geometry, cursor command freshness/consumption, bridge sync and focus behavior, and menu hook installation/restoration. The unsupported-host guard was also checked. Cabin behavior after loading a save still needs separate coverage for this startup revision.

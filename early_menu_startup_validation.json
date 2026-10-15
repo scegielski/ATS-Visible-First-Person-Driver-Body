@@ -1,0 +1,39 @@
+{
+  "prototype": "0.36.2 background early menu polling",
+  "previous_checkpoint_committed": true,
+  "tests": [
+    "DriverDiagnosticRegression passed",
+    "ControllerLayerRegression passed",
+    "EarlyMenuHookRegression passed",
+    "Unsupported host rejects early hooks"
+  ],
+  "installed": true,
+  "runtime_observation": {
+    "process_start": "09:29:33",
+    "early_host_ready": "09:29:38",
+    "first_surface_and_poll": "09:29:40",
+    "first_native_cursor_event": "09:29:47",
+    "spf_reuses_early_hooks": "09:29:52",
+    "native_cursor_after_handoff": "09:29:52",
+    "final_test": {
+      "steamvr_fully_stopped_and_restarted": true,
+      "installed_module_paths_verified": true,
+      "early_host_ready": "09:45:57",
+      "first_surface": "09:45:59",
+      "first_native_cursor_event": "09:46:04"
+    }
+  },
+  "pending": [
+    "Cabin controls after loading save for this startup revision"
+  ],
+  "framework_modified": false,
+  "additional_process": false,
+  "user_validation": "After a full SteamVR restart, user confirms left-eye lag and tearing are gone and early pointers/clicks behave normally in the menu.",
+  "change": "Bridge sync only notifies focus. Early polling runs on a background thread until SPF activation; native cursor commands are transferred to the game thread with a 100ms freshness limit. Surface publication uses a nonblocking lock.",
+  "diagnostic_limitations": [
+    "Early baseline comparisons had launcher bridge-path ambiguity",
+    "Initial disabled-layer test remained active due explicit request; corrected run verified absent",
+    "Restarting ATS alone did not clear the reported stereo issue; full SteamVR restart preceded the successful final test",
+    "Root cause of previous persistent stereo state not conclusively established"
+  ]
+}

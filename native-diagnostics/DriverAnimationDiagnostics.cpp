@@ -1,3 +1,6 @@
+#include "EarlyMenuCursor.hpp"
+#include <thread>
+#include "vendor/minhook/include/MinHook.h"
 #include "NativeMenuCursor.hpp"
 #include <Windows.h>
 #include <bcrypt.h>
@@ -137,7 +140,7 @@ const SPF_Load_API* load=nullptr;
 SPF_Logger_Handle* logger=nullptr;
 SPF_Hook_Handle* driverHook=nullptr;
 SPF_Hook_Handle* advanceHook=nullptr;
-std::atomic<bool> enabled{false};
+std::atomic<bool> enabled{false};std::atomic<bool> earlyMenuOwned{false};std::atomic<bool> earlyMenuStopped{false};
 uintptr_t expectedReturn=0;
 using ResetAnimation=uint32_t (*)(uintptr_t,uint32_t,uint32_t);
 using EnableAnimation=void (*)(uintptr_t,uint32_t,bool);
@@ -171,6 +174,10 @@ std::atomic<uint64_t> worldGeneration{1};
 thread_local uint64_t currentGeneration=0;
 void Log(SPF_LogLevel level,const char* text) {
  if(load && load->logger && logger) load->logger->Log(logger,level,text);
+}
+void EarlyMenuTrace(const char* message) noexcept {
+ HMODULE self=nullptr;wchar_t path[MAX_PATH]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&EarlyMenuTrace),&self)||!GetModuleFileNameW(self,path,MAX_PATH))return;
+ auto slash=wcsrchr(path,L'\\');if(!slash)return;wcscpy_s(slash+1,MAX_PATH-(slash+1-path),L"logs\\controller_menu_early.log");FILE* file=nullptr;if(!_wfopen_s(&file,path,L"a")){SYSTEMTIME t{};GetLocalTime(&t);std::fprintf(file,"%04u-%02u-%02u %02u:%02u:%02u %s\n",t.wYear,t.wMonth,t.wDay,t.wHour,t.wMinute,t.wSecond,message);std::fclose(file);}
 }
 bool SafeRead(uintptr_t address,void* output,size_t size) noexcept {
  if(!address || !output || size>4096) return false;
@@ -270,7 +277,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.35.1");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.36.2");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -288,9 +295,11 @@ void OnLoad(const SPF_Load_API* api) {
 }
 extern "C" {void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;void MenuModeObserveStub();void MenuSurfaceObserveStub();}
 extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept {char text[192];std::snprintf(text,sizeof(text),"MENU_LASER owner=%d hit=%d,%d trigger=%.3f,%.3f button=%d mouse_events=%u/%u",owner,leftHit,rightHit,leftTrigger,rightTrigger,button,sent,requested);Log(SPF_LOG_INFO,text);}
+std::atomic<bool> earlyMenuFocused{false};EarlyMenuCursor earlyCursor;thread_local bool earlyMenuWorker=false;
 using NativeCursorEmit=void(__fastcall*)(uintptr_t,uint64_t,const NativeMenuCursorEvent*);NativeCursorEmit nativeCursorEmit=nullptr;
 extern "C" bool ApplyNativeMenuCursor(float u,float v) noexcept {
- if(!enabled.load() || !nativeCursorEmit)return false;
+ if(earlyMenuWorker)return earlyCursor.Publish(u,v,GetTickCount64());
+ if((!enabled.load() && (!earlyMenuOwned.load() || earlyMenuStopped.load())) || !nativeCursorEmit)return false;
  auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t inputRoot=0,input=0,vt=0,window=0;unsigned char alternate=0;float rect[4]{};NativeMenuCursorEvent event;
  if(!SafeRead(base+0x368de98,&inputRoot,8)||!SafeRead(inputRoot+0x100,&input,8)||!SafeRead(input,&vt,8)||vt!=base+0x2204e88||!SafeRead(input+0x170,&window,8)||!window||!SafeRead(base+0x368e14c,&alternate,1)||!SafeRead(base+(alternate?0x2d0a1f8:0x2d0a1e8),rect,sizeof(rect))||!BuildNativeMenuCursorEvent(u,v,rect,event))return false;
  __try {
@@ -299,16 +308,44 @@ extern "C" bool ApplyNativeMenuCursor(float u,float v) noexcept {
   *reinterpret_cast<unsigned char*>(input+0x335)=1;*reinterpret_cast<unsigned char*>(input+0x336)=1;
   nativeCursorEmit(input,0,&event);
  } __except(EXCEPTION_EXECUTE_HANDLER){return false;}
+ static std::atomic<bool> firstNative{false};if(earlyMenuOwned.load() && !enabled.load() && !firstNative.exchange(true))EarlyMenuTrace("first early native cursor event");
  static uint64_t report=0;auto now=GetTickCount64();if(now-report>=2000){report=now;char text[180];std::snprintf(text,sizeof(text),"MENU_NATIVE_CURSOR uv=%.3f,%.3f position=%.1f,%.1f viewport=%.0f,%.0f",u,v,event.x,event.y,rect[1]-rect[0],rect[2]-rect[3]);Log(SPF_LOG_INFO,text);}return true;
 }
+std::atomic<bool> earlyMenuGame{false};
 thread_local bool nativeMenuGame=false;
-extern "C" void CaptureMenuMode(uint32_t inGame) noexcept {nativeMenuGame=(inGame&255)!=0;}
+extern "C" void CaptureMenuMode(uint32_t inGame) noexcept {nativeMenuGame=(inGame&255)!=0;earlyMenuGame.store(nativeMenuGame);}
 extern "C" void CaptureMenuSurface(uintptr_t frame) noexcept {
  float transform[8]{},size[2]{},eye[3]{};if(!SafeRead(frame-0x28,transform,sizeof(transform)) || !SafeRead(frame-0x60,size,sizeof(size)) || !SafeRead(frame-0x40,eye,sizeof(eye)))return;RemoveMenuEyeOffset(transform,eye);
  using FloatQuery=float(__fastcall*)(uintptr_t);auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));float radius=reinterpret_cast<FloatQuery>(base+0x1dc850)(base+(nativeMenuGame?0x2d47d10:0x2d47bd0));
  PublishControllerMenuSurface(transform,size,radius);
+ if(earlyMenuOwned.load() && !enabled.load() && earlyMenuFocused.load()){float u=0,v=0;if(earlyCursor.Take(u,v,GetTickCount64()))ApplyNativeMenuCursor(u,v);}
+ if(earlyMenuOwned.load() && !earlyMenuStopped.load() && !enabled.load()){static std::atomic<bool> firstSurface{false};if(!firstSurface.exchange(true))EarlyMenuTrace("first early menu surface; capture only");}
  static uint64_t lastLog=0;auto now=GetTickCount64();if(now-lastLog>=2000){lastLog=now;char text[256];std::snprintf(text,sizeof(text),"MENU_SURFACE game=%d center=%.3f,%.3f,%.3f q=%.3f,%.3f,%.3f,%.3f size=%.3f,%.3f radius=%.3f",nativeMenuGame?1:0,transform[0],transform[1],transform[2],transform[4],transform[5],transform[6],transform[7],size[0],size[1],radius);Log(SPF_LOG_INFO,text);}
 
+}
+extern "C" __declspec(dllexport) void SPF_PollEarlyMenuSupport(int focused) {
+ earlyMenuFocused.store(focused!=0);
+}
+// Called by the OpenXR bridge after instance creation, outside its input lock.
+// Own one set of menu hooks for this DLL's process lifetime; SPF later reuses it.
+extern "C" __declspec(dllexport) bool SPF_StartEarlyMenuSupport() {
+ static std::mutex startMutex;std::lock_guard lock(startMutex);if(earlyMenuOwned.load())return true;
+ char hash[65]{};if(!HashExecutable(hash)||std::strcmp(hash,kHash)!=0)return false;
+ auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+ const unsigned char modeCode[]{0x0f,0x28,0xd8,0x48,0x8d,0x4d,0x8c,0x0f,0x57,0xc9,0xf3,0x0f,0x11,0x9d,0,9,0,0};
+ const unsigned char surfaceCode[]{0x45,0x8b,0xc6,0x48,0x8d,0x55,0xd4,0x48,0x8b,0xce,0xe8};
+ const unsigned char cursorCode[]{0x48,0x89,0x5c,0x24,0x10,0x48,0x89,0x6c,0x24,0x18,0x48,0x89,0x74,0x24,0x20,0x57,0x41,0x54,0x41,0x56};
+ unsigned char actual[sizeof(modeCode)]{};if(!SafeRead(base+0x42c826,actual,sizeof(modeCode))||std::memcmp(actual,modeCode,sizeof(modeCode)))return false;
+ if(!SafeRead(base+0x42d144,actual,sizeof(surfaceCode))||std::memcmp(actual,surfaceCode,sizeof(surfaceCode)))return false;
+ unsigned char cursorActual[sizeof(cursorCode)]{};if(!SafeRead(base+0x269650,cursorActual,sizeof(cursorCode))||std::memcmp(cursorActual,cursorCode,sizeof(cursorCode)))return false;
+ auto status=MH_Initialize();if(status!=MH_OK && status!=MH_ERROR_ALREADY_INITIALIZED)return false;
+ void* mode=reinterpret_cast<void*>(base+0x42c826);void* surface=reinterpret_cast<void*>(base+0x42d144);
+ if(MH_CreateHook(mode,reinterpret_cast<void*>(MenuModeObserveStub),&gMenuModeOriginal)!=MH_OK)return false;
+ if(MH_CreateHook(surface,reinterpret_cast<void*>(MenuSurfaceObserveStub),&gMenuSurfaceOriginal)!=MH_OK){MH_RemoveHook(mode);return false;}
+ nativeCursorEmit=reinterpret_cast<NativeCursorEmit>(base+0x269650);earlyMenuStopped.store(false);earlyMenuOwned.store(true);
+ MH_QueueEnableHook(mode);MH_QueueEnableHook(surface);if(MH_ApplyQueued()!=MH_OK){earlyMenuOwned.store(false);MH_DisableHook(mode);MH_DisableHook(surface);MH_RemoveHook(mode);MH_RemoveHook(surface);nativeCursorEmit=nullptr;return false;}
+ std::thread([]{earlyMenuWorker=true;while(!earlyMenuStopped.load() && !enabled.load()){PollControllerMenuMouse(earlyMenuFocused.load() && !earlyMenuGame.load());std::this_thread::sleep_for(std::chrono::milliseconds(8));}earlyMenuWorker=false;}).detach();
+ return true;
 }
 using RadioStationFn=void(__fastcall*)(uintptr_t,unsigned char);using RadioVolumeFn=void(__fastcall*)(uintptr_t,float);RadioStationFn nativeRadioStation=nullptr;RadioVolumeFn nativeRadioVolume=nullptr;using RadioSelectFn=void(__fastcall*)(uintptr_t,uint64_t);RadioSelectFn nativeRadioSelect=nullptr;using RadioPauseFn=void(__fastcall*)(uintptr_t);RadioPauseFn nativeRadioPause=nullptr;RadioPauseFn nativeRadioInitialize=nullptr;
 using WiperCountFn=uint64_t(__fastcall*)(uintptr_t);using WiperSetFn=void(__fastcall*)(uintptr_t,uint32_t);WiperCountFn nativeWiperCount=nullptr;WiperSetFn nativeWiperSet=nullptr;
@@ -341,7 +378,8 @@ void Activated(const SPF_Core_API* api) {
  else Log(SPF_LOG_WARN,"HEAD_RECENTER native input-site signature mismatch; observer disabled.");
  constexpr char menuModePattern[]="0F 28 D8 48 8D 4D 8C 0F 57 C9 F3 0F 11 9D 00 09 00 00";
  constexpr char menuSurfacePattern[]="45 8B C6 48 8D 55 D4 48 8B CE E8 ?? ?? ?? ?? 48 8D 8D A0 03 00 00";
- if(hooks->Hook_FindPattern(menuModePattern)==base+0x42c826 && hooks->Hook_FindPattern(menuSurfacePattern)==base+0x42d144){hooks->Hook_Register(kName,"MenuMode","Observe VR menu context",reinterpret_cast<void*>(MenuModeObserveStub),&gMenuModeOriginal,menuModePattern,true);hooks->Hook_Register(kName,"MenuSurface","Observe final VR menu surface with eye translation removed",reinterpret_cast<void*>(MenuSurfaceObserveStub),&gMenuSurfaceOriginal,menuSurfacePattern,true);}else Log(SPF_LOG_WARN,"MENU_LASER surface signatures unavailable; air mouse retained.");
+ if(earlyMenuOwned.load())Log(SPF_LOG_INFO,"MENU_EARLY reusing early-owned menu hooks; framework polling takes over on activation.");
+ else if(hooks->Hook_FindPattern(menuModePattern)==base+0x42c826 && hooks->Hook_FindPattern(menuSurfacePattern)==base+0x42d144){hooks->Hook_Register(kName,"MenuMode","Observe VR menu context",reinterpret_cast<void*>(MenuModeObserveStub),&gMenuModeOriginal,menuModePattern,true);hooks->Hook_Register(kName,"MenuSurface","Observe final VR menu surface with eye translation removed",reinterpret_cast<void*>(MenuSurfaceObserveStub),&gMenuSurfaceOriginal,menuSurfacePattern,true);}else Log(SPF_LOG_WARN,"MENU_LASER surface signatures unavailable; air mouse retained.");
  constexpr char cursorEmitPattern[]="48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 56 48 83 EC 70 48 8D B1 98 00 00 00";
  if(hooks->Hook_FindPattern(cursorEmitPattern)==base+0x269650)nativeCursorEmit=reinterpret_cast<NativeCursorEmit>(base+0x269650);else Log(SPF_LOG_WARN,"MENU_NATIVE_CURSOR signature unavailable; relative input retained.");
  expectedReturn=base+0x9e2552;
@@ -660,7 +698,7 @@ void Update() {
   Log(SPF_LOG_INFO,text);
  }
 }
-void Unload() { nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
+void Unload() { earlyMenuStopped.store(true); nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.
