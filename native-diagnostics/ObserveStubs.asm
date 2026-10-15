@@ -171,6 +171,7 @@ NativeRecenterObserveStub PROC FRAME
  mov edx, ecx
  mov rcx, r12
  call CaptureNativeRecenter
+ mov byte ptr [rsp+28h], al
  movdqu xmm0, [rsp+60h]
  movdqu xmm1, [rsp+70h]
  movdqu xmm2, [rsp+80h]

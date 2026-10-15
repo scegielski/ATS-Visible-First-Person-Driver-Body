@@ -97,7 +97,7 @@ LiveGesturePose liveGesturePose;
 LiveGesturePose liveSignalLeft{kSignalLeftTargets},liveSignalRight{kSignalRightTargets};
 SPF_Hook_Handle* nativeRecenterHook=nullptr;
 constexpr char kNativeRecenterPattern[]="84 C9 74 76 49 8B 8C 24 08 0E 00 00 48 85 C9 74 06 48 8B 01 FF 50 58 48 8D 45";
-std::atomic<uint64_t> nativeRecenterSequence{0},nativeRecenterTick{0};NativeRecenterGate nativeRecenterGate;
+std::atomic<uint64_t> nativeRecenterSequence{0},nativeRecenterTick{0},controllerRecenterTick{0};NativeRecenterGate nativeRecenterGate,recenterFeedbackGate;
 SPF_Hook_Handle* headHook=nullptr;
 SPF_Hook_Handle* controllerAttachHook=nullptr;
 constexpr char kControllerAttachPattern[]="FF 96 38 01 00 00 8B D8 85 C0 79 58 48 8B 46 58 48 85 C0";
@@ -242,7 +242,7 @@ void TruckSignals(const SPF_TruckData* data,void*) {
 }
 void Reset() {
  ResetIntegratedAdjustments();
- headCalibration.Reset();nativeRecenterGate={nativeRecenterSequence.load(),0,0};{std::lock_guard lock(headDriveMutex);headDrive={};}
+ controllerRecenterTick.store(0);headCalibration.Reset();nativeRecenterGate={nativeRecenterSequence.load(),0,0};recenterFeedbackGate={nativeRecenterSequence.load(),0,0};{std::lock_guard lock(headDriveMutex);headDrive={};}
  {std::lock_guard lock(signalGateMutex);signalGate.Cancel();}
  signalReady.store(0);skipSignalDirection.store(0);signalCancels.fetch_add(1);
  {std::lock_guard lock(engineGateMutex);engineStartGate.Cancel();}
@@ -581,6 +581,9 @@ void UpdateHeadTorso() {
  const bool interior=bodyCameraValid.load() && bodyCameraType.load()==2;
  const bool cameraKnown=bodyCameraValid.load() && bodyCameraType.load()>=0 && bodyCameraType.load()<=9;
  const bool fresh=cameraKnown && pose.tick && now-pose.tick<=250 && (pose.flags&15)==15 && controls && now-controls<=250 && body && now-body<=250;
+ const bool headFresh=pose.tick&&now>=pose.tick&&now-pose.tick<=250&&(pose.flags&15)==15;
+ recenterFeedbackGate.Observe(nativeRecenterSequence.load(),nativeRecenterTick.load());
+ if(recenterFeedbackGate.Consume(now,pose.tick,headFresh)){PlayVRRecenterFeedback();Log(SPF_LOG_INFO,"HEAD_RECENTER spoken confirmation from fresh headset pose, independent of cabin.");}
  nativeRecenterGate.Observe(nativeRecenterSequence.load(),nativeRecenterTick.load());
  bool recenter=nativeRecenterGate.Consume(now,pose.tick,fresh);
  if(recenter){ResetControllerMarkerFrame();Log(SPF_LOG_INFO,"HEAD_RECENTER native action applied from fresh post-request pose.");}
@@ -922,11 +925,16 @@ extern "C" void CaptureRadioInput(uintptr_t context) noexcept {
  }
  if(command.volume!=0)nativeRadioVolume(context,command.volume);
 }
-extern "C" void CaptureNativeRecenter(uintptr_t inputOwner,uint32_t requested) noexcept {
- if(!enabled.load() || !(requested&255u) || !inputOwner)return;
- uintptr_t input=0;if(!SafeRead(inputOwner+0xbd8,&input,sizeof(input)) || !input)return;
- nativeRecenterTick.store(GetTickCount64());nativeRecenterSequence.fetch_add(1);
- Log(SPF_LOG_INFO,"HEAD_RECENTER native ATS head-reset action observed.");
+extern "C" bool RequestControllerHeadReset() noexcept {
+ if(!enabled.load()||!nativeRecenterHook){Log(SPF_LOG_WARN,"HEAD_RECENTER controller request unavailable before native hook activation.");return false;}
+ controllerRecenterTick.store(GetTickCount64());Log(SPF_LOG_INFO,"HEAD_RECENTER right B double press queued for ATS native reset.");return true;
+}
+extern "C" uint32_t CaptureNativeRecenter(uintptr_t inputOwner,uint32_t requested) noexcept {
+ if(!enabled.load()||!inputOwner)return requested;
+ uintptr_t input=0;if(!SafeRead(inputOwner+0xbd8,&input,sizeof(input))||!input)return requested;
+ requested=MergeControllerHeadReset(requested,controllerRecenterTick.exchange(0),GetTickCount64());
+ if(requested&255u){nativeRecenterTick.store(GetTickCount64());nativeRecenterSequence.fetch_add(1);Log(SPF_LOG_INFO,"HEAD_RECENTER native ATS head-reset action observed.");}
+ return requested;
 }
 extern "C" void CaptureHeadViews(uintptr_t pointer,uint32_t count,uint64_t flags,int32_t result,uintptr_t info) noexcept {
  if(!enabled.load())return;

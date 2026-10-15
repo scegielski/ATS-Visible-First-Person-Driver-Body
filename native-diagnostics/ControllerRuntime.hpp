@@ -35,3 +35,5 @@ void QueueControllerRadioTuneSound();
 void QueueControllerRadioClickSound(bool playing);
 
 void PollControllerMenuMouse(bool menu);
+
+void PlayVRRecenterFeedback();

@@ -1,6 +1,6 @@
 {
   "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
-  "sha256": "9b9ea9ac9c6345169007ba38100dcac40f06ee7cca67432b12ce7aa9e2186ba0",
+  "sha256": "2a35d3c7fca2c014f5e43f70e8b212cc77c055af679d0abb32cdc17b767cfafb",
   "payload": {
     "version": "0.39.2",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
@@ -9,7 +9,7 @@
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "1c0952b44276451c60e4c2d6956f1e30e8c7659b4bef060d78e9cd49f3a0eb8c",
+        "sha256": "182052a655ae399c6e14c4566bfe7dd1a410b75ef6b9625be5096681f1c999cf",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -202,6 +202,14 @@
         "destination": "plugin",
         "target": "sounds/controller_right_ring.wav",
         "sha256": "5c54075cf1f70da9cb50563b9b84ddb4369ae6bf190353411fd67439f5ab1f9c",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_vr_recenter.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_vr_recenter.wav",
+        "sha256": "17d6e04a9a46863753f688da9259000111d269c0ac23590b8ecb155bfe559b5d",
         "mutable": false,
         "onlyIfMissing": false
       },

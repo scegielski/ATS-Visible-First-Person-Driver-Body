@@ -102,7 +102,8 @@ extern "C" bool CaptureEngineRequest(uintptr_t vehicle,uint32_t request,uint32_t
 extern "C" unsigned char CaptureSignalRequest(uintptr_t vehicle,uint32_t side,uint32_t input) noexcept {Check(vehicle==123 && side==signalTestSide && input==0x55667701,"signal mid-function callback arguments");return signalReplacement;}
 extern "C" uint64_t RecenterTestEntry(uintptr_t,uint64_t);
 extern "C" void RecenterTestContinuation();
-extern "C" void CaptureNativeRecenter(uintptr_t owner,uint32_t request) noexcept {Check(owner==123 && request==0x55667701,"native recenter observer callback arguments");}
+uint32_t recenterExpected=0x55667701;unsigned char recenterReplacement=1;
+extern "C" uint32_t CaptureNativeRecenter(uintptr_t owner,uint32_t request) noexcept {Check(owner==123 && request==recenterExpected,"native recenter observer callback arguments");return recenterReplacement;}
 extern "C" uintptr_t HeadTestEntry(uintptr_t,uint32_t,uint64_t,int32_t);
 extern "C" void HeadTestContinuation();
 extern "C" void CaptureHeadViews(uintptr_t views,uint32_t count,uint64_t flags,int32_t result,uintptr_t locate) noexcept {
@@ -274,7 +275,13 @@ int main() {
  ControllerHand button;button.Button(true,100,true);Check(button.enabled && button.calibrate,"controller first thumbstick press enables calibration");button.Button(true,200,true);Check(button.enabled,"held click does not toggle repeatedly");button.Button(false,300,true);button.Button(true,400,true);Check(!button.enabled,"second click disables independently");button.Button(true,1200,true);Check(button.enabled && button.calibrate,"long hold recalibrates and enables");
 
  gRecenterOriginal=reinterpret_cast<void*>(RecenterTestContinuation);Check(RecenterTestEntry(123,0x1122334455667701ull)==0x1122334455667701ull,"recenter observer leaves native edge register unchanged");
+ recenterExpected=0x55667700;Check(RecenterTestEntry(123,0x1122334455667700ull)==0x1122334455667701ull,"controller reset changes only native boolean byte and preserves upper register");
+ Check(MergeControllerHeadReset(0,100,200)==1&&MergeControllerHeadReset(1,0,200)==1,"controller reset merges with native reset without dropping user input");Check(MergeControllerHeadReset(0,100,601)==0&&MergeControllerHeadReset(0,300,200)==0,"stale or future controller reset is rejected");
+
  Check(GestureLookPitch({.9659258f,.258819f,0,0})>.5f && GestureLookPitch({.9659258f,-.258819f,0,0})<-.5f,"upward and downward head pitch signs follow tracked look");
+ NativeRecenterGate titleFeedback,cabinCalibration;titleFeedback.Observe(1,100);cabinCalibration.Observe(1,100);
+ Check(titleFeedback.Consume(120,110,true)&&!cabinCalibration.Consume(120,110,false),"title reset speaks from fresh head pose without a body or driving telemetry");
+ Check(!titleFeedback.Consume(130,125,true),"title confirmation occurs only once");Check(cabinCalibration.Consume(140,135,true)&&!titleFeedback.Consume(140,135,true),"later body calibration does not repeat recenter speech");
  NativeRecenterGate nativeCalibration;nativeCalibration.Observe(1,100);
  Check(!nativeCalibration.Consume(100,100,true),"recenter waits beyond pre-request pose");
  Check(!nativeCalibration.Consume(120,110,false),"invalid tracking cannot recalibrate");

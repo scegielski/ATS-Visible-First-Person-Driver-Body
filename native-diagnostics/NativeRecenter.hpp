@@ -8,3 +8,7 @@ struct NativeRecenterGate {
   if(!fresh || poseTick<=requested)return false;pending=0;return true;
  }
 };
+
+inline uint32_t MergeControllerHeadReset(uint32_t nativeRequest,uint64_t controllerTick,uint64_t now){
+ return controllerTick&&now>=controllerTick&&now-controllerTick<=500?nativeRequest|1u:nativeRequest;
+}

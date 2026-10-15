@@ -1,14 +1,14 @@
 {
   "native_suites_passed": 6,
   "installer_lifecycle": "Passed lifecycle plus old vehicle-section migration, retired INI removal, reinstall and uninstall preservation",
-  "payload_integrity": "41 payload files; general defaults embedded; Mustang poses and boxes live; all WAVs in sounds",
+  "payload_integrity": "42 payload files; embedded general defaults, live Mustang poses/boxes, all audio in sounds",
   "installer": "releases/installer/SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
   "live_installer_test": "User installed; disabled SPF state prevented cabin activation. Live enable/disable exposed runtime shutdown crash; revised DLL installed for VR retest.",
   "integrated_adjustment_vr_test": "pending",
   "installed_game_modified_by_installer": true,
   "committed": true,
-  "installer_sha256": "9b9ea9ac9c6345169007ba38100dcac40f06ee7cca67432b12ce7aa9e2186ba0",
-  "payload_files": 41,
+  "installer_sha256": "2a35d3c7fca2c014f5e43f70e8b212cc77c055af679d0abb32cdc17b767cfafb",
+  "payload_files": 42,
   "steam_policy": "Steam launch options are not read or modified; Steam may remain open; working OpenXR VR configuration is a prerequisite",
   "configuration": "General settings embedded in DLL; Mustang poses and boxes in separate live INIs; SPF-owned settings.json",
   "footprint": "Plugin-local .setup helper/uninstaller/record; optional backups only for changed originals; no persistent payload, separate Program Files manager, or ProgramData state",
@@ -21,5 +21,6 @@
   "accessory_menu_drag": "User confirmed held-trigger dragging works in accessory preview; six native suites pass; revised DLL installed",
   "menu_right_drag": "Restored 150ms delay installed with menu shortcut build; 8px movement threshold retained",
   "map_detection": "Runtime widget type observed on world map and absent on accessory screen; exact supported executable only",
-  "menu_shortcuts": "User confirmed Enter and Escape work in cabin and menus; distinct successful key-down clicks added; six suites and WAV format checks pass"
+  "menu_shortcuts": "User confirmed Enter and Escape work in cabin and menus; distinct successful key-down clicks added; six suites and WAV format checks pass",
+  "controller_recenter": "User confirmed right B recenter and spoken VR recenter cue, including title screen. Independent fresh-head gate avoids body requirement and duplicate speech; six suites pass; installed"
 }

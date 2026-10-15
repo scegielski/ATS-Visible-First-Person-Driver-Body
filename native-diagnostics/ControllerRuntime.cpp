@@ -231,6 +231,7 @@ Tracked MenuAimPose(vr::TrackedDeviceIndex_t device,const vr::TrackedDevicePose_
 void UpdateCabinControllerModels(const vr::TrackedDevicePose_t* poses){
  std::array<ControllerMeshPose,64> modelPoses{};for(unsigned side=0;side<2;++side){cabinLaserReady[side]=false;auto index=systemVR?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;if(!head.valid || index>=vr::k_unMaxTrackedDeviceCount || !hands[side].valid || controls[side].enabled){HideControllerPointer(side);continue;}controllerAim[side]=MenuAimPose(index,poses[index]);cabinModelReady[side]=ShowMenuControllerModel(side,index,poses[index],head,modelPoses);bool fresh=GetTickCount64()-cabinLaserTick[side]<250;cabinLaserReady[side]=ShowControllerPointer(side,controllerAim[side],head,fresh?cabinLaserDistance[side]:2.f,fresh && cabinLaserHit[side]);}SubmitMenuModelPoses(modelPoses);
 }
+extern "C" bool RequestControllerHeadReset() noexcept;
 extern "C" bool IsWorldMapMenuActive() noexcept;
 void PlayKeyboardShortcutSound(bool enter){
  static const auto folder=[]{HMODULE module=nullptr;wchar_t path[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PlayKeyboardShortcutSound),&module)||!GetModuleFileNameW(module,path,32768))return std::filesystem::path{};return std::filesystem::path(path).parent_path()/"sounds";}();
@@ -245,12 +246,13 @@ void UpdateMenuKeys(bool active,bool x,bool y,bool enter,bool escape,uint64_t no
 }
 // Keyboard shortcuts apply to the focused game, independent of menu surface or hand IK.
 void PollControllerShortcuts(bool permitted){
- static MenuDoublePress enterPress,escapePress;
+ static MenuDoublePress enterPress,escapePress,recenterPress;
  DWORD process=0;GetWindowThreadProcessId(GetForegroundWindow(),&process);
  bool pressed[2]{},mode[2]{},thumb[2]{};float grips[2]{},triggers[2]{},inward[2]{};
  bool valid=permitted&&process==GetCurrentProcessId()&&PollNativeControllerButtons(pressed,grips,triggers,mode,thumb,inward);
  auto now=GetTickCount64();bool enter=enterPress.Step(valid,mode[0],now),escape=escapePress.Step(valid,thumb[0],now);
  UpdateMenuKeys(valid,mode[0],thumb[0],enter,escape,now);
+ if(recenterPress.Step(valid,thumb[1],now))RequestControllerHeadReset();
 }
 bool PollMenuLaser(bool menu){
  using namespace DriverIK;static ControllerMenuMouse click,rightClick;static MenuButtonRoute buttons;static MenuCursorMotion cursor;static IgnitionTriggerGate choose[2],chooseGrip[2];static int owner=-1;static uint64_t last=0;auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
@@ -288,3 +290,10 @@ void PublishControllerMenuSurface(const float* transform,const float* size,float
 
 // Menu input is exclusively laser-based; grip is reserved for right click/drag.
 void PollControllerMenuMouse(bool menu){std::lock_guard lock(guard);PollControllerShortcuts(true);PollMenuLaser(menu);}
+
+void PlayVRRecenterFeedback(){
+ HMODULE module=nullptr;wchar_t path[32768]{};
+ if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PlayVRRecenterFeedback),&module)||!GetModuleFileNameW(module,path,32768))return;
+ auto sound=std::filesystem::path(path).parent_path()/"sounds"/"controller_vr_recenter.wav";
+ PlaySoundW(sound.c_str(),nullptr,SND_FILENAME|SND_ASYNC|SND_NODEFAULT);
+}
