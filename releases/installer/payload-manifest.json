@@ -1,0 +1,323 @@
+{
+  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
+  "sha256": "5f616d6047ea2f63722d5aea74a154bf07537b089e1f38eaa744e713563988f0",
+  "payload": {
+    "version": "0.39.2",
+    "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
+    "files": [
+      {
+        "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
+        "destination": "plugin",
+        "target": "SPF_VisibleFirstPersonDriverBody.dll",
+        "sha256": "4c9f79dee05e19ff043d5a5d23953fc515942fa33de4df7ea0b430099ce96282",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/spf_controller_xr_layer.dll",
+        "destination": "plugin",
+        "target": "spf_controller_xr_layer.dll",
+        "sha256": "c8bd7882c8ab274a2d7b93099735c1ffa858715c45b11a79a5ec30e63f317bb5",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/spf_controller_openvr.dll",
+        "destination": "plugin",
+        "target": "spf_controller_openvr.dll",
+        "sha256": "e61701f75930b4c47615d17f5901ca62edf1a948f5ea804d4cbbdc94ad2e6e2e",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/OPENVR_LICENSE.txt",
+        "destination": "plugin",
+        "target": "OPENVR_LICENSE.txt",
+        "sha256": "f56ff606104d4ef18e617921a75c73ad73b5a1a1d70c69590c29de16919e04ad",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/OPENXR_LICENSE.txt",
+        "destination": "plugin",
+        "target": "OPENXR_LICENSE.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/config/mustang_boxes.ini",
+        "destination": "plugin",
+        "target": "config/mustang_boxes.ini",
+        "sha256": "7ae657ee6fde61a02d68919a80a8f4650000162ce5cca92e6d4c79ee3a2d8803",
+        "mutable": true,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/config/mustang_poses.ini",
+        "destination": "plugin",
+        "target": "config/mustang_poses.ini",
+        "sha256": "2699ac82f0664b09867eebd80f1114d458f86cbf0b98f376657b9332970f6d7f",
+        "mutable": true,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_finger_added.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_finger_added.wav",
+        "sha256": "446d930673d3bacf5d4248459cb5a1c7dfcfac7ede2bb5a5e40629ed66de2e7f",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_finger_removed.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_finger_removed.wav",
+        "sha256": "1225d95847ccf9c33d93ef4ff5b5b765944eff6e8f7f5eb94d74ff7d68854fd4",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_hand_disengaged.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_hand_disengaged.wav",
+        "sha256": "85b5d9fd45c15d061d79e02414407a8edf154d1453bc7a0aeea8083f7d91f9f0",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_hand_engaged.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_hand_engaged.wav",
+        "sha256": "ded9eb15d23c6067d2fae6220f9bc870dd509d849b3016c8e18fb46f292e00ac",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_left_index.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_left_index.wav",
+        "sha256": "d614f8ce245085c48e2f168acfe7f359c197c89beb20397dd3b9333db64d1ee8",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_left_middle.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_left_middle.wav",
+        "sha256": "88f97b467ea212654024ff7aa5ba25b1019553b3a8b105119dc3c3e02e37f3af",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_left_pinky.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_left_pinky.wav",
+        "sha256": "631c7f3cb711e2f2a500ec52b90f602a116e2a3089125edf135efa08bef14d09",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_left_ring.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_left_ring.wav",
+        "sha256": "0c27e15043da8b5ba90aa18074cd5b5446b6d21a7039d37ce24660789de4ee68",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radio_click.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radio_click.wav",
+        "sha256": "e18aa13074f49be11ca5c6f7fc9ff12e25da443e855bd8c622c5822de8185588",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radio_off.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radio_off.wav",
+        "sha256": "2d7607915bf3f85ad48a799ee6c72b75c5663aa356b71ba363140c655a0cd731",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radio_on.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radio_on.wav",
+        "sha256": "6cebccb8101c64be11499cbd2b46bc75c4304121547a0fdb14f530a463b68502",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radio_tune.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radio_tune.wav",
+        "sha256": "bb069f3842de1c6757da39797440fdfec625121f3e61842ea6b1ea9a14caf30d",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_right_index.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_right_index.wav",
+        "sha256": "8228125a050a6e4eb55d294cea06e0cd5780353421f6c8c23b03c67432c65f51",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_right_middle.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_right_middle.wav",
+        "sha256": "01a7903e60bcc6be599e081f85902554cb3fc8e433c636464de709e0baa72f5c",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_right_pinky.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_right_pinky.wav",
+        "sha256": "1a48d3220c68866d8988e7633e387eb163047f0423665d761eb3f220bb8847d4",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_right_ring.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_right_ring.wav",
+        "sha256": "5c54075cf1f70da9cb50563b9b84ddb4369ae6bf190353411fd67439f5ab1f9c",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "bin/openxr_loader.dll",
+        "destination": "bin",
+        "target": "openxr_loader.dll",
+        "sha256": "66946ea6e9cc2649e299ec412521c5eafe56c635d05055097fe4db81e11932df",
+        "mutable": false,
+        "onlyIfMissing": true
+      },
+      {
+        "source": "plugin/LOADER_LICENSE.txt",
+        "destination": "plugin",
+        "target": "LOADER_LICENSE.txt",
+        "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "mod/ATS-VisibleDriverBody-Mustang-0.1.0.scs",
+        "destination": "mod",
+        "target": "ATS-VisibleDriverBody-Mustang-0.1.0.scs",
+        "sha256": "72631fefd99b463081611a6fc2e2d4e47ec3eb32f75228c490a11a6856753dda",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/center.wav",
+        "destination": "plugin",
+        "target": "sounds/center.wav",
+        "sha256": "875d122f8d61228c675e3e8a250d697cfc22bdc1363242ce8a57861640ec018a",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/click.wav",
+        "destination": "plugin",
+        "target": "sounds/click.wav",
+        "sha256": "852f5f601ec6d3b6523eb4d23d2fce363c93f164890420000ccc1fc11972f379",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/exit.wav",
+        "destination": "plugin",
+        "target": "sounds/exit.wav",
+        "sha256": "47b33d0d72b4aba88bb55d6f407155c6813c4d07056200bb16d1cca029dceeb8",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/left.wav",
+        "destination": "plugin",
+        "target": "sounds/left.wav",
+        "sha256": "771734f1d5d3ecfbed5227fe66dfa94263b565b57db55882637833a66a3e394f",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/off.wav",
+        "destination": "plugin",
+        "target": "sounds/off.wav",
+        "sha256": "b66b3c24a22376cebde29d2341c40f6cda311c47a07ee3151448c24e9bde14d5",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/right.wav",
+        "destination": "plugin",
+        "target": "sounds/right.wav",
+        "sha256": "0feefcc75b7492b0d5635b8424039d669ef13ab1923112f747f1b37d79a76525",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/seat.wav",
+        "destination": "plugin",
+        "target": "sounds/seat.wav",
+        "sha256": "89450c48247e6d4431552f79ce8b08eaca861ba517b0365c7816a2061ee8f401",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/servo.wav",
+        "destination": "plugin",
+        "target": "sounds/servo.wav",
+        "sha256": "376b1c40965eb9557175d8f5bdb15d7fa81f59971d2dd92ffe5d1fcd00ab6e01",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/steering_extension.wav",
+        "destination": "plugin",
+        "target": "sounds/steering_extension.wav",
+        "sha256": "0e721ac18d1ef0fef0f4bb15c5068e4a2cee51350c7880ab16ec9d197660c7d0",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/steering_tilt.wav",
+        "destination": "plugin",
+        "target": "sounds/steering_tilt.wav",
+        "sha256": "35a896ef3a8f60dc748f53883a737359cd1ea003558d7325d625dd097aeb07d4",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/licenses/nlohmann-json-MIT.txt",
+        "destination": "plugin",
+        "target": "licenses/nlohmann-json-MIT.txt",
+        "sha256": "6f48a03625699eea99e599744efea0bf9c9dd67a669e65554df1cd726b8a2477",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/licenses/SPF-API-Apache-2.0.txt",
+        "destination": "plugin",
+        "target": "licenses/SPF-API-Apache-2.0.txt",
+        "sha256": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/licenses/MinHook.txt",
+        "destination": "plugin",
+        "target": "licenses/MinHook.txt",
+        "sha256": "4f21f857550d7be854da6ea5f2da4e6775ca4e3fbb535e4f3d961c47d0bf3335",
+        "mutable": false,
+        "onlyIfMissing": false
+      }
+    ]
+  },
+  "tested": "Automated fixture lifecycle; live install pending"
+}

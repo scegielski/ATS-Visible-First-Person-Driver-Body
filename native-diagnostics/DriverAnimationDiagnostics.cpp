@@ -1,3 +1,5 @@
+#include "DriverSettings.hpp"
+#include "IntegratedAdjustments.hpp"
 #include "EarlyMenuCursor.hpp"
 #include <thread>
 #include "vendor/minhook/include/MinHook.h"
@@ -239,6 +241,7 @@ void TruckSignals(const SPF_TruckData* data,void*) {
  if(direction){signalDirection.store(direction);signalEventTick.store(GetTickCount64());signalSequence.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_EVENT direction=%s",direction==1?"left":"right");Log(SPF_LOG_INFO,text);}
 }
 void Reset() {
+ ResetIntegratedAdjustments();
  headCalibration.Reset();nativeRecenterGate={nativeRecenterSequence.load(),0,0};{std::lock_guard lock(headDriveMutex);headDrive={};}
  {std::lock_guard lock(signalGateMutex);signalGate.Cancel();}
  signalReady.store(0);skipSignalDirection.store(0);signalCancels.fetch_add(1);
@@ -277,7 +280,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.37.5");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.39.0");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -288,9 +291,11 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
  api->Defaults_AddKeybind(h,"Gestures","LeftWindowBird","keyboard","KEY_F10","always");
  api->Defaults_AddKeybind(h,"Gestures","RightHandBird","keyboard","KEY_F11","always");
  api->Defaults_AddKeybind(h,"Setup","EditInteractionBoxes","keyboard","KEY_F9","always");
+ DescribeIntegratedAdjustments(h,api);
 
 }
 void OnLoad(const SPF_Load_API* api) {
+ LoadIntegratedAdjustments(api);
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
 }
 extern "C" {void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;void MenuModeObserveStub();void MenuSurfaceObserveStub();}
@@ -358,6 +363,7 @@ bool __fastcall ControllerWindowControl(uintptr_t actor,uintptr_t state,float dt
  return ForwardControllerWindow(originalWindowControl,actor,state,dt,open,close,electricity,player,allowed,direction);
 }
 void Activated(const SPF_Core_API* api) {
+ ActivateIntegratedAdjustments(api);
  core=api;
  if(!core || !core->hooks) {Log(SPF_LOG_ERROR,"DIAG: hooks API unavailable.");return;}
  char hash[65]{};
@@ -427,24 +433,18 @@ void Activated(const SPF_Core_API* api) {
  enabled.store(true);
  Log(SPF_LOG_INFO,"PEDALS: hooks requested for private interior model; supports prior steering/pedal clips and independent clutch clip. New brake alignment and clutch visual validation pending.");
 }
-struct PoseFileWatch {std::filesystem::path path;uint64_t lastPoll=0,lastStamp=0;bool attempted=false;};
+struct PoseFileWatch {std::filesystem::path path;uint64_t lastPoll=0;bool attempted=false;std::string previous;};
 void PollOneGestureFile(const wchar_t* filename,const char* hand,LiveGesturePose& store,PoseFileWatch& watch) {
- auto& path=watch.path;auto& lastPoll=watch.lastPoll;auto& lastStamp=watch.lastStamp;auto& attempted=watch.attempted;
+ auto& path=watch.path;auto& lastPoll=watch.lastPoll;auto& attempted=watch.attempted;
  const auto now=GetTickCount64();if(now-lastPoll<500)return;lastPoll=now;
  if(path.empty()) {
   HMODULE module=nullptr;wchar_t modulePath[32768]{};
   if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollOneGestureFile),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
   path=std::filesystem::path(modulePath).parent_path()/L"config"/filename;
  }
- WIN32_FILE_ATTRIBUTE_DATA info{};
- if(!GetFileAttributesExW(path.c_str(),GetFileExInfoStandard,&info))return;
- const uint64_t stamp=(static_cast<uint64_t>(info.ftLastWriteTime.dwHighDateTime)<<32)|info.ftLastWriteTime.dwLowDateTime;
- if(attempted && stamp==lastStamp)return;
- attempted=true;lastStamp=stamp;
- if(info.nFileSizeHigh || info.nFileSizeLow>65536){Log(SPF_LOG_WARN,"POSE_RELOAD rejected: file too large; last valid pose retained.");return;}
- std::ifstream file(path,std::ios::binary);if(!file)return;
- std::string content(info.nFileSizeLow,'\0');file.read(content.data(),static_cast<std::streamsize>(content.size()));
- if(!file && !content.empty()){Log(SPF_LOG_WARN,"POSE_RELOAD rejected: incomplete read; last valid pose retained.");return;}
+ std::string content;if(!ReadDriverSetting(path,content))return;
+ if(attempted && content==watch.previous)return;attempted=true;watch.previous=content;
+ if(content.size()>65536){Log(SPF_LOG_WARN,"POSE_RELOAD rejected: section too large; last valid pose retained.");return;}
  std::string error;char text[256];
  if(store.Replace(content,error))std::snprintf(text,sizeof(text),"POSE_RELOAD hand=%s accepted generation=%llu joints=21",hand,static_cast<unsigned long long>(store.Generation()));
  else std::snprintf(text,sizeof(text),"POSE_RELOAD hand=%s rejected: %s; last valid pose retained.",hand,error.c_str());
@@ -454,8 +454,8 @@ void PollBodyVisibilityMode() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
  HMODULE module=nullptr;wchar_t path[32768]{};
  if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollBodyVisibilityMode),&module) || !GetModuleFileNameW(module,path,32768))return;
- auto filePath=std::filesystem::path(path).parent_path()/L"config"/L"body_visibility.txt";std::error_code ec;auto size=std::filesystem::file_size(filePath,ec);if(ec || size>64)return;
- std::ifstream file(filePath);std::string value,extra;if(!(file>>value) || (file>>extra))return;
+ auto filePath=std::filesystem::path(path).parent_path()/L"config"/L"body_visibility.txt";std::error_code ec;auto size=DriverSettingSize(filePath,ec);if(ec || size>64)return;
+ auto file=OpenDriverSetting(filePath);std::string value,extra;if(!(file>>value) || (file>>extra))return;
  int mode=value=="interior"?0:value=="replace-exterior"?1:-1;
  if(mode>=0 && mode!=bodyVisibilityMode.load()){bodyVisibilityMode.store(mode);Log(SPF_LOG_INFO,mode==0?"VISIBILITY_MODE interior":"VISIBILITY_MODE replace-exterior");}
 }
@@ -464,8 +464,8 @@ void PollSignalActivationDelay() {
  HMODULE module=nullptr;wchar_t modulePath[32768]{};
  if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollSignalActivationDelay),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
  auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"signal_activation_delay.txt";
- std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
- std::ifstream file(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
+ std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>128)return;
+ auto file=OpenDriverSetting(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
  float value=0;if(!ParseSignalDelay(text,value))return;
  if(signalActivationDelay.exchange(value)!=value){char message[128];std::snprintf(message,sizeof(message),"SIGNAL_TIMING_RELOAD accepted delay_seconds=%.3f",value);Log(SPF_LOG_INFO,message);}
 }
@@ -474,8 +474,8 @@ void PollSignalActuationSeconds() {
  HMODULE module=nullptr;wchar_t modulePath[32768]{};
  if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollSignalActuationSeconds),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
  auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"signal_actuation_seconds.txt";
- std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
- std::ifstream file(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
+ std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>128)return;
+ auto file=OpenDriverSetting(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
  float value=0;if(!ParseSignalActuation(text,value))return;
  if(signalActuationSeconds.exchange(value)!=value){char message[128];std::snprintf(message,sizeof(message),"SIGNAL_TIMING_RELOAD accepted actuation_seconds=%.3f",value);Log(SPF_LOG_INFO,message);}
 }
@@ -484,8 +484,8 @@ void PollLeftElbowInset() {
  HMODULE module=nullptr;wchar_t modulePath[32768]{};
  if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollLeftElbowInset),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
  auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"left_elbow_inset.txt";
- std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
- std::ifstream file(path);float value;std::string extra;
+ std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>128)return;
+ auto file=OpenDriverSetting(path);float value;std::string extra;
  if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>.15f)return;
  if(value!=leftElbowInset.load()){leftElbowInset.store(value);char text[128];std::snprintf(text,sizeof(text),"ELBOW_RELOAD accepted inset_m=%.4f",value);Log(SPF_LOG_INFO,text);}
 }
@@ -494,8 +494,8 @@ void PollRightElbowInset() {
  HMODULE module=nullptr;wchar_t modulePath[32768]{};
  if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollRightElbowInset),&module) || !GetModuleFileNameW(module,modulePath,32768))return;
  auto path=std::filesystem::path(modulePath).parent_path()/L"config"/L"right_elbow_inset.txt";
- std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
- std::ifstream file(path);float value;std::string extra;
+ std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>128)return;
+ auto file=OpenDriverSetting(path);float value;std::string extra;
  if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>.15f)return;
  if(value!=rightElbowInset.load()){rightElbowInset.store(value);char text[128];std::snprintf(text,sizeof(text),"RIGHT_ELBOW_RELOAD accepted inset_m=%.4f",value);Log(SPF_LOG_INFO,text);}
 }
@@ -536,8 +536,8 @@ void PollDeferredEngineStart(bool engineValid,PlayerEngineState state) {
 void PollHeadTrackingLimits() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
  HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollHeadTrackingLimits),&module) || !GetModuleFileNameW(module,name,32768))return;
- auto path=std::filesystem::path(name).parent_path()/L"config"/L"head_tracking_limits.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>256)return;
- std::ifstream file(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"head_tracking_limits.txt";std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>256)return;
+ auto file=OpenDriverSetting(path,std::ios::binary);if(!file)return;std::string text(static_cast<size_t>(size),'\0');file.read(text.data(),static_cast<std::streamsize>(size));if(!file)return;
  HeadTrackingLimits limits;if(!ParseHeadTrackingLimits(text,limits))return;
  const bool changed=limits.forward!=headForwardLimit.load() || limits.degrees!=headLeanLimitDegrees.load() || limits.lateral!=headLateralLimit.load();headForwardLimit.store(limits.forward);headLeanLimitDegrees.store(limits.degrees);headLateralLimit.store(limits.lateral);
  if(changed){char message[160];std::snprintf(message,sizeof(message),"HEAD_LIMITS_RELOAD forward_m=%.3f max_lean_degrees=%.1f lateral_m=%.3f",limits.forward,limits.degrees,limits.lateral);Log(SPF_LOG_INFO,message);}
@@ -546,24 +546,24 @@ void PollInteriorHeadBackshift() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
  HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollInteriorHeadBackshift),&module) || !GetModuleFileNameW(module,name,32768))return;
  auto modePath=std::filesystem::path(name).parent_path()/L"config"/L"interior_head_mode.txt";
- std::error_code modeError;auto modeSize=std::filesystem::file_size(modePath,modeError);
- if(!modeError && modeSize<=64){std::ifstream modeFile(modePath);std::string mode,extra;if((modeFile>>mode) && !(modeFile>>extra) && (mode=="visible" || mode=="collapse")){bool collapse=mode=="collapse";if(collapseInteriorHead.exchange(collapse)!=collapse)Log(SPF_LOG_INFO,collapse?"INTERIOR_HEAD_MODE collapse":"INTERIOR_HEAD_MODE visible");}}
- auto path=std::filesystem::path(name).parent_path()/L"config"/L"interior_head_backshift.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
- std::ifstream file(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) )return;
+ std::error_code modeError;auto modeSize=DriverSettingSize(modePath,modeError);
+ if(!modeError && modeSize<=64){auto modeFile=OpenDriverSetting(modePath);std::string mode,extra;if((modeFile>>mode) && !(modeFile>>extra) && (mode=="visible" || mode=="collapse")){bool collapse=mode=="collapse";if(collapseInteriorHead.exchange(collapse)!=collapse)Log(SPF_LOG_INFO,collapse?"INTERIOR_HEAD_MODE collapse":"INTERIOR_HEAD_MODE visible");}}
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"interior_head_backshift.txt";std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>128)return;
+ auto file=OpenDriverSetting(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) )return;
  if(interiorHeadBackshift.exchange(value)!=value){char message[128];std::snprintf(message,sizeof(message),"INTERIOR_HEAD_RELOAD backshift_m=%.4f",value);Log(SPF_LOG_INFO,message);}
 }
 void PollHeadTrackingGain() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
  HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollHeadTrackingGain),&module) || !GetModuleFileNameW(module,name,32768))return;
- auto path=std::filesystem::path(name).parent_path()/L"config"/L"head_tracking_gain.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
- std::ifstream file(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>1)return;
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"head_tracking_gain.txt";std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>128)return;
+ auto file=OpenDriverSetting(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>1)return;
  if(headTrackingGain.exchange(value)!=value)Log(SPF_LOG_INFO,"HEAD_TORSO live gain accepted.");
 }
 void PollGestureHeadFollowGain() {
  static uint64_t last=0;const auto now=GetTickCount64();if(now-last<500)return;last=now;
  HMODULE module=nullptr;wchar_t name[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PollGestureHeadFollowGain),&module) || !GetModuleFileNameW(module,name,32768))return;
- auto path=std::filesystem::path(name).parent_path()/L"config"/L"gesture_head_follow_gain.txt";std::error_code ec;auto size=std::filesystem::file_size(path,ec);if(ec || size>128)return;
- std::ifstream file(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>1)return;
+ auto path=std::filesystem::path(name).parent_path()/L"config"/L"gesture_head_follow_gain.txt";std::error_code ec;auto size=DriverSettingSize(path,ec);if(ec || size>128)return;
+ auto file=OpenDriverSetting(path);float value;std::string extra;if(!(file>>value) || (file>>extra) || !std::isfinite(value) || value<0 || value>1)return;
  if(gestureHeadFollowGain.exchange(value)!=value)Log(SPF_LOG_INFO,"GESTURE_HEAD_FOLLOW live gain accepted.");
 }
 HeadTorsoDrive SnapshotHeadDrive(){std::lock_guard lock(headDriveMutex);return headDrive;}
@@ -590,6 +590,7 @@ void PollObservedHead() {
  char text[384];std::snprintf(text,sizeof(text),"HEAD_TRACKING valid=1 samples=%llu rejected=%llu flags=%llu position_m=%.4f,%.4f,%.4f delta_m=%.4f,%.4f,%.4f quat_xyzw=%.5f,%.5f,%.5f,%.5f",static_cast<unsigned long long>(headAccepted.load()),static_cast<unsigned long long>(headRejected.load()),static_cast<unsigned long long>(pose.flags),pose.position[0],pose.position[1],pose.position[2],pose.position[0]-baseline.position[0],pose.position[1]-baseline.position[1],pose.position[2]-baseline.position[2],pose.orientation[0],pose.orientation[1],pose.orientation[2],pose.orientation[3]);Log(SPF_LOG_INFO,text);
 }
 void Update() {
+ PollIntegratedAdjustments();
  if(!enabled.load()) {
   const bool paused=core && core->gameworld && core->gameworld->GW_IsGamePaused && core->gameworld->GW_IsGamePaused();
   PollControllerMenuMouse(paused);
@@ -699,7 +700,7 @@ void Update() {
   Log(SPF_LOG_INFO,text);
  }
 }
-void Unload() { earlyMenuStopped.store(true); nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
+void Unload() { CloseIntegratedAdjustments(); earlyMenuStopped.store(true); nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.

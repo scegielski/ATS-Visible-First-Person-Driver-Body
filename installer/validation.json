@@ -1,0 +1,18 @@
+{
+  "native_suites_passed": 6,
+  "installer_lifecycle": "Passed lifecycle plus old vehicle-section migration, retired INI removal, reinstall and uninstall preservation",
+  "payload_integrity": "39 payload files; no driver_body.ini; all WAVs in sounds",
+  "installer": "releases/installer/SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
+  "live_installer_test": "User installed; disabled SPF state prevented cabin activation. Live enable/disable exposed runtime shutdown crash; revised DLL installed for VR retest.",
+  "integrated_adjustment_vr_test": "pending",
+  "installed_game_modified_by_installer": true,
+  "committed": true,
+  "installer_sha256": "5f616d6047ea2f63722d5aea74a154bf07537b089e1f38eaa744e713563988f0",
+  "payload_files": 39,
+  "steam_policy": "Steam launch options are not read or modified; Steam may remain open; working OpenXR VR configuration is a prerequisite",
+  "configuration": "General settings embedded in DLL; Mustang poses and boxes in separate live INIs; SPF-owned settings.json",
+  "footprint": "Plugin-local .setup helper/uninstaller/record; optional backups only for changed originals; no persistent payload, separate Program Files manager, or ProgramData state",
+  "standalone_adjustment_policy": "Assumed absent; never examined or modified",
+  "audio_policy": "No legacy sound migration or retained WAV backups; all packaged WAVs in sounds",
+  "runtime_shutdown_fix": "Plugin unload retains OpenVR connection for process lifetime; six suites pass, startup hooks verified, user cabin and toggle test pending."
+}

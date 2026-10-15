@@ -1,5 +1,12 @@
 # ATS Visible First Person Driver Body
 
+Installer candidate **0.39.2** (integrated plugin 0.39.0) packages the current controller/body build and
+integrates mirror, seat, and steering-wheel adjustment into the main DLL. The
+standalone adjustment plugin is no longer required by this build. See
+[installer instructions and validation status](installer/README.md). Six native
+test suites and isolated installer lifecycle tests pass. A live installation exposed a disabled SPF state and an unload-time SteamVR shutdown bug; cabin hooks now activate with the revised build. The latest file layout still needs a complete VR regression check. All WAVs use sounds/. General defaults are embedded in the DLL; Mustang poses and box placements use separate live INIs alongside SPF-owned settings.json. Historical
+release notes below describe earlier checkpoints.
+
 Plugin output and SPF identity: `SPF_VisibleFirstPersonDriverBody` (SPF Visible First Person Driver Body), version 0.22.2. Renaming an existing installation requires moving its calibrated config files, enabled setting, and early OpenXR bridge registration to the new plugin directory. The ATS VR Controller Hands shortcut uses the migrated launcher.
 
 
