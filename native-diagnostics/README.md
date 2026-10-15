@@ -33,3 +33,9 @@ SteamVR models and game reference assets are loaded from their installations, no
 These tools require their original dependencies (NumPy, and Capstone/pefile for executable analysis) plus extracted game/reference assets and SCS conversion tools where applicable. They are not installer dependencies. Several builders reproduce historical prototypes; inspect their selected input and output archive before running them.
 
 `../development/evidence/` preserves checkpoint JSON reports, including the steering integration audit consumed by pose builders. Their version-specific results are historical evidence. Current installer validation remains in `../installer/validation.json`; release payload hashes remain in `../releases/installer/payload-manifest.json`. Moving a report does not revalidate its findings.
+
+## Release asset audit
+
+Build `releases/ATS-VisibleDriverBody-Mustang.scs` with `python development/scripts/package_release.py`. This uses an explicit runtime allowlist from the validated animation/marker archive. It verifies ZIP CRCs, private model/texture dependencies, absence of diagnostic accessories and byte identity of retained meshes and animations. Stock driver materials remain supplied by ATS.
+
+`package/` is the older authoring seed used by asset builders, not the installer payload. Removed mannequin and diagnostic fixtures are retained under `development/legacy-assets/package/` for historical reproduction. The installer reads only the audited current archive. The receipt is `development/evidence/release_asset_audit.json`.

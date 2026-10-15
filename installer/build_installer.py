@@ -48,7 +48,7 @@ def main():
         add(path, 'plugin', 'sounds/' + path.name)
     add(ROOT / 'releases/controller-layer/openxr_loader.dll', 'bin', 'openxr_loader.dll', missing=True)
     add(ROOT / 'releases/controller-layer/LOADER_LICENSE.txt', 'plugin', 'LOADER_LICENSE.txt')
-    add(ROOT / 'releases/ATS-VisibleDriverBody-Mustang-0.18.0-radio-interaction-box-test.scs',
+    add(ROOT / 'releases/ATS-VisibleDriverBody-Mustang.scs',
         'mod', 'ATS-VisibleDriverBody-Mustang-0.1.0.scs')
     for path in sorted((ROOT / 'releases/adjustment-sounds').glob('*.wav')):
         add(path, 'plugin', 'sounds/' + path.name)

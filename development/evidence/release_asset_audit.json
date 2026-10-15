@@ -1,0 +1,39 @@
+{
+  "archive": "ATS-VisibleDriverBody-Mustang.scs",
+  "files": 18,
+  "sha256": "9d7132a49ee8be723f3f697658b636accf72849dadca261e7633aac1cdeea868",
+  "removed": [
+    "automat/52/52d15629f5612944.mat",
+    "automat/90/908be9267d0a2f9c.mat",
+    "automat/a7/a7e3fbf83b70f425.mat",
+    "automat/ad/ad04bde66293e4b9.mat",
+    "def/vehicle/car/ford.mustang_67/accessory/carpet/diagnostic_tifa_carpet.sii",
+    "def/vehicle/car/ford.mustang_67/accessory/carpet/spf_driver_body.sii",
+    "def/vehicle/car/ford.mustang_67/accessory/toyseat/diagnostic_stock_toyseat.sii",
+    "model/spf_driver_body/denim.dds",
+    "model/spf_driver_body/denim.tobj",
+    "model/spf_driver_body/driver_body.pmd",
+    "model/spf_driver_body/driver_body.pmg",
+    "model/spf_driver_body/shirt.dds",
+    "model/spf_driver_body/shirt.tobj",
+    "model/spf_driver_body/shoe.dds",
+    "model/spf_driver_body/shoe.tobj",
+    "model/spf_driver_body/skin.dds",
+    "model/spf_driver_body/skin.tobj",
+    "model/spf_stock_driver/diagnostic_stock_toyseat.pmd",
+    "model/spf_stock_driver/diagnostic_stock_toyseat.pmg",
+    "model/spf_stock_driver/diagnostic_tifa_carpet.pmd",
+    "model/spf_stock_driver/diagnostic_tifa_carpet.pmg"
+  ],
+  "retained_runtime_assets": "Byte-identical except manifest, description and accessory display name",
+  "external_stock_materials": [
+    "/automat/20/208cc55119c27f16.mat",
+    "/automat/4c/4c15e1551f8198e8.mat",
+    "/automat/71/7156b89b22e709c3.mat",
+    "/automat/72/72e3dc1a0464df05.mat",
+    "/automat/88/88859b8c3ba45b91.mat",
+    "/automat/c2/c29b079c5186f60b.mat",
+    "/automat/fd/fd13e967b0dbdf19.mat"
+  ],
+  "in_game_check": "pending"
+}

@@ -8,6 +8,8 @@ The plugin combines steering and pedal animations, head and torso tracking, cont
 
 Use the [Windows installer](releases/installer/SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe) with ATS closed. Steam can remain open. SPF Framework and a working ATS OpenXR VR launch configuration are prerequisites. Setup leaves Steam launch options unchanged.
 
+The current body archive is [ATS-VisibleDriverBody-Mustang.scs](releases/ATS-VisibleDriverBody-Mustang.scs); versioned test archives are historical.
+
 See the [installer guide](installer/README.md) for dependencies, file locations, update and uninstall behavior. On a new profile, enable the included body archive in ATS Mod Manager and select its body accessory in the Mustang. Launch through Steam normally after installation.
 
 ## Use

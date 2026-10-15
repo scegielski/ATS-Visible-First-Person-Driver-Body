@@ -1,6 +1,6 @@
 {
   "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
-  "sha256": "b0aba71c49cc95aca8f0eaf9ca8e4a2ebfc5e1a54aa1e0ea2c646c58ad582b1c",
+  "sha256": "1d9a401e3e1c60384956d2632c240ba3d97e9181340db781327e7e61886a0d07",
   "payload": {
     "version": "0.39.2",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
@@ -209,7 +209,7 @@
         "source": "mod/ATS-VisibleDriverBody-Mustang-0.1.0.scs",
         "destination": "mod",
         "target": "ATS-VisibleDriverBody-Mustang-0.1.0.scs",
-        "sha256": "72631fefd99b463081611a6fc2e2d4e47ec3eb32f75228c490a11a6856753dda",
+        "sha256": "9d7132a49ee8be723f3f697658b636accf72849dadca261e7633aac1cdeea868",
         "mutable": false,
         "onlyIfMissing": false
       },

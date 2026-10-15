@@ -98,7 +98,7 @@ with zipfile.ZipFile(source) as z:
   name=f'automat/cf/{axis+1:016x}.mat'
   additions[name]=(f'effect : "eut2.dif" {{\n diffuse : {{ {rgb[0]}, {rgb[1]}, {rgb[2]} }}\n additional_ambient : 0.5\n texture : "texture_base" {{ source : "/model/spf_controller_markers/white.tobj" }}\n}}\n').encode()
  path=b'/model/spf_controller_markers/white.dds'
- tobj=bytearray((root/'package/model/spf_driver_body/skin.tobj').read_bytes()[:48]);struct.pack_into('<I',tobj,40,len(path));additions['model/spf_controller_markers/white.tobj']=bytes(tobj)+path
+ tobj=bytearray((root/'development/legacy-assets/package/model/spf_driver_body/skin.tobj').read_bytes()[:48]);struct.pack_into('<I',tobj,40,len(path));additions['model/spf_controller_markers/white.tobj']=bytes(tobj)+path
  # A 4x4 opaque white RGBA DDS keeps these materials independent of stock textures.
  header=[124,0x100f,4,4,16,0,0]+[0]*11+[32,0x41,0,32,0xff,0xff00,0xff0000,0xff000000,0x1000,0,0,0,0]
  assert len(header)==31

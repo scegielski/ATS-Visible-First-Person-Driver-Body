@@ -1,1 +1,5 @@
-Independent headless seated driver mannequin for the Ford Mustang 1967 interior. Select SPF Seated Driver Body (prototype) under carpet accessories. Static body: no steering or pedal animation yet. Intended for first-person/VR visibility testing. Requires Ford Road Trip DLC. Replaces only the selected interior carpet accessory; original accessory options remain available. Converted with official SCS conversion tools; in-game placement is not yet verified.
+Animated driver body and VR interaction markers for the Mustang.
+Requires the matching SPF Visible First Person Driver Body plugin, SPF Framework,
+and the Mustang vehicle. Select SPF Stock Driver Body in carpet accessories.
+Controller models are loaded from SteamVR at runtime. No diagnostic accessories
+or static prototype mannequin are included.

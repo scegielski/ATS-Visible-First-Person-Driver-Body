@@ -7,7 +7,7 @@
   "integrated_adjustment_vr_test": "pending",
   "installed_game_modified_by_installer": true,
   "committed": true,
-  "installer_sha256": "b0aba71c49cc95aca8f0eaf9ca8e4a2ebfc5e1a54aa1e0ea2c646c58ad582b1c",
+  "installer_sha256": "1d9a401e3e1c60384956d2632c240ba3d97e9181340db781327e7e61886a0d07",
   "payload_files": 39,
   "steam_policy": "Steam launch options are not read or modified; Steam may remain open; working OpenXR VR configuration is a prerequisite",
   "configuration": "General settings embedded in DLL; Mustang poses and boxes in separate live INIs; SPF-owned settings.json",
@@ -16,5 +16,6 @@
   "audio_policy": "No legacy sound migration or retained WAV backups; all packaged WAVs in sounds",
   "runtime_shutdown_fix": "Plugin unload retains OpenVR connection for process lifetime; six suites pass, startup hooks verified, user cabin and toggle test pending.",
   "configuration_vr_test": "User confirmed split configuration layout works in VR",
-  "menu_axes_flash": "Removed startup axes fallback; six native suites pass; installed; visual startup check pending"
+  "menu_axes_flash": "Removed startup axes fallback; six native suites pass; installed; visual startup check pending",
+  "asset_audit": "18 runtime files; 21 obsolete assets excluded; retained geometry/animations byte-identical; ZIP CRC and private dependency checks pass; installed, in-game test pending"
 }
