@@ -1,4 +1,5 @@
 #include "ControllerModelData.hpp"
+#include "ControllerModelInput.hpp"
 #include <Windows.h>
 #include "ControllerRuntime.hpp"
 #include "ControllerFingers.hpp"

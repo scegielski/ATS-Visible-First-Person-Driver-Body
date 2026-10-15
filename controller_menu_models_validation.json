@@ -15,5 +15,12 @@
   "change": "Runtime SteamVR meshes in menus and cabin; tip-based aiming; common white beam/hit-dot renderer; fixed 1.5 mm width independent of beam length.",
   "user_validation": "User confirmed Quest models visible, menu pointing/clicking working, cabin models and tip aiming looking good, and final white fixed-width pointers looking good; requested commit and push.",
   "runtime_observation": "0.37.1 stereo renderer initialized and submitted both eye views successfully.",
-  "limitations": "Visual confirmation covers the reported session, not long-term stereo timing across all runtime sessions."
+  "limitations": "Visual confirmation covers the reported session, not long-term stereo timing across all runtime sessions.",
+  "component_animation": {
+    "version": "0.37.5",
+    "input": "Native bridge values mapped to SteamVR component state using installed Quest definitions",
+    "automated": "All four suites pass, including analog channels, independent button masks and neutral release",
+    "installed": true,
+    "user_report": "Requested commit and push following installed test; no separate detailed component visual report"
+  }
 }

@@ -1,4 +1,5 @@
 #include "ControllerModelData.hpp"
+#include "ControllerModelInput.hpp"
 #include "EarlyMenuCursor.hpp"
 #include "NativeMenuCursor.hpp"
 #include "MenuLaser.hpp"
@@ -133,6 +134,8 @@ extern "C" void XRActionAttachContinuation();
 extern "C" {extern void* gHornControlOriginal;uint64_t HornControlObserveStub(uintptr_t,uint64_t,uint64_t,uint64_t);}
 extern "C" uint64_t HornControlTestContinuation(uintptr_t object,uint64_t held,uint64_t air,uint64_t transform){Check(object==123 && air==456 && transform==789,"horn observer preserves receiver and other arguments");return held;}
 int main() {
+ auto animatedInput=ControllerModelInput(true,true,false,.4f,.7f,-.8f,.6f);Check(animatedInput.rAxis[0].x==-.8f && animatedInput.rAxis[0].y==.6f && animatedInput.rAxis[1].x==.7f && animatedInput.rAxis[2].x==.4f,"model analog channels match Quest component definitions");Check((animatedInput.ulButtonPressed&vr::ButtonMaskFromId(vr::k_EButton_Axis0)) && (animatedInput.ulButtonPressed&vr::ButtonMaskFromId(vr::k_EButton_Grip)) && !(animatedInput.ulButtonPressed&vr::ButtonMaskFromId(vr::k_EButton_ApplicationMenu)),"model stick and face buttons independent");auto releasedInput=ControllerModelInput(false,false,false,0,0,0,0);Check(!releasedInput.ulButtonPressed && releasedInput.rAxis[1].x==0,"model input releases to neutral");
+
  gHornControlOriginal=reinterpret_cast<void*>(HornControlTestContinuation);Check(HornControlObserveStub(123,0x1122334455667701ull,456,789)==0x1122334455667701ull,"horn observer forwards full register with native held state intact");
 
  std::ifstream fingerFile("../../releases/controller_left_fingers.txt");std::string fingerText((std::istreambuf_iterator<char>(fingerFile)),{}),fingerError;LiveControllerFingerPose liveFingerLeft(false),liveFingerRight(true);
