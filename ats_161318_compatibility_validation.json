@@ -1,0 +1,176 @@
+{
+  "game_build": "1.61.3.18",
+  "executable_sha256": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
+  "unique_entry_patterns": [
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kDriverPattern",
+      "unique_rva": "0x9e2400"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kAdvancePattern",
+      "unique_rva": "0x15e09e0"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kBonePattern",
+      "unique_rva": "0x15e1700"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kEngineRequestPattern",
+      "unique_rva": "0x5e4c80"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kNativeRecenterPattern",
+      "unique_rva": "0x428852"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kControllerAttachPattern",
+      "unique_rva": "0x1636248"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kHeadPattern",
+      "unique_rva": "0x16348ee"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kSignalLeftPattern",
+      "unique_rva": "0x9f8da2"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "kSignalRightPattern",
+      "unique_rva": "0x9f8e30"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "radioPausePattern",
+      "unique_rva": "0x9aee30"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "radioInitializePattern",
+      "unique_rva": "0x59df20"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "radioSelectPattern",
+      "unique_rva": "0x59dc50"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "radioInputPattern",
+      "unique_rva": "0x68affe"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "radioStationPattern",
+      "unique_rva": "0x68ee00"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "radioVolumePattern",
+      "unique_rva": "0x68ef10"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "wiperCountPattern",
+      "unique_rva": "0x5ea5c0"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "wiperSetPattern",
+      "unique_rva": "0x5ea480"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "wipersPattern",
+      "unique_rva": "0x9f834c"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "lightsPattern",
+      "unique_rva": "0x9f8bbb"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "windowPattern",
+      "unique_rva": "0x9ec8d0"
+    },
+    {
+      "source": "native-diagnostics/DriverAnimationDiagnostics.cpp",
+      "pattern": "hornControlPattern",
+      "unique_rva": "0x9eae60"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kUpdatePattern",
+      "unique_rva": "0x545990"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kSetRotationPattern",
+      "unique_rva": "0x164a70"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kSelectPattern",
+      "unique_rva": "0x545c08"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kSlotPattern",
+      "unique_rva": "0x545c45"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kLeftPattern",
+      "unique_rva": "0x545cc5"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kRightPattern",
+      "unique_rva": "0x545d0b"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kUpPattern",
+      "unique_rva": "0x545d43"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kDownPattern",
+      "unique_rva": "0x545d73"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/Signatures.hpp",
+      "pattern": "kResetPattern",
+      "unique_rva": "0x545da3"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/NativeSeat.inc",
+      "pattern": "kSeatApplyPattern",
+      "unique_rva": "0x114f3d0"
+    },
+    {
+      "source": "../SPF_AdjustmentHotkeys/NativeSeat.inc",
+      "pattern": "kSeatUiPattern",
+      "unique_rva": "0x114f4c3"
+    }
+  ],
+  "driver_call_chain_and_manual_engine_callers": "verified",
+  "radio_vtable_methods": "verified",
+  "seat_ui_skip_epilogue": "verified",
+  "automated_regressions": [
+    "DriverDiagnosticRegression passed",
+    "ControllerLayerRegression passed",
+    "MirrorRegression passed"
+  ],
+  "runtime_validation": "Hooks activated in ATS; user confirmed in-game features working again.",
+  "commit_scope": "Native compatibility only; menu mouse support is a separate commit."
+}

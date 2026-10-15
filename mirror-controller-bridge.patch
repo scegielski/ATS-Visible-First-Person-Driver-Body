@@ -1,5 +1,5 @@
 diff --git a/MirrorControls.cpp b/MirrorControls.cpp
-index ca395fe..a1d2017 100644
+index ca395fe..e4fc751 100644
 --- a/MirrorControls.cpp
 +++ b/MirrorControls.cpp
 @@ -1,4 +1,5 @@
@@ -8,6 +8,15 @@ index ca395fe..a1d2017 100644
  #include <bcrypt.h>
  #include <mmsystem.h>
  #include <filesystem>
+@@ -49,7 +50,7 @@ void CenterSlotStub();
+ }
+ namespace {
+ constexpr char kName[] = "SPF_MirrorControls";
+-constexpr char kExecutableHash[] = "5d3b4e343154de6b25dd366b6048c5bc5c452a4daa50bc38b33fd2e571d54257";
++constexpr char kExecutableHash[] = "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4";
+ using UpdateFn = void(__fastcall*)(void*, float);
+ using SetRotationFn = void(__fastcall*)(void*, const float*);
+ UpdateFn originalUpdate = nullptr;
 @@ -97,6 +98,7 @@ std::atomic<unsigned char> inputMask{0};
  std::array<SPF_Hook_Handle*,5> inputHooks{};
  std::atomic<bool> movementAllowed{false};
@@ -62,6 +71,81 @@ index ca395fe..a1d2017 100644
  SPF_PLUGIN_EXPORT bool SPF_GetManifestAPI(SPF_Manifest_API* api) {
      if (!api) return false;
      api->BuildManifest=BuildManifest; return true;
+diff --git a/NativeSeat.inc b/NativeSeat.inc
+index ab3ed15..f020185 100644
+--- a/NativeSeat.inc
++++ b/NativeSeat.inc
+@@ -5,7 +5,7 @@ SeatApplyFn originalSeatApply=nullptr;
+ SPF_Hook_Handle* seatApplyHook=nullptr;
+ SPF_Hook_Handle* seatUiHook=nullptr;
+ constexpr char kSeatApplyPattern[]="48 89 5C 24 08 57 48 83 EC 70 48 8B F9 E8 4E E6 FF FF F3 0F 10 8F 78 03 00 00 F3 0F 5C 8F 9C 03 00 00 F3 0F 10 87 80 03 00 00";
+-constexpr char kSeatUiPattern[]="48 8B 4F 10 BA A0 00 00 00 E8 8F 8E 23 FF 48 8B D8";
++constexpr char kSeatUiPattern[]="48 8B 4F 10 BA A0 00 00 00 E8 7F 7A 23 FF 48 8B D8";
+ std::mutex seatMutex;
+ std::array<unsigned char,0x400> seatTemplate{};
+ uintptr_t seatVehicleSettings=0;
+@@ -13,7 +13,7 @@ bool seatCalibrated=false;
+ uintptr_t LiveSeatSettings() {
+  uintptr_t global=0,service=0,actor=0,settings=0;
+  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+- if(!Read(base+0x36b8d70,global) || !global || !Read(global+0x31b0,service) || !service ||
++ if(!Read(base+0x36bad90,global) || !global || !Read(global+0x31b0,service) || !service ||
+     !Read(service+0x18,actor) || !actor || !Read(actor+0x1f8,settings)) return 0;
+  return settings;
+ }
+@@ -57,7 +57,7 @@ bool RefreshSeatDefaults() {
+  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+  uintptr_t global=0,manager=0,settings=0;
+  std::array<unsigned char,0x400> fresh{};
+- const bool valid=Read(base+0x36b8d70,global) && Read(base+0x36b8de0,manager) && ReadSeatDefaults(global,manager,fresh,settings);
++ const bool valid=Read(base+0x36bad90,global) && Read(base+0x36bae00,manager) && ReadSeatDefaults(global,manager,fresh,settings);
+  bool first=false;
+  { std::lock_guard lock(seatMutex);
+    if(!valid) { seatCalibrated=false; seatVehicleSettings=0; return false; }
+@@ -129,8 +129,8 @@ void MoveNativeSeat(float dt,unsigned char mask,int mode) {
+ }
+ void RegisterSeatHooks() {
+  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+- if(core->hooks->Hook_FindPattern(kSeatApplyPattern)!=base+0x114e000 || core->hooks->Hook_FindPattern(kSeatUiPattern)!=base+0x114e0f3) { Log(SPF_LOG_WARN,"SEAT: native signatures mismatch; seat controls disabled."); return; }
+- gSeatApplyReturn=reinterpret_cast<void*>(base+0x114e19a);
++ if(core->hooks->Hook_FindPattern(kSeatApplyPattern)!=base+0x114f3d0 || core->hooks->Hook_FindPattern(kSeatUiPattern)!=base+0x114f4c3) { Log(SPF_LOG_WARN,"SEAT: native signatures mismatch; seat controls disabled."); return; }
++ gSeatApplyReturn=reinterpret_cast<void*>(base+0x114f56a);
+  seatUiHook=core->hooks->Hook_Register(kName,"SeatUiTail","Skip seat UI only during hotkey call",reinterpret_cast<void*>(SeatUiStub),&gSeatUiOriginal,kSeatUiPattern,true);
+  seatApplyHook=core->hooks->Hook_Register(kName,"SeatApply","Capture native seat defaults and limits",reinterpret_cast<void*>(DetourSeatApply),reinterpret_cast<void**>(&originalSeatApply),kSeatApplyPattern,true);
+  Log(SPF_LOG_INFO,"SEAT: hooks requested; native defaults initialize automatically when seat mode is selected.");
+diff --git a/Signatures.hpp b/Signatures.hpp
+index d451210..584423d 100644
+--- a/Signatures.hpp
++++ b/Signatures.hpp
+@@ -1,20 +1,20 @@
+ #pragma once
+ #include <cstdint>
+-constexpr uintptr_t kUpdateRva = 0x5458e0;
++constexpr uintptr_t kUpdateRva = 0x545990;
+ constexpr char kUpdatePattern[] = "40 56 48 83 EC 70 48 8B F1 0F 29 74 24 60 48 8B 89 18 14 00 00 0F 28 F1 48 85 C9 74 12 83 B9 F8 00 00 00 02 75 09 E8 ?? ?? ?? ?? B1 01";
+ constexpr uintptr_t kSetRotationRva = 0x164a70;
+ constexpr char kSetRotationPattern[] = "48 89 5C 24 08 57 48 83 EC 70 F3 0F 10 0A 48 8B DA 0F 29 74 24 60 48 8B F9 F3 0F 10 35 ?? ?? ?? ?? F3 0F 59 CE 0F 29 7C 24 50 44 0F 29 44 24 40 0F 28 C1";
+-constexpr uintptr_t kSelectRva=0x545b58;
++constexpr uintptr_t kSelectRva=0x545c08;
+ constexpr char kSelectPattern[]="48 89 AC 24 88 00 00 00 84 C9 74 ?? 33 ED EB ??";
+-constexpr uintptr_t kSlotRva=0x545b95;
++constexpr uintptr_t kSlotRva=0x545c45;
+ constexpr char kSlotPattern[]="48 8B 86 18 01 00 00 4C 89 B4 24 98 00 00 00";
+-constexpr uintptr_t kLeftRva=0x545c15;
++constexpr uintptr_t kLeftRva=0x545cc5;
+ constexpr char kLeftPattern[]="84 C9 74 ?? 0F 28 C6 B2 ?? F3 0F 59 05 ?? ?? ?? ??";
+-constexpr uintptr_t kRightRva=0x545c5b;
++constexpr uintptr_t kRightRva=0x545d0b;
+ constexpr char kRightPattern[]="84 C9 74 ?? F3 0F 59 35 ?? ?? ?? ?? B2 ??";
+-constexpr uintptr_t kUpRva=0x545c93;
++constexpr uintptr_t kUpRva=0x545d43;
+ constexpr char kUpPattern[]="84 C9 74 ?? F3 0F 58 E5 B2 ?? F3 0F 11 64 24 44";
+-constexpr uintptr_t kDownRva=0x545cc3;
++constexpr uintptr_t kDownRva=0x545d73;
+ constexpr char kDownPattern[]="84 C9 74 ?? F3 0F 5C E5 B2 ?? F3 0F 11 64 24 44";
+-constexpr uintptr_t kResetRva=0x545cf3;
++constexpr uintptr_t kResetRva=0x545da3;
+ constexpr char kResetPattern[]="84 C9 74 ?? 48 C7 44 24 40 ?? ?? ?? ?? EB ??";
 diff --git a/Tests.cpp b/Tests.cpp
 index 364d949..bdc5eaf 100644
 --- a/Tests.cpp

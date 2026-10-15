@@ -19,5 +19,5 @@ struct EngineStartGate {
 };
 inline bool IsManualEngineStartCaller(uintptr_t base,uintptr_t returnAddress) noexcept {
  // The game's player-control engine/electricity bindings. Automatic/forced callers pass.
- return returnAddress==base+0x9f79ec || returnAddress==base+0x9f7b6c || returnAddress==base+0x5e1aee;
+ return returnAddress==base+0x9f81ac || returnAddress==base+0x9f832c || returnAddress==base+0x5e1cee;
 }

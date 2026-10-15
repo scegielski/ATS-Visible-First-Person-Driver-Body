@@ -65,7 +65,7 @@ void AdvanceObserveStub();
 namespace {
 thread_local bool controllerIgnitionCycle=false;
 constexpr char kName[]="SPF_VisibleFirstPersonDriverBody";
-constexpr char kHash[]="5d3b4e343154de6b25dd366b6048c5bc5c452a4daa50bc38b33fd2e571d54257";
+constexpr char kHash[]="c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4";
 constexpr char kDriverPattern[]="40 53 48 83 EC 50 48 83 79 08 00 48 8B D9 0F 84 43 01 00 00 83 79 10 FF 0F 84 39 01 00 00 80 79";
 constexpr char kAdvancePattern[]="48 8B C4 55 41 57 48 81 EC 88 00 00 00 48 8B E9 44 8B FA 48 81 C1 08 02 00 00 0F 29 70 C8 0F 28";
 constexpr char kBonePattern[]="48 8B C4 48 89 68 18 56 57 41 54 41 55 41 57 48 81 EC 00 02 00 00 8B AC 24 50 02 00 00 45 33 ED";
@@ -267,7 +267,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.31.4");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.31.5");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -301,47 +301,47 @@ void Activated(const SPF_Core_API* api) {
  }
  const auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
  auto hooks=core->hooks;
- if(hooks->Hook_FindPattern(kDriverPattern)!=base+0x9e1c40 ||
-    hooks->Hook_FindPattern(kAdvancePattern)!=base+0x15deed0) {
+ if(hooks->Hook_FindPattern(kDriverPattern)!=base+0x9e2400 ||
+    hooks->Hook_FindPattern(kAdvancePattern)!=base+0x15e09e0) {
   Log(SPF_LOG_ERROR,"DIAG: expected unique entry signatures absent; no hooks registered.");return;
  }
- if(hooks->Hook_FindPattern(kEngineRequestPattern)!=base+0x5e4a20){Log(SPF_LOG_ERROR,"ENGINE_REQUEST: signature mismatch; diagnostic disabled.");return;}
- if(hooks->Hook_FindPattern(kBonePattern)!=base+0x15dfbf0) {Log(SPF_LOG_ERROR,"HORN: bone entry signature mismatch; diagnostic disabled.");return;}
- if(hooks->Hook_FindPattern(kSignalLeftPattern)!=base+0x9f85e2 || hooks->Hook_FindPattern(kSignalRightPattern)!=base+0x9f8670){Log(SPF_LOG_ERROR,"SIGNAL_DELAY: input-site signature mismatch; no hooks registered.");return;}
- if(hooks->Hook_FindPattern(kHeadPattern)==base+0x1632dde)headHook=hooks->Hook_Register(kName,"HeadTrackingObserver","Observe local-space OpenXR head views",reinterpret_cast<void*>(HeadObserveStub),&gHeadOriginal,kHeadPattern,true);
+ if(hooks->Hook_FindPattern(kEngineRequestPattern)!=base+0x5e4c80){Log(SPF_LOG_ERROR,"ENGINE_REQUEST: signature mismatch; diagnostic disabled.");return;}
+ if(hooks->Hook_FindPattern(kBonePattern)!=base+0x15e1700) {Log(SPF_LOG_ERROR,"HORN: bone entry signature mismatch; diagnostic disabled.");return;}
+ if(hooks->Hook_FindPattern(kSignalLeftPattern)!=base+0x9f8da2 || hooks->Hook_FindPattern(kSignalRightPattern)!=base+0x9f8e30){Log(SPF_LOG_ERROR,"SIGNAL_DELAY: input-site signature mismatch; no hooks registered.");return;}
+ if(hooks->Hook_FindPattern(kHeadPattern)==base+0x16348ee)headHook=hooks->Hook_Register(kName,"HeadTrackingObserver","Observe local-space OpenXR head views",reinterpret_cast<void*>(HeadObserveStub),&gHeadOriginal,kHeadPattern,true);
  else Log(SPF_LOG_WARN,"HEAD_TRACKING: view-site signature mismatch; observer disabled.");
- if(hooks->Hook_FindPattern(kNativeRecenterPattern)==base+0x428872)nativeRecenterHook=hooks->Hook_Register(kName,"NativeHeadRecenter","Observe ATS head-reset input without consuming it",reinterpret_cast<void*>(NativeRecenterObserveStub),&gRecenterOriginal,kNativeRecenterPattern,true);
+ if(hooks->Hook_FindPattern(kNativeRecenterPattern)==base+0x428852)nativeRecenterHook=hooks->Hook_Register(kName,"NativeHeadRecenter","Observe ATS head-reset input without consuming it",reinterpret_cast<void*>(NativeRecenterObserveStub),&gRecenterOriginal,kNativeRecenterPattern,true);
  else Log(SPF_LOG_WARN,"HEAD_RECENTER native input-site signature mismatch; observer disabled.");
- expectedReturn=base+0x9e1d92;
- resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15de620);
- enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15decc0);
- durationQuery=reinterpret_cast<DurationQuery>(base+0x359eb0);
- frameQuery=reinterpret_cast<FrameQuery>(base+0x359f20);
+ expectedReturn=base+0x9e2552;
+ resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15e0130);
+ enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15e07d0);
+ durationQuery=reinterpret_cast<DurationQuery>(base+0x359e70);
+ frameQuery=reinterpret_cast<FrameQuery>(base+0x359ee0);
  driverHook=hooks->Hook_Register(kName,"DriverUpdate","Observe driver update",reinterpret_cast<void*>(DriverObserveStub),&gDriverOriginal,kDriverPattern,true);
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
  boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
  engineRequestHook=hooks->Hook_Register(kName,"EngineRequest","Observe player engine start/stop request",reinterpret_cast<void*>(EngineRequestObserveStub),&gEngineOriginal,kEngineRequestPattern,true);
  constexpr char radioPausePattern[]="8B 91 F0 00 00 00 8B C2 83 E0 01 F6 C2 01 74 0E 85 C0 74 2D BA 01 00 00 00";
- if(hooks->Hook_FindPattern(radioPausePattern)==base+0x9ae720)nativeRadioPause=reinterpret_cast<RadioPauseFn>(base+0x9ae720);else Log(SPF_LOG_ERROR,"RADIO_BOX pause signature mismatch.");
+ if(hooks->Hook_FindPattern(radioPausePattern)==base+0x9aee30)nativeRadioPause=reinterpret_cast<RadioPauseFn>(base+0x9aee30);else Log(SPF_LOG_ERROR,"RADIO_BOX pause signature mismatch.");
  constexpr char radioInitializePattern[]="40 55 53 56 57 41 54 48 8D 6C 24 C0 48 81 EC 40 01 00 00 48 8B F1 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 83 F8 02";
- if(hooks->Hook_FindPattern(radioInitializePattern)==base+0x59de70)nativeRadioInitialize=reinterpret_cast<RadioPauseFn>(base+0x59de70);else Log(SPF_LOG_ERROR,"RADIO_BOX station initializer signature mismatch.");
+ if(hooks->Hook_FindPattern(radioInitializePattern)==base+0x59df20)nativeRadioInitialize=reinterpret_cast<RadioPauseFn>(base+0x59df20);else Log(SPF_LOG_ERROR,"RADIO_BOX station initializer signature mismatch.");
  constexpr char radioSelectPattern[]="48 89 5C 24 08 57 48 83 EC 40 48 8B 01 48 8B FA 48 8B D9 FF 50 58 48 3B 7B 18";
- if(hooks->Hook_FindPattern(radioSelectPattern)==base+0x59dba0)nativeRadioSelect=reinterpret_cast<RadioSelectFn>(base+0x59dba0);else Log(SPF_LOG_ERROR,"RADIO_BOX station selector signature mismatch.");
+ if(hooks->Hook_FindPattern(radioSelectPattern)==base+0x59dc50)nativeRadioSelect=reinterpret_cast<RadioSelectFn>(base+0x59dc50);else Log(SPF_LOG_ERROR,"RADIO_BOX station selector signature mismatch.");
  constexpr char radioInputPattern[]="48 8B 8E 08 02 00 00 48 85 C9 74 28 83 B9 F8 00 00 00 02 75 1F";
  constexpr char radioStationPattern[]="48 89 5C 24 08 48 89 74 24 10 57 48 81 EC A0 00 00 00 48 8B 1D ?? ?? ?? ?? 0F B6 F2 48 8B F9";
  constexpr char radioVolumePattern[]="48 8B C4 53 48 81 EC 30 01 00 00 0F 29 70 E8 48 8B D9 48 8D 0D ?? ?? ?? ?? 0F 29 78 D8 0F 28 F1";
- if(hooks->Hook_FindPattern(radioInputPattern)==base+0x68ad9e && hooks->Hook_FindPattern(radioStationPattern)==base+0x68eba0 && hooks->Hook_FindPattern(radioVolumePattern)==base+0x68ecb0){nativeRadioStation=reinterpret_cast<RadioStationFn>(base+0x68eba0);nativeRadioVolume=reinterpret_cast<RadioVolumeFn>(base+0x68ecb0);hooks->Hook_Register(kName,"ControllerRadio","Apply controller radio station and volume input",reinterpret_cast<void*>(RadioInputObserveStub),&gRadioInputOriginal,radioInputPattern,true);}else Log(SPF_LOG_ERROR,"RADIO_BOX native signatures mismatch; controller radio disabled.");
+ if(hooks->Hook_FindPattern(radioInputPattern)==base+0x68affe && hooks->Hook_FindPattern(radioStationPattern)==base+0x68ee00 && hooks->Hook_FindPattern(radioVolumePattern)==base+0x68ef10){nativeRadioStation=reinterpret_cast<RadioStationFn>(base+0x68ee00);nativeRadioVolume=reinterpret_cast<RadioVolumeFn>(base+0x68ef10);hooks->Hook_Register(kName,"ControllerRadio","Apply controller radio station and volume input",reinterpret_cast<void*>(RadioInputObserveStub),&gRadioInputOriginal,radioInputPattern,true);}else Log(SPF_LOG_ERROR,"RADIO_BOX native signatures mismatch; controller radio disabled.");
  constexpr char wiperCountPattern[]="48 83 EC 28 48 8B 41 18 48 8D 0D ?? ?? ?? ?? 48 8B 90 F8 01 00 00 48 8B 52 38 E8 ?? ?? ?? ?? 48 85 C0 74 0F 48 8B 80 B8 0F 00 00 48 FF C0";
  constexpr char wiperSetPattern[]="48 89 5C 24 08 57 48 83 EC 20 48 8B 41 18 8B FA 48 8B D9 48 8D 0D ?? ?? ?? ?? 48 8B 90 F8 01 00 00 48 8B 52 38 E8 ?? ?? ?? ?? 48 85 C0 74 0C";
- if(hooks->Hook_FindPattern(wiperCountPattern)==base+0x5ea360 && hooks->Hook_FindPattern(wiperSetPattern)==base+0x5ea220){nativeWiperCount=reinterpret_cast<WiperCountFn>(base+0x5ea360);nativeWiperSet=reinterpret_cast<WiperSetFn>(base+0x5ea220);}else Log(SPF_LOG_ERROR,"WIPERS_BOX cycle setter signature mismatch.");
+ if(hooks->Hook_FindPattern(wiperCountPattern)==base+0x5ea5c0 && hooks->Hook_FindPattern(wiperSetPattern)==base+0x5ea480){nativeWiperCount=reinterpret_cast<WiperCountFn>(base+0x5ea5c0);nativeWiperSet=reinterpret_cast<WiperSetFn>(base+0x5ea480);}else Log(SPF_LOG_ERROR,"WIPERS_BOX cycle setter signature mismatch.");
  constexpr char wipersPattern[]="84 C9 74 5D 48 8B 47 18 48 8D 0D ?? ?? ?? ?? 8B 9F 30 02 00 00 FF C3";
- if(hooks->Hook_FindPattern(wipersPattern)==base+0x9f7b8c)hooks->Hook_Register(kName,"ControllerWipers","Combine player wiper cycle with controller trigger",reinterpret_cast<void*>(WipersRequestStub),&gWipersOriginal,wipersPattern,true);else Log(SPF_LOG_ERROR,"WIPERS_BOX input signature mismatch; controller wipers disabled.");
+ if(hooks->Hook_FindPattern(wipersPattern)==base+0x9f834c)hooks->Hook_Register(kName,"ControllerWipers","Combine player wiper cycle with controller trigger",reinterpret_cast<void*>(WipersRequestStub),&gWipersOriginal,wipersPattern,true);else Log(SPF_LOG_ERROR,"WIPERS_BOX input signature mismatch; controller wipers disabled.");
  constexpr char lightsPattern[]="84 C9 0F 84 99 00 00 00 0F B6 87 48 02 00 00 0F B6 8F 49 02 00 00";
- if(hooks->Hook_FindPattern(lightsPattern)==base+0x9f83fb)hooks->Hook_Register(kName,"ControllerLights","Combine player lights cycle with controller trigger",reinterpret_cast<void*>(LightsRequestStub),&gLightsOriginal,lightsPattern,true);else Log(SPF_LOG_ERROR,"LIGHTS_BOX input signature mismatch; controller lights disabled.");
+ if(hooks->Hook_FindPattern(lightsPattern)==base+0x9f8bbb)hooks->Hook_Register(kName,"ControllerLights","Combine player lights cycle with controller trigger",reinterpret_cast<void*>(LightsRequestStub),&gLightsOriginal,lightsPattern,true);else Log(SPF_LOG_ERROR,"LIGHTS_BOX input signature mismatch; controller lights disabled.");
  constexpr char windowPattern[]="48 83 EC 68 4C 8B 51 20 4D 8B 42 30 49 8D 4A 20 0F 29 7C 24 40 0F 28 FA 49 83 F8 2F";
- if(hooks->Hook_FindPattern(windowPattern)==base+0x9ec110)hooks->Hook_Register(kName,"ControllerWindows","Combine player window controls with controller box input",reinterpret_cast<void*>(ControllerWindowControl),reinterpret_cast<void**>(&originalWindowControl),windowPattern,true);else Log(SPF_LOG_ERROR,"WINDOW_BOX native signature mismatch; controller window adjustment disabled.");
- constexpr char hornControlPattern[]="4C 8B DC 49 89 5B 08 49 89 6B 10 49 89 73 18 49 89 7B 20 41 56 48 81 EC 90 00 00 00";
- if(hooks->Hook_FindPattern(hornControlPattern)==base+0x9ea6a0)hooks->Hook_Register(kName,"ControllerHornBox","Combine player horn with controller box contact",reinterpret_cast<void*>(HornControlObserveStub),&gHornControlOriginal,hornControlPattern,true);else Log(SPF_LOG_ERROR,"HORN_BOX control signature mismatch.");
+ if(hooks->Hook_FindPattern(windowPattern)==base+0x9ec8d0)hooks->Hook_Register(kName,"ControllerWindows","Combine player window controls with controller box input",reinterpret_cast<void*>(ControllerWindowControl),reinterpret_cast<void**>(&originalWindowControl),windowPattern,true);else Log(SPF_LOG_ERROR,"WINDOW_BOX native signature mismatch; controller window adjustment disabled.");
+ constexpr char hornControlPattern[]="4C 8B DC 49 89 5B 08 49 89 6B 10 49 89 73 18 49 89 7B 20 41 56 48 81 EC 90 00 00 00 44 0F B7 91 10 06 00 00";
+ if(hooks->Hook_FindPattern(hornControlPattern)==base+0x9eae60)hooks->Hook_Register(kName,"ControllerHornBox","Combine player horn with controller box contact",reinterpret_cast<void*>(HornControlObserveStub),&gHornControlOriginal,hornControlPattern,true);else Log(SPF_LOG_ERROR,"HORN_BOX control signature mismatch.");
  signalLeftHook=hooks->Hook_Register(kName,"SignalLeftRequest","Delay player left toggle until stalk contact",reinterpret_cast<void*>(SignalLeftRequestStub),&gSignalLeftOriginal,kSignalLeftPattern,true);
  signalRightHook=hooks->Hook_Register(kName,"SignalRightRequest","Delay player right toggle until stalk contact",reinterpret_cast<void*>(SignalRightRequestStub),&gSignalRightOriginal,kSignalRightPattern,true);
  if(!driverHook || !advanceHook || !boneHook || !engineRequestHook || !signalLeftHook || !signalRightHook) {
@@ -535,7 +535,7 @@ void Update() {
  engineStarting.store(engineValid && engineState==PlayerEngineState::Starting);engineTick.store(engineValid?GetTickCount64():0);
  PollDeferredEngineStart(engineValid,engineState);
  if(ConsumeControllerIgnitionRequest() && engineValid && (engineState==PlayerEngineState::Off || engineState==PlayerEngineState::Running)){
-  auto controller=expectedPlayerDriverController.load();auto fresh=telemetryTick.load();auto entry=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))+0x5e1a70;const unsigned char expectedCode[]={0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x48};unsigned char actualCode[sizeof(expectedCode)]{};
+  auto controller=expectedPlayerDriverController.load();auto fresh=telemetryTick.load();auto entry=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))+0x5e1c70;const unsigned char expectedCode[]={0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9,0x48};unsigned char actualCode[sizeof(expectedCode)]{};
   if(controller && fresh && GetTickCount64()-fresh<250 && SafeRead(entry,actualCode,sizeof(actualCode)) && !std::memcmp(expectedCode,actualCode,sizeof(actualCode))){
    skipNextEngineStartEvent.store(true);controllerIgnitionCycle=true;using NativeIgnitionCycle=void(*)(uintptr_t);reinterpret_cast<NativeIgnitionCycle>(entry)(controller-0x1df0);controllerIgnitionCycle=false;
    uint32_t result=99;unsigned char electric=0;SafeRead(controller-0x1df0+0x1b8,&result,4);SafeRead(controller-0x1df0+0x1bc,&electric,1);if(result!=1)skipNextEngineStartEvent.store(false);char message[160];std::snprintf(message,sizeof(message),"IGNITION_INTERACTION native ignition cycle state_after=%u electricity=%u",result,electric);Log(SPF_LOG_INFO,message);
@@ -821,14 +821,14 @@ extern "C" void CaptureRadioInput(uintptr_t context) noexcept {
  using Ready=bool(__fastcall*)(uintptr_t);if(!reinterpret_cast<Ready>(ready)(context))return;
  if(command.station){
  auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t manager=0,radio=0,table=0;uint64_t count=0,current=0;
- bool valid=nativeRadioSelect && SafeRead(base+0x36b8ed8,&manager,sizeof(manager)) && manager && SafeRead(manager+8,&radio,sizeof(radio)) && radio && SafeRead(radio,&table,sizeof(table)) && table==base+0x22c7e10 && SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));
+ bool valid=nativeRadioSelect && SafeRead(base+0x36baef8,&manager,sizeof(manager)) && manager && SafeRead(manager+8,&radio,sizeof(radio)) && radio && SafeRead(radio,&table,sizeof(table)) && table==base+0x22c9e08 && SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));
  if(valid)valid=EnsureRadioList(radio,count,current);
  int next=valid?NextControllerRadioStation(current,count,command.station):-1;
  if(next>=0){nativeRadioSelect(radio,static_cast<uint64_t>(next));uint64_t after=~uint64_t{};SafeRead(radio+0xe0,&after,sizeof(after));if(after==static_cast<uint64_t>(next))QueueControllerRadioTuneSound();char message[192];std::snprintf(message,sizeof(message),"RADIO_BOX select before=%llu requested=%d after=%llu stations=%llu",static_cast<unsigned long long>(current),next,static_cast<unsigned long long>(after),static_cast<unsigned long long>(count));Log(SPF_LOG_INFO,message);}else Log(SPF_LOG_WARN,"RADIO_BOX station list unavailable; selection deferred.");
  }
  if(command.toggle){
  auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t manager=0,radio=0,table=0,stream=0;uint64_t count=0,current=0;
- bool valid=nativeRadioPause && nativeRadioSelect && SafeRead(base+0x36b8ed8,&manager,sizeof(manager)) && manager && SafeRead(manager+8,&radio,sizeof(radio)) && radio && SafeRead(radio,&table,sizeof(table)) && table==base+0x22c7e10 && SafeRead(radio+0xe8,&stream,sizeof(stream)) && SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));
+ bool valid=nativeRadioPause && nativeRadioSelect && SafeRead(base+0x36baef8,&manager,sizeof(manager)) && manager && SafeRead(manager+8,&radio,sizeof(radio)) && radio && SafeRead(radio,&table,sizeof(table)) && table==base+0x22c9e08 && SafeRead(radio+0xe8,&stream,sizeof(stream)) && SafeRead(radio+0x18,&count,sizeof(count)) && SafeRead(radio+0xe0,&current,sizeof(current));
  if(valid && !stream)valid=EnsureRadioList(radio,count,current);
  int action=valid?ControllerRadioPlaybackAction(stream!=0,current,count):-1;
  if(action==-2){nativeRadioPause(radio);uint32_t flags=0;if(SafeRead(radio+0xf0,&flags,sizeof(flags)))QueueControllerRadioClickSound((flags&1)==0);Log(SPF_LOG_INFO,"RADIO_BOX play/pause toggled on current station.");}else if(action>=0){nativeRadioSelect(radio,static_cast<uint64_t>(action));uintptr_t started=0;if(SafeRead(radio+0xe8,&started,sizeof(started)) && started)QueueControllerRadioClickSound(true);Log(SPF_LOG_INFO,"RADIO_BOX playback started on selected station.");}else Log(SPF_LOG_WARN,"RADIO_BOX play/pause unavailable until station list loads.");

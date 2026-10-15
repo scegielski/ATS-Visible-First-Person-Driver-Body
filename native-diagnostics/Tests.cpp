@@ -306,14 +306,14 @@ int main() {
  gate.Queue(100,1,3000,11);Check(gate.Poll(200,1,3100,true,0,11,replay)==EngineStartGate::Cancelled,"vehicle change prevents replay");
  gate.Queue(100,1,3000,11);Check(gate.Poll(100,1,5000,true,0,0,replay)==EngineStartGate::Timeout,"missing animation has bounded delay fallback");
  gate.Queue(100,1,6000,12);Check(gate.Poll(100,1,6100,false,0,0,replay)==EngineStartGate::Cancelled,"stale world does not start vehicle");
- Check(IsManualEngineStartCaller(0x100000,0x100000+0x9f79ec) && !IsManualEngineStartCaller(0x100000,0x100000+0x5db25f),"manual caller guard excludes automatic engine paths");
+ Check(IsManualEngineStartCaller(0x100000,0x100000+0x9f81ac) && !IsManualEngineStartCaller(0x100000,0x100000+0x5db25f),"manual caller guard excludes automatic engine paths");
  }
 
  gEngineOriginal=reinterpret_cast<void*>(EngineOriginal);Check(EngineRequestObserveStub(0x12345678,0xabcdef01,0xfedcba00,0x11223344,0x55667788)==0x987654,"engine observer preserves original return");
  suppressEngine=true;Check(EngineRequestObserveStub(0x12345678,0xabcdef01,0xfedcba00,0x11223344,0x55667788)==0 && engineOriginalCalls==1,"deferred engine request skips original exactly once");suppressEngine=false;
  {
  constexpr uintptr_t base=0x100000,game=0x200000,owner=0x300000,vt=0x400000,vehicle=0x500000,model=0x600000;bool wrong=false;
- auto reader=[&](uintptr_t a,void* out,size_t n){uintptr_t value=0;if(a==base+0x36b8db0)value=game;else if(a==game+0xaa0)value=owner;else if(a==owner)value=vt;else if(a==vt+0x1b8)value=wrong?0:base+0x4d9c90;else if(a==owner+0x31b0)value=vehicle;else if(a==vehicle+0x1df8)value=model;else return false;if(n!=8)return false;std::memcpy(out,&value,8);return true;};
+ auto reader=[&](uintptr_t a,void* out,size_t n){uintptr_t value=0;if(a==base+0x36badd0)value=game;else if(a==game+0xaa0)value=owner;else if(a==owner)value=vt;else if(a==vt+0x1b8)value=wrong?0:base+0x4d9cf0;else if(a==owner+0x31b0)value=vehicle;else if(a==vehicle+0x1df8)value=model;else return false;if(n!=8)return false;std::memcpy(out,&value,8);return true;};
  uintptr_t controller=0,candidate=0;Check(ReadPlayerExteriorDriver(base,reader,controller,candidate) && controller==vehicle+0x1df0 && candidate==model,"player exterior identity follows guarded vehicle owner");
  Check(IsConfirmedPlayerDriver(controller,candidate,controller,candidate),"exact observed player driver matches");
  Check(!IsConfirmedPlayerDriver(vehicle+0x2c8,candidate,controller,candidate),"traffic driver using same asset rejected");
@@ -564,10 +564,10 @@ int main() {
  uint32_t engine=0;bool badOwner=false,missing=false;
  auto readEngine=[&](uintptr_t a,void* out,size_t n){
   uintptr_t value=0;
-  if(a==b+0x36b8db0)value=g;
+  if(a==b+0x36badd0)value=g;
   else if(a==g+0xaa0)value=o;
   else if(a==o)value=t;
-  else if(a==t+0x1b8)value=badOwner?0:b+0x4d9c90;
+  else if(a==t+0x1b8)value=badOwner?0:b+0x4d9cf0;
   else if(a==o+0x31b0)value=missing?0:v;
   else if(a==v+0x1b8 && n==4){std::memcpy(out,&engine,4);return true;}
   else return false;
@@ -656,10 +656,10 @@ int main() {
   uintptr_t value=0;
   if(address==hornState+0xf0 && size==1){std::memcpy(output,&heldByte,1);return true;}
   if(size!=8)return false;
-  if(address==base+0x36b8db0)value=game;
+  if(address==base+0x36badd0)value=game;
   else if(address==game+0xaa0)value=owner;
   else if(address==owner)value=vt;
-  else if(address==vt+0x1b8)value=base+(wrongOwner?0x1234:0x4d9c90);
+  else if(address==vt+0x1b8)value=base+(wrongOwner?0x1234:0x4d9cf0);
   else if(address==owner+0x31b0)value=vehicle;
   else if(address==vehicle+0x1d38)value=missingHorn?0:hornState;
   else return false;
