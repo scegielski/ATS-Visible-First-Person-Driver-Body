@@ -1,9 +1,11 @@
-# Controller menu mouse prototype
+# Controller menu pointing checkpoint
 
-In ATS menus or while paused, hold either controller grip and rotate that controller to steer the existing mouse cursor. Squeeze the trigger for left click or hold it to drag; release to end the click. Tilt the thumbstick up/down to scroll. Release grip to reposition without moving the cursor. The first gripping controller owns the cursor until released.
+Menus show controller axes, straight forward beams, and hit dots. Point either controller at the captured VR menu surface without holding grip. A fresh trigger press selects that controller for cursor ownership; holding trigger drags and the thumbstick scrolls. Ownership stays stable through brief misses. Cabin interactions pause during menu control.
 
-This uses relative controller rotation, not a laser intersecting the floating VR UI panel. Direct panel-aligned pointing is not implemented. Input is limited to foreground ATS and menu/pause detection. Cabin interactions are suspended while menu control is active. Tracking loss, grip release, menu exit and plugin unload release a held mouse button. A trigger already held when acquiring the cursor must be released before clicking.
+The ray uses the final native menu transform with its per-eye translation removed, supports flat and curved panels, and is expressed relative to the headset. Beam and intersection use the same raw controller forward axis. Quest tip pitch compensation is disabled at the user's request.
 
-Menu polling is independent of version-specific animation hook activation. Unsupported executables retain their native-hook guard; only the menu prototype may run while the framework reports a paused game. Controller input reads use the game's synchronized action state without adding OpenXR synchronization calls.
+Cursor movement currently uses smoothed relative mouse input. Direct Windows cursor positioning was tested and did not move ATS's menu cursor. Relative gain starts at 1.5 on each axis. The installed config file `controller_menu_cursor_gain.txt` contains horizontal and vertical multipliers, for example `1.5 1.5`; valid edits reload every half second, invalid values preserve the last valid pair. Accepted values are finite, positive, and at most 10. This is a tuning workaround; direct internal ATS cursor positioning remains unimplemented.
 
-Validation: driver and controller-layer regressions pass, covering rotation, held-input suppression, tracking loss and yaw wrap. The user confirmed menu control works. The separately committed ATS compatibility fix restores driving features.
+The grip-and-rotate air mouse remains a fallback when the native menu surface is unavailable. Version-specific native hooks retain their executable and signature guards. Controller input reads do not add OpenXR synchronization calls.
+
+Validation: both regression suites pass, including ray/surface geometry, eye-offset removal, pointer ownership, stationary movement, independent gain, reverse travel, and invalid edits. The user reports the relative-pointer version is almost working, but exact cursor/laser alignment remains unresolved. No claim of pixel-exact positioning or complete click coverage is made. Plugin 0.34.8 is installed with matching release binary.

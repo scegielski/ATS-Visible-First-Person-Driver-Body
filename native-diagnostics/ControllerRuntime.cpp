@@ -9,6 +9,8 @@
 #include "MirrorInteraction.hpp"
 #include "NativeControllerInput.hpp"
 #include "ControllerMenuMouse.hpp"
+#include "MenuLaser.hpp"
+extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept;
 #include "vendor/openvr.h"
 #include <mutex>
 #include <cstdio>
@@ -29,7 +31,8 @@ struct Tracked {DriverIK::V point{};DriverIK::Q rotation{1,0,0,0};bool valid=fal
 LiveControllerFingerPose liveFingers[2]{LiveControllerFingerPose(false),LiveControllerFingerPose(true)};
 ControllerFingerMode fingerMode[2];
 DriverIK::V hornTarget{},hornBoxOffset{},leftHandBoxOffset{.14f,0,0};uint64_t hornTargetTick=0,hornBoxTick=0;bool hornBoxHeld=false;float hornBoxScale=1.25f;InteractionBoxEditor boxEditor;std::string previousBoxPlacement;uint64_t placementPoll=0;IgnitionTriggerGate radioTriggers[2];IgnitionTriggerGate wiperTriggers[2];uint64_t wiperRequestTick=0;IgnitionTriggerGate lightTriggers[2];uint64_t lightRequestTick=0;IgnitionTriggerGate ignitionTriggers[2];DriverIK::V ignitionTarget{},ignitionBoxOffset{},handBoxOffset{-.08f,0,0};uint64_t ignitionTargetTick=0,interactionRequestTick=0;ControllerSceneFrame actualSceneFrame{};uint64_t sceneXRFrameTick=0,sceneCameraTick=0;DriverPalette sceneMarkers{};uint64_t sceneMarkerTick=0;bool markerCalibrated=false;DriverIK::V markerOrigin{},markerAnchor{};DriverIK::Q markerBasis{1,0,0,0};
-vr::IVROverlay* markerOverlay=nullptr;vr::VROverlayHandle_t markers[2][6]{};int markerError=0;
+vr::IVRRenderModels* controllerModels=nullptr;vr::IVROverlay* markerOverlay=nullptr;vr::VROverlayHandle_t markers[2][6]{};int markerError=0;
+void DestroyMenuLasers();
 void HideMarkers(){if(markerOverlay)for(auto& side:markers)for(auto handle:side)if(handle)markerOverlay->HideOverlay(handle);}
 void CreateMarkers(){
  if(!markerOverlay)return;
@@ -66,7 +69,7 @@ bool Connect(){
  auto init=reinterpret_cast<Init>(GetProcAddress(library,"VR_InitInternal2"));auto get=reinterpret_cast<Interface>(GetProcAddress(library,"VR_GetGenericInterface"));shutdownVR=reinterpret_cast<Shutdown>(GetProcAddress(library,"VR_ShutdownInternal"));
  vr::EVRInitError error=vr::VRInitError_None;
  if(init && get && shutdownVR){init(&error,vr::VRApplication_Background,nullptr);initialized=error==vr::VRInitError_None;if(initialized)systemVR=static_cast<vr::IVRSystem*>(get(vr::IVRSystem_Version,&error));}
- errorCode=static_cast<int>(error);if(systemVR){markerOverlay=static_cast<vr::IVROverlay*>(get(vr::IVROverlay_Version,&error));CreateMarkers();return true;}
+ errorCode=static_cast<int>(error);if(systemVR){controllerModels=static_cast<vr::IVRRenderModels*>(get(vr::IVRRenderModels_Version,&error));markerOverlay=static_cast<vr::IVROverlay*>(get(vr::IVROverlay_Version,&error));CreateMarkers();return true;}
  if(initialized && shutdownVR)shutdownVR();initialized=false;FreeLibrary(library);library=nullptr;return false;
 }
 }
@@ -153,7 +156,7 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
  return mask;
 }
 void ControllerStatus(char* buffer,size_t length){std::lock_guard lock(guard);std::snprintf(buffer,length,"CONTROLLER_IK mirror_bridge=%d connected=%d error=%d marker_error=%d native_input=%d twist_share=%.3f grip=%.3f,%.3f trigger=%.3f,%.3f left_valid=%d right_valid=%d left_enabled=%d right_enabled=%d samples=%llu,%llu solves=%llu,%llu rejected=%llu,%llu calibrations=%llu,%llu finger_mode=%s,%s mode_switches=%llu,%llu finger_pose_revision=%llu,%llu finger_pose_rejected=%llu,%llu",mirrorBridgeStatus,systemVR?1:0,errorCode,markerError,NativeControllerInputStatus(),twistShare,fingerGrip[0],fingerGrip[1],fingerTrigger[0],fingerTrigger[1],hands[0].valid?1:0,hands[1].valid?1:0,controls[0].enabled?1:0,controls[1].enabled?1:0,samples[0],samples[1],solves[0],solves[1],rejects[0],rejects[1],calibrations[0],calibrations[1],fingerMode[0].Name(),fingerMode[1].Name(),fingerMode[0].switches,fingerMode[1].switches,liveFingers[0].Revision(),liveFingers[1].Revision(),liveFingers[0].Rejected(),liveFingers[1].Rejected());}
-void CloseControllers(){std::lock_guard lock(guard);HideMarkers();if(markerOverlay)for(auto& side:markers)for(auto handle:side)if(handle)markerOverlay->DestroyOverlay(handle);for(auto& side:markers)for(auto& handle:side)handle=0;markerOverlay=nullptr;systemVR=nullptr;if(initialized && shutdownVR)shutdownVR();initialized=false;if(library)FreeLibrary(library);library=nullptr;}
+void CloseControllers(){std::lock_guard lock(guard);HideMarkers();DestroyMenuLasers();if(markerOverlay)for(auto& side:markers)for(auto handle:side)if(handle)markerOverlay->DestroyOverlay(handle);for(auto& side:markers)for(auto& handle:side)handle=0;markerOverlay=nullptr;controllerModels=nullptr;systemVR=nullptr;if(initialized && shutdownVR)shutdownVR();initialized=false;if(library)FreeLibrary(library);library=nullptr;}
 
 bool ApplyControllerMarkerPalette(DriverPalette& palette){std::lock_guard lock(guard);palette={};if(sceneMarkerTick && GetTickCount64()-sceneMarkerTick<=250)palette=sceneMarkers;return true;}
 
@@ -184,10 +187,49 @@ void QueueControllerRadioTuneSound(){std::lock_guard lock(guard);radioTunePendin
 
 void QueueControllerRadioClickSound(bool playing){std::lock_guard lock(guard);radioClickPending=playing?1:-1;}
 
+
+namespace {MenuLaserSurface menuSurface;uint64_t menuSurfaceTick=0;vr::VROverlayHandle_t menuBeams[2]{},menuDots[2]{};
+void DestroyMenuLasers(){if(markerOverlay)for(unsigned i=0;i<2;++i){if(menuBeams[i])markerOverlay->DestroyOverlay(menuBeams[i]);if(menuDots[i])markerOverlay->DestroyOverlay(menuDots[i]);menuBeams[i]=menuDots[i]=0;}menuSurfaceTick=0;}
+void HideMenuLasers(){if(markerOverlay)for(unsigned i=0;i<2;++i){if(menuBeams[i])markerOverlay->HideOverlay(menuBeams[i]);if(menuDots[i])markerOverlay->HideOverlay(menuDots[i]);}}
+void EnsureMenuLasers(){if(!markerOverlay)return;for(unsigned i=0;i<2;++i){if(!menuBeams[i]){auto key=std::string("spf.driver.menu.beam.")+std::to_string(i);if(markerOverlay->CreateOverlay(key.c_str(),"Menu controller laser",&menuBeams[i])==vr::VROverlayError_None){std::vector<unsigned char> pixels(4*1024*4,255);markerOverlay->SetOverlayRaw(menuBeams[i],pixels.data(),4,1024,4);}}if(!menuDots[i]){auto key=std::string("spf.driver.menu.dot.")+std::to_string(i);if(markerOverlay->CreateOverlay(key.c_str(),"Menu laser hit",&menuDots[i])==vr::VROverlayError_None){std::array<unsigned char,32*32*4> pixels{};for(int y=0;y<32;++y)for(int x=0;x<32;++x){auto n=(y*32+x)*4;pixels[n]=pixels[n+1]=pixels[n+2]=255;pixels[n+3]=(x-16)*(x-16)+(y-16)*(y-16)<200?255:0;}markerOverlay->SetOverlayRaw(menuDots[i],pixels.data(),32,32,4);markerOverlay->SetOverlayWidthInMeters(menuDots[i],.012f);}}for(auto h:{menuBeams[i],menuDots[i]})if(h)markerOverlay->SetOverlayColor(h,i?1.f:.2f,i?.55f:.7f,i?.1f:1.f);}}
+vr::HmdMatrix34_t MenuOverlayMatrix(DriverIK::V x,DriverIK::V y,DriverIK::V z,DriverIK::V p){vr::HmdMatrix34_t m{};for(unsigned r=0;r<3;++r){m.m[r][0]=x[r];m.m[r][1]=y[r];m.m[r][2]=z[r];m.m[r][3]=p[r];}return m;}
+Tracked MenuAimPose(vr::TrackedDeviceIndex_t device,const vr::TrackedDevicePose_t& raw){
+ if(!controllerModels || !systemVR)return Convert(raw);char model[256]{};vr::ETrackedPropertyError error{};systemVR->GetStringTrackedDeviceProperty(device,vr::Prop_RenderModelName_String,model,sizeof(model),&error);vr::VRControllerState_t buttons{};vr::RenderModel_ControllerMode_State_t mode{};vr::RenderModel_ComponentState_t component{};
+ if(error!=vr::TrackedProp_Success || !systemVR->GetControllerState(device,&buttons,sizeof(buttons)) || !controllerModels->GetComponentState(model,"tip",&buttons,&mode,&component))return Convert(raw);
+ MenuPoseMatrix deviceMatrix{},tipMatrix{};for(unsigned r=0;r<3;++r)for(unsigned c=0;c<4;++c){deviceMatrix[r][c]=raw.mDeviceToAbsoluteTracking.m[r][c];tipMatrix[r][c]=component.mTrackingToComponentLocal.m[r][c];}auto composed=ComposeMenuAim(deviceMatrix,tipMatrix);auto pose=raw;for(unsigned r=0;r<3;++r)for(unsigned c=0;c<4;++c)pose.mDeviceToAbsoluteTracking.m[r][c]=composed[r][c];return Convert(pose);
+}
+bool PollMenuLaser(bool menu){
+ using namespace DriverIK;static ControllerMenuMouse click;static MenuCursorMotion cursor;static IgnitionTriggerGate choose[2];static int owner=-1;static uint64_t last=0;auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
+ DWORD pid=0;auto window=GetForegroundWindow();GetWindowThreadProcessId(window,&pid);menu=menu && pid==GetCurrentProcessId();
+ bool surfaceFresh=menuSurfaceTick && now-menuSurfaceTick<250;
+ if(!menu || !surfaceFresh){HideMenuLasers();auto out=click.Step(false,false,0,0,0,0,0);if(out.button<0){INPUT e{};e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_LEFTUP;SendInput(1,&e,sizeof(e));}owner=-1;cursor.Step(false,-1,0,0,0,0,0);choose[0]=choose[1]={};return false;}
+ if(!systemVR && now-attempt>=5000){attempt=now;Connect();}
+ bool pressed[2]{},mode[2]{},thumb[2]{};float grips[2]{},triggers[2]{},inward[2]{},sticks[4]{};bool valid=systemVR && PollNativeControllerButtons(pressed,grips,triggers,mode,thumb,inward);if(valid)ReadControllerStickAxes(sticks);
+ vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};if(valid)systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);
+ auto h=Convert(poses[0]);valid=valid && h.valid;MenuLaserHit hits[2]{};EnsureMenuLasers();
+ for(unsigned side=0;side<2;++side){auto index=valid?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;auto hand=index<vr::k_unMaxTrackedDeviceCount?Convert(poses[index]):Tracked{};
+  if(!valid || !hand.valid){if(markerOverlay){for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);if(menuBeams[side])markerOverlay->HideOverlay(menuBeams[side]);if(menuDots[side])markerOverlay->HideOverlay(menuDots[side]);}continue;}
+  auto ray=MenuRayInHeadSpace(hand.point,hand.rotation,h.point,h.rotation);auto start=ray.origin;auto direction=ray.direction;hits[side]=IntersectMenuLaser(menuSurface,start,direction);float length=hits[side].hit?hits[side].distance:2.f;auto y=Rotate(hand.rotation,{0,0,-1});auto middle=Add(hand.point,Mul(y,length*.5f));auto z=Unit(Sub(h.point,middle));auto x=Unit(Cross(y,z));z=Unit(Cross(x,y));ShowAxes(side,index);
+  if(markerOverlay && menuBeams[side]){auto m=MenuOverlayMatrix(x,y,z,middle);markerOverlay->SetOverlayWidthInMeters(menuBeams[side],length/256.f);markerOverlay->SetOverlayTransformAbsolute(menuBeams[side],vr::TrackingUniverseStanding,&m);markerOverlay->ShowOverlay(menuBeams[side]);}
+  if(markerOverlay && menuDots[side]){if(hits[side].hit){auto point=Add(hand.point,Mul(y,length));auto q=h.rotation;auto m=MenuOverlayMatrix(Rotate(q,{1,0,0}),Rotate(q,{0,1,0}),Rotate(q,{0,0,1}),point);markerOverlay->SetOverlayTransformAbsolute(menuDots[side],vr::TrackingUniverseStanding,&m);markerOverlay->ShowOverlay(menuDots[side]);}else markerOverlay->HideOverlay(menuDots[side]);}
+ }
+ bool select[2]{};for(unsigned side=0;side<2;++side)select[side]=choose[side].Step(triggers[side],valid,hits[side].hit);
+ bool hitFlags[2]{hits[0].hit,hits[1].hit};if(!click.down && (select[0]||select[1]))click.Step(true,true,0,0,0,0,0);owner=SelectMenuLaserOwner(owner,click.down,hitFlags,select);
+ bool hit=owner>=0 && hits[owner].hit;auto output=click.Step(hit,hit,0,0,hit?triggers[owner]:0,hit?sticks[owner*2+1]:0,dt);INPUT events[3]{};UINT count=0;
+ static float gainX=1.5f,gainY=1.5f;static uint64_t gainPoll=0;if(now-gainPoll>=500 && !guideFile.empty()){gainPoll=now;std::ifstream gainFile(guideFile.parent_path()/"controller_menu_cursor_gain.txt");if(gainFile){std::string text((std::istreambuf_iterator<char>(gainFile)),{});ParseMenuCursorGain(text,gainX,gainY);}}
+ RECT rect{};GetClientRect(window,&rect);auto motion=hit?cursor.Step(true,owner,hits[owner].u,hits[owner].v,rect.right,rect.bottom,dt,gainX,gainY):MenuCursorMotion::Output{};
+ if(motion.anchor){POINT point{motion.x,motion.y};if(ClientToScreen(window,&point))SetCursorPos(point.x,point.y);}
+
+ if(motion.dx||motion.dy){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dx=motion.dx;e.mi.dy=motion.dy;e.mi.dwFlags=MOUSEEVENTF_MOVE;}
+ if(output.button){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=output.button>0?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP;}if(output.wheel){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_WHEEL;e.mi.mouseData=static_cast<DWORD>(output.wheel*WHEEL_DELTA);}unsigned sent=count?SendInput(count,events,sizeof(INPUT)):0;static uint64_t lastReport=0;if(output.button || now-lastReport>=2000){lastReport=now;ReportMenuLaser(owner,hits[0].hit?1:0,hits[1].hit?1:0,triggers[0],triggers[1],output.button,sent,count);}return true;
+}
+}
+void PublishControllerMenuSurface(const float* transform,const float* size,float radius){for(unsigned i=0;i<8;++i)if(!std::isfinite(transform[i]))return;float n=0;for(unsigned i=4;i<8;++i)n+=transform[i]*transform[i];if(n<.98f||n>1.02f||!std::isfinite(radius)||!std::isfinite(size[0])||!std::isfinite(size[1])||size[0]<=0||size[1]<=0||size[0]>20||size[1]>20)return;std::lock_guard lock(guard);menuSurface={{transform[0],transform[1],transform[2]},{transform[4],transform[5],transform[6],transform[7]},size[0],size[1],radius};menuSurfaceTick=GetTickCount64();}
+
 // Menu cursor prototype: controller rotation acts as a relative air mouse.
 void PollControllerMenuMouse(bool menu){
  static ControllerMenuMouse mouse;static int owner=-1;static uint64_t last=0;static float remainderX=0,remainderY=0;
- std::lock_guard lock(guard);auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
+ std::lock_guard lock(guard);if(PollMenuLaser(menu)){auto release=mouse.Step(false,false,0,0,0,0,0);if(release.button<0){INPUT e{};e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_LEFTUP;SendInput(1,&e,sizeof(e));}owner=-1;return;}auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
  DWORD pid=0;GetWindowThreadProcessId(GetForegroundWindow(),&pid);menu=menu && pid==GetCurrentProcessId();
  bool pressed[2]{},mode[2]{},thumb[2]{};float grip[2]{},trigger[2]{},inward[2]{},axes[4]{};
  bool valid=menu && PollNativeControllerButtons(pressed,grip,trigger,mode,thumb,inward);

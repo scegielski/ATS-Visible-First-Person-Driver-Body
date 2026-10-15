@@ -1,13 +1,21 @@
 {
-  "user_validation": "User confirmed menu works.",
+  "checkpoint": "0.34.8 relative menu laser pointer",
+  "user_validation": "User reports current version is almost working and requests checkpoint before internal cursor experiments. Earlier relative version under-traveled in both axes; direct Windows positioning produced no movement.",
   "automated_validation": [
     "DriverDiagnosticRegression passed",
     "ControllerLayerRegression passed"
   ],
-  "prototype": "Relative controller rotation while grip held; trigger click/drag and thumbstick scroll.",
+  "installed": true,
   "limitations": [
-    "No direct VR panel ray mapping",
-    "Menu and pause detection require runtime coverage beyond the tested menu"
+    "Exact cursor-to-laser alignment remains unresolved",
+    "Relative gain 1.5 is a trial value",
+    "Native internal cursor positioning not implemented",
+    "Complete menu click coverage remains unverified"
   ],
-  "native_compatibility": "Separate preceding commit"
+  "features": [
+    "Controller axes, straight beams and hit dots",
+    "Final native menu surface capture and eye-offset removal",
+    "Stable per-controller ownership",
+    "Live independent horizontal and vertical gains"
+  ]
 }

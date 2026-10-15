@@ -25,6 +25,7 @@
 #include "HeadTorso.hpp"
 #include "GestureHeadFollow.hpp"
 #include "ControllerRuntime.hpp"
+#include "MenuLaser.hpp"
 #include "NativeControllerInput.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
@@ -268,7 +269,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.33.0");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.34.8");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -283,6 +284,17 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
 }
 void OnLoad(const SPF_Load_API* api) {
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
+}
+extern "C" {void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;void MenuModeObserveStub();void MenuSurfaceObserveStub();}
+extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept {char text[192];std::snprintf(text,sizeof(text),"MENU_LASER owner=%d hit=%d,%d trigger=%.3f,%.3f button=%d mouse_events=%u/%u",owner,leftHit,rightHit,leftTrigger,rightTrigger,button,sent,requested);Log(SPF_LOG_INFO,text);}
+thread_local bool nativeMenuGame=false;
+extern "C" void CaptureMenuMode(uint32_t inGame) noexcept {nativeMenuGame=(inGame&255)!=0;}
+extern "C" void CaptureMenuSurface(uintptr_t frame) noexcept {
+ float transform[8]{},size[2]{},eye[3]{};if(!SafeRead(frame-0x28,transform,sizeof(transform)) || !SafeRead(frame-0x60,size,sizeof(size)) || !SafeRead(frame-0x40,eye,sizeof(eye)))return;RemoveMenuEyeOffset(transform,eye);
+ using FloatQuery=float(__fastcall*)(uintptr_t);auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));float radius=reinterpret_cast<FloatQuery>(base+0x1dc850)(base+(nativeMenuGame?0x2d47d10:0x2d47bd0));
+ PublishControllerMenuSurface(transform,size,radius);
+ static uint64_t lastLog=0;auto now=GetTickCount64();if(now-lastLog>=2000){lastLog=now;char text[256];std::snprintf(text,sizeof(text),"MENU_SURFACE game=%d center=%.3f,%.3f,%.3f q=%.3f,%.3f,%.3f,%.3f size=%.3f,%.3f radius=%.3f",nativeMenuGame?1:0,transform[0],transform[1],transform[2],transform[4],transform[5],transform[6],transform[7],size[0],size[1],radius);Log(SPF_LOG_INFO,text);}
+
 }
 using RadioStationFn=void(__fastcall*)(uintptr_t,unsigned char);using RadioVolumeFn=void(__fastcall*)(uintptr_t,float);RadioStationFn nativeRadioStation=nullptr;RadioVolumeFn nativeRadioVolume=nullptr;using RadioSelectFn=void(__fastcall*)(uintptr_t,uint64_t);RadioSelectFn nativeRadioSelect=nullptr;using RadioPauseFn=void(__fastcall*)(uintptr_t);RadioPauseFn nativeRadioPause=nullptr;RadioPauseFn nativeRadioInitialize=nullptr;
 using WiperCountFn=uint64_t(__fastcall*)(uintptr_t);using WiperSetFn=void(__fastcall*)(uintptr_t,uint32_t);WiperCountFn nativeWiperCount=nullptr;WiperSetFn nativeWiperSet=nullptr;
@@ -313,6 +325,9 @@ void Activated(const SPF_Core_API* api) {
  else Log(SPF_LOG_WARN,"HEAD_TRACKING: view-site signature mismatch; observer disabled.");
  if(hooks->Hook_FindPattern(kNativeRecenterPattern)==base+0x428852)nativeRecenterHook=hooks->Hook_Register(kName,"NativeHeadRecenter","Observe ATS head-reset input without consuming it",reinterpret_cast<void*>(NativeRecenterObserveStub),&gRecenterOriginal,kNativeRecenterPattern,true);
  else Log(SPF_LOG_WARN,"HEAD_RECENTER native input-site signature mismatch; observer disabled.");
+ constexpr char menuModePattern[]="0F 28 D8 48 8D 4D 8C 0F 57 C9 F3 0F 11 9D 00 09 00 00";
+ constexpr char menuSurfacePattern[]="45 8B C6 48 8D 55 D4 48 8B CE E8 ?? ?? ?? ?? 48 8D 8D A0 03 00 00";
+ if(hooks->Hook_FindPattern(menuModePattern)==base+0x42c826 && hooks->Hook_FindPattern(menuSurfacePattern)==base+0x42d144){hooks->Hook_Register(kName,"MenuMode","Observe VR menu context",reinterpret_cast<void*>(MenuModeObserveStub),&gMenuModeOriginal,menuModePattern,true);hooks->Hook_Register(kName,"MenuSurface","Observe final VR menu surface with eye translation removed",reinterpret_cast<void*>(MenuSurfaceObserveStub),&gMenuSurfaceOriginal,menuSurfacePattern,true);}else Log(SPF_LOG_WARN,"MENU_LASER surface signatures unavailable; air mouse retained.");
  expectedReturn=base+0x9e2552;
  resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15e0130);
  enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15e07d0);
@@ -534,8 +549,8 @@ void Update() {
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
  const bool menuMouse=core && core->gameworld && core->gameworld->GW_IsGamePaused && (core->gameworld->GW_IsGamePaused() || !cameraValid || !telemetryTick.load() || GetTickCount64()-telemetryTick.load()>250);
- PollControllerMenuMouse(menuMouse);
  PollControllers(!menuMouse && cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
+ PollControllerMenuMouse(menuMouse);
  PollGesturePoseFile();PollGestureHeadFollowGain();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
