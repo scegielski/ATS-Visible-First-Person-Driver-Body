@@ -1,3 +1,5 @@
+#include "MenuKeyPulse.hpp"
+#include "MenuDoublePress.hpp"
 #include "MenuButtonRoute.hpp"
 #include "DriverSettings.hpp"
 #include "IntegratedAdjustments.hpp"
@@ -16,6 +18,7 @@
 #include "ControllerMenuMouse.hpp"
 #include "MenuLaser.hpp"
 extern "C" void ReportMenuModel(unsigned side,const char* name,unsigned part,int status) noexcept;
+extern "C" void ReportMenuShortcut(int x,int y,int enter,int escape,int key,int edge,unsigned sent) noexcept;
 extern "C" bool ApplyNativeMenuCursor(float u,float v) noexcept;
 extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept;
 #include "vendor/openvr.h"
@@ -27,6 +30,7 @@ extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTri
 #include <mmsystem.h>
 #pragma comment(lib,"winmm.lib")
 namespace {
+void PollControllerShortcuts(bool permitted);
 int radioClickPending=0;bool radioTunePending=false;ControllerRadioStick radioStick;ControllerRadioCommand radioCommand;uint64_t radioTick=0;float windowRequests[2]{};uint64_t windowRequestTick=0;
 int mirrorContact[2]{-1,-1};uint64_t mirrorContactTick=0;int mirrorBridgeStatus=5;
 void SendMirrorInput(int mirror,float x,float y){mirrorBridgeStatus=SetIntegratedAdjustmentInput(MirrorPhysicalSlot(mirror),x,y);}
@@ -168,7 +172,7 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
 }
 void ControllerStatus(char* buffer,size_t length){std::lock_guard lock(guard);std::snprintf(buffer,length,"CONTROLLER_IK mirror_bridge=%d connected=%d error=%d marker_error=%d native_input=%d twist_share=%.3f grip=%.3f,%.3f trigger=%.3f,%.3f left_valid=%d right_valid=%d left_enabled=%d right_enabled=%d samples=%llu,%llu solves=%llu,%llu rejected=%llu,%llu calibrations=%llu,%llu finger_mode=%s,%s mode_switches=%llu,%llu finger_pose_revision=%llu,%llu finger_pose_rejected=%llu,%llu",mirrorBridgeStatus,systemVR?1:0,errorCode,markerError,NativeControllerInputStatus(),twistShare,fingerGrip[0],fingerGrip[1],fingerTrigger[0],fingerTrigger[1],hands[0].valid?1:0,hands[1].valid?1:0,controls[0].enabled?1:0,controls[1].enabled?1:0,samples[0],samples[1],solves[0],solves[1],rejects[0],rejects[1],calibrations[0],calibrations[1],fingerMode[0].Name(),fingerMode[1].Name(),fingerMode[0].switches,fingerMode[1].switches,liveFingers[0].Revision(),liveFingers[1].Revision(),liveFingers[0].Rejected(),liveFingers[1].Rejected());}
 void CloseControllers(){
- std::lock_guard lock(guard);HideMarkers();DestroyMenuLasers();
+ std::lock_guard lock(guard);PollControllerShortcuts(false);HideMarkers();DestroyMenuLasers();
  cabinModelsActive=false;cabinModelReady[0]=cabinModelReady[1]=false;
  // OpenVR and the game's OpenXR runtime share vrclient in this process.
  // A framework plugin toggle must not shut that client down under xrEndFrame.
@@ -228,6 +232,26 @@ void UpdateCabinControllerModels(const vr::TrackedDevicePose_t* poses){
  std::array<ControllerMeshPose,64> modelPoses{};for(unsigned side=0;side<2;++side){cabinLaserReady[side]=false;auto index=systemVR?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;if(!head.valid || index>=vr::k_unMaxTrackedDeviceCount || !hands[side].valid || controls[side].enabled){HideControllerPointer(side);continue;}controllerAim[side]=MenuAimPose(index,poses[index]);cabinModelReady[side]=ShowMenuControllerModel(side,index,poses[index],head,modelPoses);bool fresh=GetTickCount64()-cabinLaserTick[side]<250;cabinLaserReady[side]=ShowControllerPointer(side,controllerAim[side],head,fresh?cabinLaserDistance[side]:2.f,fresh && cabinLaserHit[side]);}SubmitMenuModelPoses(modelPoses);
 }
 extern "C" bool IsWorldMapMenuActive() noexcept;
+void PlayKeyboardShortcutSound(bool enter){
+ static const auto folder=[]{HMODULE module=nullptr;wchar_t path[32768]{};if(!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(&PlayKeyboardShortcutSound),&module)||!GetModuleFileNameW(module,path,32768))return std::filesystem::path{};return std::filesystem::path(path).parent_path()/"sounds";}();
+ if(!folder.empty())PlaySoundW((folder/(enter?"controller_key_enter.wav":"controller_key_escape.wav")).c_str(),nullptr,SND_FILENAME|SND_ASYNC|SND_NODEFAULT);
+}
+void UpdateMenuKeys(bool active,bool x,bool y,bool enter,bool escape,uint64_t now){
+ static MenuKeyPulse pulses[2];static bool previousX=false,previousY=false;
+ bool inputChanged=x!=previousX||y!=previousY;previousX=x;previousY=y;
+ if(inputChanged||enter||escape)ReportMenuShortcut(x,y,enter,escape,0,0,0);
+ const bool fires[2]{enter,escape};const WORD scans[2]{0x1c,0x01};
+ for(unsigned i=0;i<2;++i){int edge=pulses[i].Step(active,fires[i],now);if(!edge)continue;INPUT event{};event.type=INPUT_KEYBOARD;event.ki.wScan=scans[i];event.ki.dwFlags=KEYEVENTF_SCANCODE|(edge<0?KEYEVENTF_KEYUP:0);auto sent=SendInput(1,&event,sizeof(INPUT));if(sent==1&&edge>0)PlayKeyboardShortcutSound(i==0);ReportMenuShortcut(x,y,enter,escape,scans[i],edge,sent);}
+}
+// Keyboard shortcuts apply to the focused game, independent of menu surface or hand IK.
+void PollControllerShortcuts(bool permitted){
+ static MenuDoublePress enterPress,escapePress;
+ DWORD process=0;GetWindowThreadProcessId(GetForegroundWindow(),&process);
+ bool pressed[2]{},mode[2]{},thumb[2]{};float grips[2]{},triggers[2]{},inward[2]{};
+ bool valid=permitted&&process==GetCurrentProcessId()&&PollNativeControllerButtons(pressed,grips,triggers,mode,thumb,inward);
+ auto now=GetTickCount64();bool enter=enterPress.Step(valid,mode[0],now),escape=escapePress.Step(valid,thumb[0],now);
+ UpdateMenuKeys(valid,mode[0],thumb[0],enter,escape,now);
+}
 bool PollMenuLaser(bool menu){
  using namespace DriverIK;static ControllerMenuMouse click,rightClick;static MenuButtonRoute buttons;static MenuCursorMotion cursor;static IgnitionTriggerGate choose[2],chooseGrip[2];static int owner=-1;static uint64_t last=0;auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
  DWORD pid=0;auto window=GetForegroundWindow();GetWindowThreadProcessId(window,&pid);menu=menu && pid==GetCurrentProcessId();
@@ -236,7 +260,9 @@ bool PollMenuLaser(bool menu){
  if(!systemVR && now-attempt>=5000){attempt=now;Connect();}
  bool pressed[2]{},mode[2]{},thumb[2]{};float grips[2]{},triggers[2]{},inward[2]{},sticks[4]{};bool valid=systemVR && PollNativeControllerButtons(pressed,grips,triggers,mode,thumb,inward);if(valid)ReadControllerStickAxes(sticks);
  vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};if(valid)systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);
- auto h=Convert(poses[0]);valid=valid && h.valid;MenuLaserHit hits[2]{};std::array<ControllerMeshPose,64> modelPoses{};EnsureMenuLasers();
+ auto h=Convert(poses[0]);valid=valid && h.valid;
+
+ MenuLaserHit hits[2]{};std::array<ControllerMeshPose,64> modelPoses{};EnsureMenuLasers();
  for(unsigned side=0;side<2;++side){auto index=valid?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;auto hand=index<vr::k_unMaxTrackedDeviceCount?MenuAimPose(index,poses[index]):Tracked{};
   if(!valid || !hand.valid){if(markerOverlay){for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);if(menuBeams[side])markerOverlay->HideOverlay(menuBeams[side]);if(menuDots[side])markerOverlay->HideOverlay(menuDots[side]);}continue;}
   auto ray=MenuRayInHeadSpace(hand.point,hand.rotation,h.point,h.rotation);auto start=ray.origin;auto direction=ray.direction;hits[side]=IntersectMenuLaser(menuSurface,start,direction);float length=hits[side].hit?hits[side].distance:2.f;ShowMenuControllerModel(side,index,poses[index],h,modelPoses);if(markerOverlay)for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);
@@ -261,4 +287,4 @@ bool PollMenuLaser(bool menu){
 void PublishControllerMenuSurface(const float* transform,const float* size,float radius){for(unsigned i=0;i<8;++i)if(!std::isfinite(transform[i]))return;float n=0;for(unsigned i=4;i<8;++i)n+=transform[i]*transform[i];if(n<.98f||n>1.02f||!std::isfinite(radius)||!std::isfinite(size[0])||!std::isfinite(size[1])||size[0]<=0||size[1]<=0||size[0]>20||size[1]>20)return;std::unique_lock lock(guard,std::try_to_lock);if(!lock.owns_lock())return;menuSurface={{transform[0],transform[1],transform[2]},{transform[4],transform[5],transform[6],transform[7]},size[0],size[1],radius};menuSurfaceTick=GetTickCount64();}
 
 // Menu input is exclusively laser-based; grip is reserved for right click/drag.
-void PollControllerMenuMouse(bool menu){std::lock_guard lock(guard);PollMenuLaser(menu);}
+void PollControllerMenuMouse(bool menu){std::lock_guard lock(guard);PollControllerShortcuts(true);PollMenuLaser(menu);}

@@ -1,3 +1,5 @@
+#include "MenuKeyPulse.hpp"
+#include "MenuDoublePress.hpp"
 #include "MenuButtonRoute.hpp"
 #include "ControllerModelData.hpp"
 #include "ControllerModelInput.hpp"
@@ -174,6 +176,13 @@ int main() {
  Check(rightDrag.Step(true,true,0,0,0,0,.01f).button==-1 && leftDrag.down,"grip release preserves held left button");
  Check(leftDrag.Step(false,false,0,0,1,0,.01f).button==-1,"tracking loss releases captured left button");
  rightDrag.Step(true,true,0,0,0,0,.01f);rightDrag.Step(true,true,0,0,1,0,.01f);Check(rightDrag.Step(false,false,0,0,1,0,.01f).button==-1,"tracking loss releases captured right button");
+ MenuKeyPulse keyPulse;Check(keyPulse.Step(true,true,100)==1,"shortcut key emits key down");Check(keyPulse.Step(true,false,101)==0&&keyPulse.down,"key remains held across frames");Check(keyPulse.Step(true,false,179)==0&&keyPulse.down,"key does not release before 80ms");Check(keyPulse.Step(true,false,180)==-1&&!keyPulse.down,"key emits delayed key up");keyPulse.Step(true,true,200);Check(keyPulse.Step(false,false,201)==-1,"focus loss immediately releases shortcut key");
+ MenuDoublePress doubleX,doubleY;doubleX.Step(true,false,90);doubleY.Step(true,false,90);
+ Check(!doubleX.Step(true,true,100)&&!doubleX.Step(true,true,110),"single press and holding do not invoke menu key");
+ doubleX.Step(true,false,120);Check(doubleX.Step(true,true,250),"two menu presses within 500ms invoke key once");Check(!doubleX.Step(true,true,260),"held second press does not repeat key");
+ doubleY.Step(true,true,100);doubleY.Step(true,false,120);Check(!doubleY.Step(true,true,650),"slow second press starts a new pair");
+ doubleY.Step(false,false,660);Check(!doubleY.Step(true,true,670),"focus loss resets pair and held button cannot fire on regain");
+ doubleX.Step(true,false,270);Check(!doubleX.Step(true,true,280),"third press is not a second overlapping double press");
  MenuButtonRoute route;auto routeOut=route.Step(1,0,true);Check(!routeOut.pressed&&!route.heldMask,"map trigger waits to distinguish click from drag");
  routeOut=route.Step(0,0,true,2,1);Check(!routeOut.pressed,"small map pointer jitter stays a click");
  routeOut=route.Step(-1,0,true);Check(routeOut.tapped==1&&!routeOut.pressed&&!routeOut.released,"stationary map trigger release emits only left tap");

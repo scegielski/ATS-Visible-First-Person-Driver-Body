@@ -1,6 +1,6 @@
 {
   "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
-  "sha256": "33d0250ded9875bb4a3ee24ef08580888be7d4f619a2df4f9501a672e4e39e20",
+  "sha256": "9b9ea9ac9c6345169007ba38100dcac40f06ee7cca67432b12ce7aa9e2186ba0",
   "payload": {
     "version": "0.39.2",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
@@ -9,7 +9,7 @@
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "1e87286f3bc8f93b388965fe7ec2e5feded326eda810cb88cbe165af6bf76da9",
+        "sha256": "1c0952b44276451c60e4c2d6956f1e30e8c7659b4bef060d78e9cd49f3a0eb8c",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -90,6 +90,22 @@
         "destination": "plugin",
         "target": "sounds/controller_hand_engaged.wav",
         "sha256": "ded9eb15d23c6067d2fae6220f9bc870dd509d849b3016c8e18fb46f292e00ac",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_key_enter.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_key_enter.wav",
+        "sha256": "bb8c3f5643796c144afcc24638d6482142a8f5dffe5f3c28b0bd70a8962e20b9",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_key_escape.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_key_escape.wav",
+        "sha256": "8c72612d98e2cca5b8a9ffe6a83bc65b359d8e0b63d805ac3a9645043ebca086",
         "mutable": false,
         "onlyIfMissing": false
       },
