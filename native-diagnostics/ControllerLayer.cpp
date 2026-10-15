@@ -1,3 +1,4 @@
+#include "ControllerModelsD3D11.hpp"
 #include <Windows.h>
 #define XR_NO_PROTOTYPES
 #include "vendor/openxr_loader_negotiation.h"
@@ -14,11 +15,11 @@ using EarlyMenuTick=void(__cdecl*)(int);EarlyMenuTick earlyMenuTick=nullptr;
 std::recursive_mutex mutex;PFN_xrGetInstanceProcAddr nextGet=nullptr;bool enabled=false;
 struct Context {
  XrInstance instance{};XrActionSet set{};XrAction actions[2]{},grip[2]{},trigger[2]{},mode[2]{},thumb[2]{},stick[2]{},haptic[2]{};XrPath touch{};int status=1;XrResult lastSync=XR_SESSION_NOT_FOCUSED;
- PFN_xrGetInstanceProcAddr get{};PFN_xrCreateSession createSession{};PFN_xrDestroySession destroySession{};PFN_xrDestroyInstance destroyInstance{};PFN_xrAttachSessionActionSets attach{};PFN_xrSyncActions sync{};PFN_xrGetActionStateBoolean boolean{};PFN_xrGetActionStateFloat analog{};PFN_xrGetActionStateVector2f vector{};PFN_xrApplyHapticFeedback vibrate{};
+ PFN_xrGetInstanceProcAddr get{};PFN_xrEndFrame endFrame{};PFN_xrCreateSession createSession{};PFN_xrDestroySession destroySession{};PFN_xrDestroyInstance destroyInstance{};PFN_xrAttachSessionActionSets attach{};PFN_xrSyncActions sync{};PFN_xrGetActionStateBoolean boolean{};PFN_xrGetActionStateFloat analog{};PFN_xrGetActionStateVector2f vector{};PFN_xrApplyHapticFeedback vibrate{};
  PFN_xrCreateActionSet createSet{};PFN_xrCreateAction createAction{};PFN_xrStringToPath path{};PFN_xrSuggestInteractionProfileBindings suggest{};
  std::vector<XrActionSuggestedBinding> gameTouch;std::vector<XrActiveActionSet> gameActive;
  template<class T> bool Load(const char* name,T& function){PFN_xrVoidFunction f{};auto result=get(instance,name,&f);if(XR_FAILED(result)){status=result;return false;}function=reinterpret_cast<T>(f);return f!=nullptr;}
- bool Init(){return Load("xrCreateSession",createSession)&&Load("xrDestroySession",destroySession)&&Load("xrDestroyInstance",destroyInstance)&&Load("xrAttachSessionActionSets",attach)&&Load("xrSyncActions",sync)&&Load("xrGetActionStateBoolean",boolean)&&Load("xrGetActionStateFloat",analog)&&Load("xrGetActionStateVector2f",vector)&&Load("xrApplyHapticFeedback",vibrate)&&Load("xrCreateActionSet",createSet)&&Load("xrCreateAction",createAction)&&Load("xrStringToPath",path)&&Load("xrSuggestInteractionProfileBindings",suggest);}
+ bool Init(){return Load("xrEndFrame",endFrame)&&Load("xrCreateSession",createSession)&&Load("xrDestroySession",destroySession)&&Load("xrDestroyInstance",destroyInstance)&&Load("xrAttachSessionActionSets",attach)&&Load("xrSyncActions",sync)&&Load("xrGetActionStateBoolean",boolean)&&Load("xrGetActionStateFloat",analog)&&Load("xrGetActionStateVector2f",vector)&&Load("xrApplyHapticFeedback",vibrate)&&Load("xrCreateActionSet",createSet)&&Load("xrCreateAction",createAction)&&Load("xrStringToPath",path)&&Load("xrSuggestInteractionProfileBindings",suggest);}
  bool Prepare(){
   if(set)return status>=0;
   XrActionSetCreateInfo info{XR_TYPE_ACTION_SET_CREATE_INFO};strcpy_s(info.actionSetName,"spf_driver_controller_hands");strcpy_s(info.localizedActionSetName,"Driver controller hands");auto result=createSet(instance,&info,&set);if(XR_FAILED(result)){status=result;return false;}
@@ -37,10 +38,10 @@ struct Context {
   result=path(instance,"/interaction_profiles/oculus/touch_controller",&touch);if(XR_FAILED(result)){status=result;return false;}XrInteractionProfileSuggestedBinding binding{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};binding.interactionProfile=touch;binding.countSuggestedBindings=static_cast<uint32_t>(bindings.size());binding.suggestedBindings=bindings.data();result=suggest(instance,&binding);status=result;return XR_SUCCEEDED(result);
  }
 };
-std::unordered_map<XrInstance,std::shared_ptr<Context>> instances;std::unordered_map<XrSession,std::shared_ptr<Context>> sessions;XrSession activeSession{};
-XrResult XRAPI_CALL CreateSession(XrInstance instance,const XrSessionCreateInfo* info,XrSession* session){std::lock_guard lock(mutex);auto c=instances.at(instance);auto result=c->createSession(instance,info,session);if(XR_SUCCEEDED(result))sessions[*session]=c;return result;}
-XrResult XRAPI_CALL DestroySession(XrSession session){std::lock_guard lock(mutex);auto c=sessions.at(session);auto result=c->destroySession(session);if(XR_SUCCEEDED(result)){sessions.erase(session);if(activeSession==session)activeSession=XR_NULL_HANDLE;}return result;}
-XrResult XRAPI_CALL DestroyInstance(XrInstance instance){std::lock_guard lock(mutex);auto c=instances.at(instance);auto result=c->destroyInstance(instance);if(XR_SUCCEEDED(result)){for(auto it=sessions.begin();it!=sessions.end();)if(it->second==c)it=sessions.erase(it);else ++it;instances.erase(instance);activeSession=XR_NULL_HANDLE;}return result;}
+std::unordered_map<XrInstance,std::shared_ptr<Context>> instances;std::unordered_map<XrSession,std::shared_ptr<Context>> sessions;XrSession activeSession{};std::unordered_map<XrSession,std::shared_ptr<ControllerModelsD3D11>> modelRenderers;
+XrResult XRAPI_CALL CreateSession(XrInstance instance,const XrSessionCreateInfo* info,XrSession* session){std::lock_guard lock(mutex);auto c=instances.at(instance);auto result=c->createSession(instance,info,session);if(XR_SUCCEEDED(result)){sessions[*session]=c;modelRenderers[*session]=std::make_shared<ControllerModelsD3D11>(instance,*session,info,c->get);}return result;}
+XrResult XRAPI_CALL DestroySession(XrSession session){std::lock_guard lock(mutex);auto c=sessions.at(session);modelRenderers.erase(session);auto result=c->destroySession(session);if(XR_SUCCEEDED(result)){sessions.erase(session);if(activeSession==session)activeSession=XR_NULL_HANDLE;}return result;}
+XrResult XRAPI_CALL DestroyInstance(XrInstance instance){std::lock_guard lock(mutex);auto c=instances.at(instance);auto result=c->destroyInstance(instance);if(XR_SUCCEEDED(result)){for(auto it=sessions.begin();it!=sessions.end();)if(it->second==c){modelRenderers.erase(it->first);it=sessions.erase(it);}else ++it;instances.erase(instance);activeSession=XR_NULL_HANDLE;}return result;}
 XrResult XRAPI_CALL Suggest(XrInstance instance,const XrInteractionProfileSuggestedBinding* info){std::lock_guard lock(mutex);auto c=instances.at(instance);XrPath touch{};if(XR_SUCCEEDED(c->path(instance,"/interaction_profiles/oculus/touch_controller",&touch))&&info->interactionProfile==touch)c->gameTouch.assign(info->suggestedBindings,info->suggestedBindings+info->countSuggestedBindings);return c->suggest(instance,info);}
 XrResult XRAPI_CALL Attach(XrSession session,const XrSessionActionSetsAttachInfo* info){std::lock_guard lock(mutex);auto c=sessions.at(session);
  if(!c->Prepare())return c->attach(session,info);
@@ -55,8 +56,9 @@ XrResult XRAPI_CALL Sync(XrSession session,const XrActionsSyncInfo* info){
  // Notify focus only; early controller work runs independently of the VR frame.
  if(earlyMenuTick)earlyMenuTick(result==XR_SUCCESS?1:0);return result;
 }
+XrResult XRAPI_CALL EndFrame(XrSession session,const XrFrameEndInfo* info){std::shared_ptr<ControllerModelsD3D11> renderer;PFN_xrEndFrame next=nullptr;{std::lock_guard lock(mutex);auto c=sessions.at(session);next=c->endFrame;auto found=modelRenderers.find(session);if(found!=modelRenderers.end())renderer=found->second;}return renderer?renderer->EndFrame(info,next):next(session,info);}
 XrResult XRAPI_CALL GetProc(XrInstance instance,const char* name,PFN_xrVoidFunction* function){std::lock_guard lock(mutex);if(enabled && instance && instances.count(instance)){
- struct Entry {const char* name;PFN_xrVoidFunction function;};const Entry entries[]={{"xrCreateSession",reinterpret_cast<PFN_xrVoidFunction>(CreateSession)},{"xrDestroySession",reinterpret_cast<PFN_xrVoidFunction>(DestroySession)},{"xrDestroyInstance",reinterpret_cast<PFN_xrVoidFunction>(DestroyInstance)},{"xrAttachSessionActionSets",reinterpret_cast<PFN_xrVoidFunction>(Attach)},{"xrSyncActions",reinterpret_cast<PFN_xrVoidFunction>(Sync)},{"xrSuggestInteractionProfileBindings",reinterpret_cast<PFN_xrVoidFunction>(Suggest)}};
+ struct Entry {const char* name;PFN_xrVoidFunction function;};const Entry entries[]={{"xrEndFrame",reinterpret_cast<PFN_xrVoidFunction>(EndFrame)},{"xrCreateSession",reinterpret_cast<PFN_xrVoidFunction>(CreateSession)},{"xrDestroySession",reinterpret_cast<PFN_xrVoidFunction>(DestroySession)},{"xrDestroyInstance",reinterpret_cast<PFN_xrVoidFunction>(DestroyInstance)},{"xrAttachSessionActionSets",reinterpret_cast<PFN_xrVoidFunction>(Attach)},{"xrSyncActions",reinterpret_cast<PFN_xrVoidFunction>(Sync)},{"xrSuggestInteractionProfileBindings",reinterpret_cast<PFN_xrVoidFunction>(Suggest)}};
  for(const auto& entry:entries)if(!std::strcmp(name,entry.name)){*function=entry.function;return XR_SUCCESS;}
  return instances.at(instance)->get(instance,name,function);
  }return nextGet?nextGet(instance,name,function):XR_ERROR_FUNCTION_UNSUPPORTED;
@@ -112,5 +114,6 @@ extern "C" __declspec(dllexport) int __cdecl SPF_ControllerToggleFeedback(unsign
 extern "C" void SPF_TestSetEarlyMenuTick(EarlyMenuTick tick){earlyMenuTick=tick;}
 extern "C" void SPF_TestControllerLayer(PFN_xrGetInstanceProcAddr get,XrInstance instance,XrSession session){std::lock_guard lock(mutex);instances.clear();sessions.clear();auto c=std::make_shared<Context>();c->get=get;c->instance=instance;c->Init();instances[instance]=c;sessions[session]=c;enabled=true;}
 extern "C" XrResult SPF_TestControllerAttach(XrSession s,const XrSessionActionSetsAttachInfo* i){return Attach(s,i);}
+extern "C" XrResult SPF_TestControllerEndFrame(XrSession session,const XrFrameEndInfo* info){return EndFrame(session,info);}
 extern "C" XrResult SPF_TestControllerSync(XrSession s,const XrActionsSyncInfo* i){return Sync(s,i);}
 #endif

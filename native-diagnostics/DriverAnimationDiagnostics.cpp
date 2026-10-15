@@ -277,7 +277,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.36.2");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.37.4");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -296,6 +296,7 @@ void OnLoad(const SPF_Load_API* api) {
 extern "C" {void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;void MenuModeObserveStub();void MenuSurfaceObserveStub();}
 extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept {char text[192];std::snprintf(text,sizeof(text),"MENU_LASER owner=%d hit=%d,%d trigger=%.3f,%.3f button=%d mouse_events=%u/%u",owner,leftHit,rightHit,leftTrigger,rightTrigger,button,sent,requested);Log(SPF_LOG_INFO,text);}
 std::atomic<bool> earlyMenuFocused{false};EarlyMenuCursor earlyCursor;thread_local bool earlyMenuWorker=false;
+extern "C" void ReportMenuModel(unsigned side,const char* name,unsigned part,int status) noexcept {char text[600];std::snprintf(text,sizeof(text),"MENU_MODEL side=%u part=%u status=%d name=%s",side,part,status,name?name:"");Log(SPF_LOG_INFO,text);EarlyMenuTrace(text);}
 using NativeCursorEmit=void(__fastcall*)(uintptr_t,uint64_t,const NativeMenuCursorEvent*);NativeCursorEmit nativeCursorEmit=nullptr;
 extern "C" bool ApplyNativeMenuCursor(float u,float v) noexcept {
  if(earlyMenuWorker)return earlyCursor.Publish(u,v,GetTickCount64());

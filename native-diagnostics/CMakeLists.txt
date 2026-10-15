@@ -12,12 +12,20 @@ add_executable(DriverDiagnosticTests Tests.cpp ObserveStubs.asm SignalStubTests.
 enable_testing()
 add_test(NAME DriverDiagnosticRegression COMMAND DriverDiagnosticTests)
 
-add_library(spf_controller_xr_layer SHARED ControllerLayer.cpp)
+add_library(spf_controller_xr_layer SHARED ControllerLayer.cpp ControllerModelsD3D11.cpp)
 target_compile_definitions(spf_controller_xr_layer PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-add_executable(ControllerLayerTests ControllerLayerTests.cpp ControllerLayer.cpp)
+add_executable(ControllerLayerTests ControllerLayerTests.cpp ControllerLayer.cpp ControllerModelsD3D11.cpp)
 target_compile_definitions(ControllerLayerTests PRIVATE SPF_CONTROLLER_LAYER_TEST WIN32_LEAN_AND_MEAN NOMINMAX)
 add_test(NAME ControllerLayerRegression COMMAND ControllerLayerTests)
 
 add_executable(EarlyMenuHookTests EarlyMenuHookTests.cpp)
 target_link_libraries(EarlyMenuHookTests PRIVATE menu_early_hooks)
 add_test(NAME EarlyMenuHookRegression COMMAND EarlyMenuHookTests)
+
+target_link_libraries(spf_controller_xr_layer PRIVATE d3d11 d3dcompiler)
+target_link_libraries(ControllerLayerTests PRIVATE d3d11 d3dcompiler)
+
+add_executable(ControllerModelRenderTests ControllerModelRenderTests.cpp ControllerModelsD3D11.cpp)
+target_compile_definitions(ControllerModelRenderTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ControllerModelRenderTests PRIVATE d3d11 d3dcompiler)
+add_test(NAME ControllerModelStereoRegression COMMAND ControllerModelRenderTests)

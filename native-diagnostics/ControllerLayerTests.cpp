@@ -12,9 +12,11 @@ extern "C" int SPF_ReadControllerInput(unsigned char*,unsigned char*,float*);
 extern "C" int SPF_ReadControllerInputWithModes(unsigned char*,unsigned char*,float*,unsigned char*,unsigned char*);
 extern "C" int SPF_ReadControllerInputWithThumbs(unsigned char*,unsigned char*,float*,unsigned char*,unsigned char*,unsigned char*,unsigned char*);
 extern "C" int SPF_ControllerToggleFeedback(unsigned);
+extern "C" XrResult SPF_TestControllerEndFrame(XrSession,const XrFrameEndInfo*);
 extern "C" void SPF_TestSetEarlyMenuTick(void(__cdecl*)(int));
 namespace {
 void Check(bool ok){if(!ok){puts("Controller layer regression failed");std::exit(1);}}
+unsigned frameCalls=0;const XrFrameEndInfo* expectedFrame=nullptr;XrResult XRAPI_CALL FrameEnd(XrSession,const XrFrameEndInfo* info){Check(info==expectedFrame);++frameCalls;return XR_SUCCESS;}
 unsigned earlyTicks=0;int earlyFocus=-1;void __cdecl EarlyTick(int focused){++earlyTicks;earlyFocus=focused;}
 unsigned hapticCount=0;unsigned attachCount=0,syncCount=0;XrActionSet extra=reinterpret_cast<XrActionSet>(9),stock=reinterpret_cast<XrActionSet>(8);XrResult syncResult=XR_SUCCESS;unsigned created=0;
 XrResult XRAPI_CALL CreateSet(XrInstance,const XrActionSetCreateInfo*,XrActionSet* out){*out=extra;return XR_SUCCESS;}
@@ -29,11 +31,12 @@ XrResult XRAPI_CALL Vector(XrSession,const XrActionStateGetInfo* info,XrActionSt
 XrResult XRAPI_CALL Haptic(XrSession,const XrHapticActionInfo* info,const XrHapticBaseHeader* base){Check(info->action==reinterpret_cast<XrAction>(13+hapticCount));auto pulse=reinterpret_cast<const XrHapticVibration*>(base);Check(pulse->duration==60000000 && pulse->amplitude==.6f);++hapticCount;return XR_SUCCESS;}
 XrResult XRAPI_CALL Unused(){return XR_SUCCESS;}
 XrResult XRAPI_CALL Get(XrInstance,const char* name,PFN_xrVoidFunction* out){
- struct Entry{const char* name;PFN_xrVoidFunction value;};Entry entries[]={{"xrApplyHapticFeedback",reinterpret_cast<PFN_xrVoidFunction>(Haptic)},{"xrGetActionStateVector2f",reinterpret_cast<PFN_xrVoidFunction>(Vector)},{"xrCreateActionSet",reinterpret_cast<PFN_xrVoidFunction>(CreateSet)},{"xrCreateAction",reinterpret_cast<PFN_xrVoidFunction>(CreateAction)},{"xrStringToPath",reinterpret_cast<PFN_xrVoidFunction>(Path)},{"xrSuggestInteractionProfileBindings",reinterpret_cast<PFN_xrVoidFunction>(Suggest)},{"xrAttachSessionActionSets",reinterpret_cast<PFN_xrVoidFunction>(Attach)},{"xrSyncActions",reinterpret_cast<PFN_xrVoidFunction>(Sync)},{"xrGetActionStateBoolean",reinterpret_cast<PFN_xrVoidFunction>(Boolean)},{"xrGetActionStateFloat",reinterpret_cast<PFN_xrVoidFunction>(Analog)}};for(const auto& e:entries)if(!std::strcmp(name,e.name)){*out=e.value;return XR_SUCCESS;}*out=reinterpret_cast<PFN_xrVoidFunction>(Unused);return XR_SUCCESS;
+ struct Entry{const char* name;PFN_xrVoidFunction value;};Entry entries[]={{"xrEndFrame",reinterpret_cast<PFN_xrVoidFunction>(FrameEnd)},{"xrApplyHapticFeedback",reinterpret_cast<PFN_xrVoidFunction>(Haptic)},{"xrGetActionStateVector2f",reinterpret_cast<PFN_xrVoidFunction>(Vector)},{"xrCreateActionSet",reinterpret_cast<PFN_xrVoidFunction>(CreateSet)},{"xrCreateAction",reinterpret_cast<PFN_xrVoidFunction>(CreateAction)},{"xrStringToPath",reinterpret_cast<PFN_xrVoidFunction>(Path)},{"xrSuggestInteractionProfileBindings",reinterpret_cast<PFN_xrVoidFunction>(Suggest)},{"xrAttachSessionActionSets",reinterpret_cast<PFN_xrVoidFunction>(Attach)},{"xrSyncActions",reinterpret_cast<PFN_xrVoidFunction>(Sync)},{"xrGetActionStateBoolean",reinterpret_cast<PFN_xrVoidFunction>(Boolean)},{"xrGetActionStateFloat",reinterpret_cast<PFN_xrVoidFunction>(Analog)}};for(const auto& e:entries)if(!std::strcmp(name,e.name)){*out=e.value;return XR_SUCCESS;}*out=reinterpret_cast<PFN_xrVoidFunction>(Unused);return XR_SUCCESS;
 }
 }
 int main(){SPF_TestSetEarlyMenuTick(EarlyTick);
  auto instance=reinterpret_cast<XrInstance>(1);auto session=reinterpret_cast<XrSession>(2);SPF_TestControllerLayer(Get,instance,session);
+ XrFrameEndInfo frame{XR_TYPE_FRAME_END_INFO};expectedFrame=&frame;Check(SPF_TestControllerEndFrame(session,&frame)==XR_SUCCESS && frameCalls==1);
  XrSessionActionSetsAttachInfo attach{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};attach.countActionSets=1;attach.actionSets=&stock;
  Check(SPF_TestControllerAttach(session,&attach)==XR_SUCCESS && attachCount==1 && attach.countActionSets==1 && attach.actionSets==&stock);
  XrActiveActionSet stockActive{stock,XR_NULL_PATH};XrActionsSyncInfo sync{XR_TYPE_ACTIONS_SYNC_INFO};sync.countActiveActionSets=1;sync.activeActionSets=&stockActive;

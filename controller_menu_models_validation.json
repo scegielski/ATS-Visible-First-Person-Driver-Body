@@ -1,0 +1,19 @@
+{
+  "prototype": "0.37.4 SteamVR controller models and shared white fixed-width pointers",
+  "installed": true,
+  "automated": [
+    "DriverDiagnosticRegression passed",
+    "ControllerLayerRegression passed",
+    "EarlyMenuHookRegression passed",
+    "ControllerModelStereoRegression passed with software D3D11 rendering, stereo parallax and graphics state restoration"
+  ],
+  "assets": "Runtime SteamVR render model names, component meshes and textures; no controller assets distributed",
+  "graphics": "D3D11 separate OpenXR stereo projection layer",
+  "pending": [],
+  "asset_observation": "ATS loaded both Quest Plus/Quest 3 controller models, including body, buttons, grip, thumbstick and trigger components, with textures.",
+  "first_runtime_issue": "0.37.0 graphics initialization failed and axes remained the fallback.",
+  "change": "Runtime SteamVR meshes in menus and cabin; tip-based aiming; common white beam/hit-dot renderer; fixed 1.5 mm width independent of beam length.",
+  "user_validation": "User confirmed Quest models visible, menu pointing/clicking working, cabin models and tip aiming looking good, and final white fixed-width pointers looking good; requested commit and push.",
+  "runtime_observation": "0.37.1 stereo renderer initialized and submitted both eye views successfully.",
+  "limitations": "Visual confirmation covers the reported session, not long-term stereo timing across all runtime sessions."
+}

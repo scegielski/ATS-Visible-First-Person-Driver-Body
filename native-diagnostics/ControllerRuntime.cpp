@@ -1,3 +1,4 @@
+#include "ControllerModelData.hpp"
 #include <Windows.h>
 #include "ControllerRuntime.hpp"
 #include "ControllerFingers.hpp"
@@ -10,6 +11,7 @@
 #include "NativeControllerInput.hpp"
 #include "ControllerMenuMouse.hpp"
 #include "MenuLaser.hpp"
+extern "C" void ReportMenuModel(unsigned side,const char* name,unsigned part,int status) noexcept;
 extern "C" bool ApplyNativeMenuCursor(float u,float v) noexcept;
 extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept;
 #include "vendor/openvr.h"
@@ -33,7 +35,8 @@ LiveControllerFingerPose liveFingers[2]{LiveControllerFingerPose(false),LiveCont
 ControllerFingerMode fingerMode[2];
 DriverIK::V hornTarget{},hornBoxOffset{},leftHandBoxOffset{.14f,0,0};uint64_t hornTargetTick=0,hornBoxTick=0;bool hornBoxHeld=false;float hornBoxScale=1.25f;InteractionBoxEditor boxEditor;std::string previousBoxPlacement;uint64_t placementPoll=0;IgnitionTriggerGate radioTriggers[2];IgnitionTriggerGate wiperTriggers[2];uint64_t wiperRequestTick=0;IgnitionTriggerGate lightTriggers[2];uint64_t lightRequestTick=0;IgnitionTriggerGate ignitionTriggers[2];DriverIK::V ignitionTarget{},ignitionBoxOffset{},handBoxOffset{-.08f,0,0};uint64_t ignitionTargetTick=0,interactionRequestTick=0;ControllerSceneFrame actualSceneFrame{};uint64_t sceneXRFrameTick=0,sceneCameraTick=0;DriverPalette sceneMarkers{};uint64_t sceneMarkerTick=0;bool markerCalibrated=false;DriverIK::V markerOrigin{},markerAnchor{};DriverIK::Q markerBasis{1,0,0,0};
 vr::IVRRenderModels* controllerModels=nullptr;vr::IVROverlay* markerOverlay=nullptr;vr::VROverlayHandle_t markers[2][6]{};int markerError=0;
-void DestroyMenuLasers();
+void DestroyMenuLasers();void DestroyMenuControllerModels();void HideMenuControllerModels();void UpdateCabinControllerModels(const vr::TrackedDevicePose_t* poses);
+bool cabinModelsActive=false,cabinModelReady[2]{};Tracked controllerAim[2];float cabinLaserDistance[2]{2,2};bool cabinLaserHit[2]{},cabinLaserReady[2]{};uint64_t cabinLaserTick[2]{};
 void HideMarkers(){if(markerOverlay)for(auto& side:markers)for(auto handle:side)if(handle)markerOverlay->HideOverlay(handle);}
 void CreateMarkers(){
  if(!markerOverlay)return;
@@ -76,7 +79,7 @@ bool Connect(){
 }
 void PollControllers(bool active,uint64_t generation){
  PollFingerFiles();
- std::lock_guard lock(guard);uint64_t now=GetTickCount64();float dt=tick?std::min(.05f,(now-tick)*.001f):0;tick=now;
+ std::lock_guard lock(guard);cabinModelsActive=active;cabinModelReady[0]=cabinModelReady[1]=false;controllerAim[0]=controllerAim[1]={};uint64_t now=GetTickCount64();float dt=tick?std::min(.05f,(now-tick)*.001f):0;tick=now;
  if(generationSeen!=generation){generationSeen=generation;radioClickPending=0;radioTunePending=false;radioStick={};radioCommand={};radioTick=0;radioTriggers[0]=radioTriggers[1]={};boxEditor.Release();boxEditor.enabled=false;markerCalibrated=false;ignitionTriggers[0]=ignitionTriggers[1]={};lightTriggers[0]=lightTriggers[1]={};wiperTriggers[0]=wiperTriggers[1]={};wiperRequestTick=0;lightRequestTick=0;interactionRequestTick=ignitionTargetTick=0;for(unsigned i=0;i<2;++i){controls[i]={};fingerMode[i]={};weights[i]=0;fingerGrip[i]=fingerTrigger[i]=fingerThumb[i]=0;lastSolveTick[i]=0;}}
  if(!systemVR && now-attempt>=5000){attempt=now;Connect();}
  if(!guideFile.empty() && now-guidePoll>=500){guidePoll=now;std::ifstream input(guideFile);if(input){std::string text((std::istreambuf_iterator<char>(input)),{});ControllerElbowGuides parsed;if(ParseControllerElbowGuides(text,parsed))elbowGuides=parsed;}std::ifstream twistInput(twistFile);float value;std::string extra;if(twistInput>>value && !(twistInput>>extra) && std::isfinite(value) && value>=0 && value<=1)twistShare=value;std::ifstream boxInput(guideFile.parent_path()/"ignition_box_offset.txt");DriverIK::V boxOffset{};if(boxInput>>boxOffset[0]>>boxOffset[1]>>boxOffset[2] && !(boxInput>>extra) && std::isfinite(boxOffset[0]) && std::isfinite(boxOffset[1]) && std::isfinite(boxOffset[2]))ignitionBoxOffset=boxOffset;std::ifstream leftBoxInput(guideFile.parent_path()/"horn_left_hand_box_offset.txt");DriverIK::V leftOffset{};if(leftBoxInput>>leftOffset[0]>>leftOffset[1]>>leftOffset[2] && !(leftBoxInput>>extra) && std::isfinite(leftOffset[0]) && std::isfinite(leftOffset[1]) && std::isfinite(leftOffset[2]))leftHandBoxOffset=leftOffset;std::ifstream hornScaleInput(guideFile.parent_path()/"horn_box_scale.txt");float scaleValue=0;if(hornScaleInput>>scaleValue && !(hornScaleInput>>extra) && std::isfinite(scaleValue) && scaleValue>0)hornBoxScale=scaleValue;std::ifstream hornBoxInput(guideFile.parent_path()/"horn_box_offset.txt");DriverIK::V hornOffset{};if(hornBoxInput>>hornOffset[0]>>hornOffset[1]>>hornOffset[2] && !(hornBoxInput>>extra) && std::isfinite(hornOffset[0]) && std::isfinite(hornOffset[1]) && std::isfinite(hornOffset[2]))hornBoxOffset=hornOffset;std::ifstream handBoxInput(guideFile.parent_path()/"ignition_hand_box_offset.txt");DriverIK::V handOffset{};if(handBoxInput>>handOffset[0]>>handOffset[1]>>handOffset[2] && !(handBoxInput>>extra) && std::isfinite(handOffset[0]) && std::isfinite(handOffset[1]) && std::isfinite(handOffset[2]))handBoxOffset=handOffset;std::ifstream blendInput(modeBlendFile);if(blendInput>>value && !(blendInput>>extra) && std::isfinite(value) && value>0)modeBlendSeconds=value;}
@@ -93,6 +96,7 @@ void PollControllers(bool active,uint64_t generation){
    if(markerOverlay)for(auto handle:markers[i])if(handle)markerOverlay->HideOverlay(handle);
 
   }
+  UpdateCabinControllerModels(poses);
  }
  for(unsigned i=0;i<2;++i){auto currentFingers=liveFingers[i].Snapshot();fingerMode[i].Advance(*currentFingers,dt,modeBlendSeconds);float desired=active && hands[i].valid && head.valid && controls[i].enabled?1.f:0.f;weights[i]+=std::clamp(desired-weights[i],-dt/.18f,dt/.18f);float alpha=1-std::exp(-dt/.04f);fingerGrip[i]+=(grips[i]-fingerGrip[i])*alpha;fingerTrigger[i]+=(triggers[i]-fingerTrigger[i])*alpha;fingerThumb[i]+=((thumbPressed[i]?1.f:0.f)-fingerThumb[i])*alpha;}
  BoxGrabInput boxInputs[2]{};bool sceneFresh=active && head.valid && sceneXRFrameTick && now-sceneXRFrameTick<250 && sceneCameraTick && now-sceneCameraTick<250;
@@ -132,8 +136,9 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
   if(!volume.valid){lightTriggers[side].Step(0,false,false);wiperTriggers[side].Step(0,false,false);radioTriggers[side].Step(0,false,false);continue;}
   if(boxEditor.enabled){InteractionBox display{volume.center,{.04f,.035f,.055f},volume.rotation};drawBox(side?48:45,display);}
   if(!controls[side].enabled){
-   auto direction=DriverIK::Rotate(rawQ,{0,0,-1});rayHits[side]=RayInteractionBoxes(boxEditor,raw,direction);
-   InteractionBox laser{DriverIK::Add(raw,DriverIK::Mul(direction,rayHits[side].distance*.5f)),{.0015f,.0015f,.5f},rawQ,1,{1,1,std::max(.001f,rayHits[side].distance)}};drawBox(53+side,laser);
+   auto aim=controllerAim[side].valid?controllerAim[side]:hands[side];auto aimOrigin=actualSceneFrame.Position(aim.point,head.point,head.rotation);auto aimQ=actualSceneFrame.Orientation(aim.rotation,head.rotation);auto direction=DriverIK::Rotate(aimQ,{0,0,-1});rayHits[side]=RayInteractionBoxes(boxEditor,aimOrigin,direction);
+   cabinLaserDistance[side]=rayHits[side].distance;cabinLaserHit[side]=rayHits[side].box>=0;cabinLaserTick[side]=GetTickCount64();
+   InteractionBox laser{DriverIK::Add(aimOrigin,DriverIK::Mul(direction,rayHits[side].distance*.5f)),{.0015f,.0015f,.5f},aimQ,1,{1,1,std::max(.001f,rayHits[side].distance)}};if(!cabinLaserReady[side])drawBox(53+side,laser);
   }
   const auto& lightsBox=boxEditor.boxes[9];bool lightsHit=controls[side].enabled?IgnitionBoxesOverlap(lightsBox.center,DriverIK::V{lightsBox.half[0]*lightsBox.scale*lightsBox.stretch[0],lightsBox.half[1]*lightsBox.scale*lightsBox.stretch[1],lightsBox.half[2]*lightsBox.scale*lightsBox.stretch[2]},volume.center,volume.rotation,{.04f,.035f,.055f},lightsBox.rotation):rayHits[side].box==9;
   if(lightTriggers[side].Step(fingerTrigger[side],!boxEditor.enabled && volume.valid,lightsHit)){lightRequestTick=sceneMarkerTick;ControllerToggleFeedback(side);}
@@ -150,7 +155,7 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
  }
 
  if(head.valid && sceneXRFrameTick && sceneMarkerTick-sceneXRFrameTick<250 && sceneCameraTick && sceneMarkerTick-sceneCameraTick<250){
- for(unsigned side=0;side<2;++side)if(hands[side].valid && !controls[side].enabled){auto position=actualSceneFrame.Position(hands[side].point,head.point,head.rotation);auto rotation=actualSceneFrame.Orientation(hands[side].rotation,head.rotation);
+ for(unsigned side=0;side<2;++side)if(hands[side].valid && !controls[side].enabled && !cabinModelReady[side]){auto position=actualSceneFrame.Position(hands[side].point,head.point,head.rotation);auto rotation=actualSceneFrame.Orientation(hands[side].rotation,head.rotation);
   auto& m=sceneMarkers[side?28:7];for(unsigned col=0;col<3;++col){DriverIK::V axis{};axis[col]=1;auto v=DriverIK::Rotate(rotation,axis);for(unsigned row=0;row<3;++row)m[row*4+col]=v[row];}m[3]=position[0];m[7]=position[1];m[11]=position[2];m[15]=1;}
  }
 
@@ -190,30 +195,42 @@ void QueueControllerRadioClickSound(bool playing){std::lock_guard lock(guard);ra
 
 
 namespace {MenuLaserSurface menuSurface;uint64_t menuSurfaceTick=0;vr::VROverlayHandle_t menuBeams[2]{},menuDots[2]{};
-void DestroyMenuLasers(){if(markerOverlay)for(unsigned i=0;i<2;++i){if(menuBeams[i])markerOverlay->DestroyOverlay(menuBeams[i]);if(menuDots[i])markerOverlay->DestroyOverlay(menuDots[i]);menuBeams[i]=menuDots[i]=0;}menuSurfaceTick=0;}
+void DestroyMenuLasers(){DestroyMenuControllerModels();if(markerOverlay)for(unsigned i=0;i<2;++i){if(menuBeams[i])markerOverlay->DestroyOverlay(menuBeams[i]);if(menuDots[i])markerOverlay->DestroyOverlay(menuDots[i]);menuBeams[i]=menuDots[i]=0;}menuSurfaceTick=0;}
 void HideMenuLasers(){if(markerOverlay)for(unsigned i=0;i<2;++i){if(menuBeams[i])markerOverlay->HideOverlay(menuBeams[i]);if(menuDots[i])markerOverlay->HideOverlay(menuDots[i]);}}
-void EnsureMenuLasers(){if(!markerOverlay)return;for(unsigned i=0;i<2;++i){if(!menuBeams[i]){auto key=std::string("spf.driver.menu.beam.")+std::to_string(i);if(markerOverlay->CreateOverlay(key.c_str(),"Menu controller laser",&menuBeams[i])==vr::VROverlayError_None){std::vector<unsigned char> pixels(4*1024*4,255);markerOverlay->SetOverlayRaw(menuBeams[i],pixels.data(),4,1024,4);}}if(!menuDots[i]){auto key=std::string("spf.driver.menu.dot.")+std::to_string(i);if(markerOverlay->CreateOverlay(key.c_str(),"Menu laser hit",&menuDots[i])==vr::VROverlayError_None){std::array<unsigned char,32*32*4> pixels{};for(int y=0;y<32;++y)for(int x=0;x<32;++x){auto n=(y*32+x)*4;pixels[n]=pixels[n+1]=pixels[n+2]=255;pixels[n+3]=(x-16)*(x-16)+(y-16)*(y-16)<200?255:0;}markerOverlay->SetOverlayRaw(menuDots[i],pixels.data(),32,32,4);markerOverlay->SetOverlayWidthInMeters(menuDots[i],.012f);}}for(auto h:{menuBeams[i],menuDots[i]})if(h)markerOverlay->SetOverlayColor(h,i?1.f:.2f,i?.55f:.7f,i?.1f:1.f);}}
+void EnsureMenuLasers(){if(!markerOverlay)return;for(unsigned i=0;i<2;++i){if(!menuBeams[i]){auto key=std::string("spf.driver.menu.beam.")+std::to_string(i);if(markerOverlay->CreateOverlay(key.c_str(),"Menu controller laser",&menuBeams[i])==vr::VROverlayError_None){std::vector<unsigned char> pixels(4*1024*4,255);markerOverlay->SetOverlayRaw(menuBeams[i],pixels.data(),4,1024,4);}}if(!menuDots[i]){auto key=std::string("spf.driver.menu.dot.")+std::to_string(i);if(markerOverlay->CreateOverlay(key.c_str(),"Menu laser hit",&menuDots[i])==vr::VROverlayError_None){std::array<unsigned char,32*32*4> pixels{};for(int y=0;y<32;++y)for(int x=0;x<32;++x){auto n=(y*32+x)*4;pixels[n]=pixels[n+1]=pixels[n+2]=255;pixels[n+3]=(x-16)*(x-16)+(y-16)*(y-16)<200?255:0;}markerOverlay->SetOverlayRaw(menuDots[i],pixels.data(),32,32,4);markerOverlay->SetOverlayWidthInMeters(menuDots[i],.012f);}}for(auto h:{menuBeams[i],menuDots[i]})if(h)markerOverlay->SetOverlayColor(h,1.f,1.f,1.f);}}
 vr::HmdMatrix34_t MenuOverlayMatrix(DriverIK::V x,DriverIK::V y,DriverIK::V z,DriverIK::V p){vr::HmdMatrix34_t m{};for(unsigned r=0;r<3;++r){m.m[r][0]=x[r];m.m[r][1]=y[r];m.m[r][2]=z[r];m.m[r][3]=p[r];}return m;}
+void HideControllerPointer(unsigned side){if(markerOverlay){if(menuBeams[side])markerOverlay->HideOverlay(menuBeams[side]);if(menuDots[side])markerOverlay->HideOverlay(menuDots[side]);}}
+bool ShowControllerPointer(unsigned side,const Tracked& hand,const Tracked& h,float length,bool hit){
+ using namespace DriverIK;EnsureMenuLasers();if(!markerOverlay || !menuBeams[side])return false;
+ auto y=Rotate(hand.rotation,{0,0,-1});auto middle=Add(hand.point,Mul(y,length*.5f));auto z=Unit(Sub(h.point,middle));auto x=Unit(Cross(y,z));z=Unit(Cross(x,y));auto m=MenuOverlayMatrix(x,y,z,middle);
+ // Preserve a 1.5 mm beam width while stretching its height to the hit distance.
+ markerOverlay->SetOverlayWidthInMeters(menuBeams[side],.0015f);markerOverlay->SetOverlayTexelAspect(menuBeams[side],256.f*.0015f/std::max(.001f,length));markerOverlay->SetOverlayTransformAbsolute(menuBeams[side],vr::TrackingUniverseStanding,&m);markerOverlay->ShowOverlay(menuBeams[side]);
+ if(menuDots[side]){if(hit){auto point=Add(hand.point,Mul(y,length));auto q=h.rotation;auto dot=MenuOverlayMatrix(Rotate(q,{1,0,0}),Rotate(q,{0,1,0}),Rotate(q,{0,0,1}),point);markerOverlay->SetOverlayTransformAbsolute(menuDots[side],vr::TrackingUniverseStanding,&dot);markerOverlay->ShowOverlay(menuDots[side]);}else markerOverlay->HideOverlay(menuDots[side]);}return true;
+}
 Tracked MenuAimPose(vr::TrackedDeviceIndex_t device,const vr::TrackedDevicePose_t& raw){
  if(!controllerModels || !systemVR)return Convert(raw);char model[256]{};vr::ETrackedPropertyError error{};systemVR->GetStringTrackedDeviceProperty(device,vr::Prop_RenderModelName_String,model,sizeof(model),&error);vr::VRControllerState_t buttons{};vr::RenderModel_ControllerMode_State_t mode{};vr::RenderModel_ComponentState_t component{};
- if(error!=vr::TrackedProp_Success || !systemVR->GetControllerState(device,&buttons,sizeof(buttons)) || !controllerModels->GetComponentState(model,"tip",&buttons,&mode,&component))return Convert(raw);
+ if(error!=vr::TrackedProp_Success)return Convert(raw);systemVR->GetControllerState(device,&buttons,sizeof(buttons));if(!controllerModels->GetComponentState(model,"tip",&buttons,&mode,&component))return Convert(raw);
  MenuPoseMatrix deviceMatrix{},tipMatrix{};for(unsigned r=0;r<3;++r)for(unsigned c=0;c<4;++c){deviceMatrix[r][c]=raw.mDeviceToAbsoluteTracking.m[r][c];tipMatrix[r][c]=component.mTrackingToComponentLocal.m[r][c];}auto composed=ComposeMenuAim(deviceMatrix,tipMatrix);auto pose=raw;for(unsigned r=0;r<3;++r)for(unsigned c=0;c<4;++c)pose.mDeviceToAbsoluteTracking.m[r][c]=composed[r][c];return Convert(pose);
+}
+#include "ControllerMenuModels.inc"
+void UpdateCabinControllerModels(const vr::TrackedDevicePose_t* poses){
+ std::array<ControllerMeshPose,64> modelPoses{};for(unsigned side=0;side<2;++side){cabinLaserReady[side]=false;auto index=systemVR?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;if(!head.valid || index>=vr::k_unMaxTrackedDeviceCount || !hands[side].valid || controls[side].enabled){HideControllerPointer(side);continue;}controllerAim[side]=MenuAimPose(index,poses[index]);cabinModelReady[side]=ShowMenuControllerModel(side,index,poses[index],head,modelPoses);bool fresh=GetTickCount64()-cabinLaserTick[side]<250;cabinLaserReady[side]=ShowControllerPointer(side,controllerAim[side],head,fresh?cabinLaserDistance[side]:2.f,fresh && cabinLaserHit[side]);}SubmitMenuModelPoses(modelPoses);
 }
 bool PollMenuLaser(bool menu){
  using namespace DriverIK;static ControllerMenuMouse click;static MenuCursorMotion cursor;static IgnitionTriggerGate choose[2];static int owner=-1;static uint64_t last=0;auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
  DWORD pid=0;auto window=GetForegroundWindow();GetWindowThreadProcessId(window,&pid);menu=menu && pid==GetCurrentProcessId();
  bool surfaceFresh=menuSurfaceTick && now-menuSurfaceTick<250;
- if(!menu || !surfaceFresh){HideMenuLasers();auto out=click.Step(false,false,0,0,0,0,0);if(out.button<0){INPUT e{};e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_LEFTUP;SendInput(1,&e,sizeof(e));}owner=-1;cursor.Step(false,-1,0,0,0,0,0);choose[0]=choose[1]={};return false;}
+ if(!menu || !surfaceFresh){if(!cabinModelsActive)HideMenuLasers();if(!cabinModelsActive)HideMenuControllerModels();auto out=click.Step(false,false,0,0,0,0,0);if(out.button<0){INPUT e{};e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_LEFTUP;SendInput(1,&e,sizeof(e));}owner=-1;cursor.Step(false,-1,0,0,0,0,0);choose[0]=choose[1]={};return false;}
  if(!systemVR && now-attempt>=5000){attempt=now;Connect();}
  bool pressed[2]{},mode[2]{},thumb[2]{};float grips[2]{},triggers[2]{},inward[2]{},sticks[4]{};bool valid=systemVR && PollNativeControllerButtons(pressed,grips,triggers,mode,thumb,inward);if(valid)ReadControllerStickAxes(sticks);
  vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};if(valid)systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);
- auto h=Convert(poses[0]);valid=valid && h.valid;MenuLaserHit hits[2]{};EnsureMenuLasers();
- for(unsigned side=0;side<2;++side){auto index=valid?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;auto hand=index<vr::k_unMaxTrackedDeviceCount?Convert(poses[index]):Tracked{};
+ auto h=Convert(poses[0]);valid=valid && h.valid;MenuLaserHit hits[2]{};std::array<ControllerMeshPose,64> modelPoses{};EnsureMenuLasers();
+ for(unsigned side=0;side<2;++side){auto index=valid?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;auto hand=index<vr::k_unMaxTrackedDeviceCount?MenuAimPose(index,poses[index]):Tracked{};
   if(!valid || !hand.valid){if(markerOverlay){for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);if(menuBeams[side])markerOverlay->HideOverlay(menuBeams[side]);if(menuDots[side])markerOverlay->HideOverlay(menuDots[side]);}continue;}
-  auto ray=MenuRayInHeadSpace(hand.point,hand.rotation,h.point,h.rotation);auto start=ray.origin;auto direction=ray.direction;hits[side]=IntersectMenuLaser(menuSurface,start,direction);float length=hits[side].hit?hits[side].distance:2.f;auto y=Rotate(hand.rotation,{0,0,-1});auto middle=Add(hand.point,Mul(y,length*.5f));auto z=Unit(Sub(h.point,middle));auto x=Unit(Cross(y,z));z=Unit(Cross(x,y));ShowAxes(side,index);
-  if(markerOverlay && menuBeams[side]){auto m=MenuOverlayMatrix(x,y,z,middle);markerOverlay->SetOverlayWidthInMeters(menuBeams[side],length/256.f);markerOverlay->SetOverlayTransformAbsolute(menuBeams[side],vr::TrackingUniverseStanding,&m);markerOverlay->ShowOverlay(menuBeams[side]);}
-  if(markerOverlay && menuDots[side]){if(hits[side].hit){auto point=Add(hand.point,Mul(y,length));auto q=h.rotation;auto m=MenuOverlayMatrix(Rotate(q,{1,0,0}),Rotate(q,{0,1,0}),Rotate(q,{0,0,1}),point);markerOverlay->SetOverlayTransformAbsolute(menuDots[side],vr::TrackingUniverseStanding,&m);markerOverlay->ShowOverlay(menuDots[side]);}else markerOverlay->HideOverlay(menuDots[side]);}
+  auto ray=MenuRayInHeadSpace(hand.point,hand.rotation,h.point,h.rotation);auto start=ray.origin;auto direction=ray.direction;hits[side]=IntersectMenuLaser(menuSurface,start,direction);float length=hits[side].hit?hits[side].distance:2.f;if(ShowMenuControllerModel(side,index,poses[index],h,modelPoses)){if(markerOverlay)for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);}else ShowAxes(side,index);
+  ShowControllerPointer(side,hand,h,length,hits[side].hit);
  }
+ SubmitMenuModelPoses(modelPoses);
  bool select[2]{};for(unsigned side=0;side<2;++side)select[side]=choose[side].Step(triggers[side],valid,hits[side].hit);
  bool hitFlags[2]{hits[0].hit,hits[1].hit};if(!click.down && (select[0]||select[1]))click.Step(true,true,0,0,0,0,0);owner=SelectMenuLaserOwner(owner,click.down,hitFlags,select);
  bool hit=owner>=0 && hits[owner].hit;auto output=click.Step(hit,hit,0,0,hit?triggers[owner]:0,hit?sticks[owner*2+1]:0,dt);INPUT events[3]{};UINT count=0;
