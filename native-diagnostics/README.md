@@ -25,3 +25,11 @@ The early bridge and SPF share one loaded main DLL. Menu hooks can start before 
 Game hooks are guarded by executable hash and verified signatures. After an ATS update, audit the call chain and supporting globals before enabling new signatures. Synthetic passing tests establish only their modeled behavior; capture runtime hook activation and perform a VR check before claiming game compatibility.
 
 SteamVR models and game reference assets are loaded from their installations, not redistributed as controller assets. Imported code licenses are under `adjustments/licenses` and `vendor/minhook`.
+
+## Asset tooling and historical evidence
+
+`../development/scripts/` contains Python asset builders, rig inspection tools and shared helpers. Run them by path from the repository root, for example `python development/scripts/test_stock_animation.py`. Imports remain between sibling scripts; repository assets and output folders are resolved from the checkout root.
+
+These tools require their original dependencies (NumPy, and Capstone/pefile for executable analysis) plus extracted game/reference assets and SCS conversion tools where applicable. They are not installer dependencies. Several builders reproduce historical prototypes; inspect their selected input and output archive before running them.
+
+`../development/evidence/` preserves checkpoint JSON reports, including the steering integration audit consumed by pose builders. Their version-specific results are historical evidence. Current installer validation remains in `../installer/validation.json`; release payload hashes remain in `../releases/installer/payload-manifest.json`. Moving a report does not revalidate its findings.

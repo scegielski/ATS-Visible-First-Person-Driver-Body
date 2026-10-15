@@ -2,8 +2,8 @@
 from pathlib import Path
 import struct,math,json,zipfile
 import numpy as np
-root=Path(__file__).resolve().parent
-bones=json.loads((root/'steering_integration_audit.json').read_text())['driver_bones']
+root=Path(__file__).resolve().parents[2]
+bones=json.loads((root/'development/evidence/steering_integration_audit.json').read_text())['driver_bones']
 before_path=root/'releases/ATS-VisibleDriverBody-Mustang-0.5.3-brake-reach-test.scs'
 with zipfile.ZipFile(before_path) as package:base=package.read('model/spf_stock_driver/steering_pedals.pma')
 frames,count=struct.unpack_from('<2I',base,4);assert (frames,count)==(3901,61)
@@ -65,4 +65,4 @@ with zipfile.ZipFile(before_path) as before,zipfile.ZipFile(archive,'w',compress
  out.writestr('model/spf_stock_driver/steering_all_pedals.pma',data)
 with zipfile.ZipFile(archive) as verify:assert verify.read('model/spf_stock_driver/steering_all_pedals.pma')==data
 report={'frames':total,'right_pedal_blocks':83,'clutch_levels':levels,'duration_seconds':(total-1)/24,'brake_reach_left_m':.14,'left_rest_shift_m':.06,'clutch_ankle_degrees':12,'clutch_bone':51,'left_ankle_position_fixed':True,'steering_and_right_pedals_byte_exact_all_clutch_levels':True,'released_clutch_matches_previous_clip':True,'clutch_toe_height_delta_m':float(pressed_world[52][1,3]-world[52][1,3]),'uncompressed_clip_bytes':len(data),'archive_bytes':archive.stat().st_size,'runtime_validated':False}
-(root/'clutch_alignment_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
+(root/'development/evidence/clutch_alignment_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))

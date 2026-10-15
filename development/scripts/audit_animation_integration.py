@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib, json, struct
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 CHARS = '\x000123456789abcdefghijklmnopqrstuvwxyz_'
 
 def token(value):

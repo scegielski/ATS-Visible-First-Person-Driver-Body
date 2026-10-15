@@ -1,7 +1,7 @@
 """PMA v5 regression: validate header pointers against physical arrays."""
 from pathlib import Path
 import struct,math
-root=Path(__file__).parent
+root=Path(__file__).resolve().parents[2]
 def validate(data):
  assert struct.unpack_from('<I',data)[0]==5
  frames,bones=struct.unpack_from('<2I',data,4)

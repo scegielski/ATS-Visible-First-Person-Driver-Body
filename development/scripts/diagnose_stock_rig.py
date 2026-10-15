@@ -1,6 +1,6 @@
 from pathlib import Path
 import struct,numpy as np,json
-root=Path(__file__).parent;mesh=(root/'stock-reference/driver.pmg').read_bytes();anim=(root/'stock-reference/ford_mustang_67_ani.pma').read_bytes()
+root=Path(__file__).resolve().parents[2];mesh=(root/'stock-reference/driver.pmg').read_bytes();anim=(root/'stock-reference/ford_mustang_67_ani.pma').read_bytes()
 def quat(q):
  w,x,y,z=q
  return np.array([[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w)],[2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],[2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]])

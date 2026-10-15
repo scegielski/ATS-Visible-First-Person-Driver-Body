@@ -1,9 +1,9 @@
 from pathlib import Path
 import math,struct,json
-root=Path(__file__).parent/'tools/base'
+root=Path(__file__).resolve().parents[2]/'tools/base'
 model=root/'model/spf_driver_body';model.mkdir(parents=True,exist_ok=True)
 # Read the verified PMG v21 attachment transform; pose is authored in interior space.
-asset=Path(__file__).parents[1]/'extracted-ford/vehicle/car/ford_mustang_67/interior/standard.pmg'
+asset=Path(__file__).resolve().parents[3]/'extracted-ford/vehicle/car/ford_mustang_67/interior/standard.pmg'
 b=asset.read_bytes()
 assert struct.unpack_from('<I',b)[0]==0x506d6715
 chars='\x000123456789abcdefghijklmnopqrstuvwxyz_'
@@ -118,7 +118,7 @@ report={'attachment_position':translation,'attachment_quaternion_wxyz':q,
  'interior_bounds':[[min(p[i] for p in interior_positions) for i in range(3)],
                     [max(p[i] for p in interior_positions) for i in range(3)]],
  'outward_winding_and_unit_normals_verified':True, 'original_geometry_no_external_asset_license_required':True, 'roundtrip_transform_verified':True,'corrected_alignment_in_game_verified':False}
-(Path(__file__).parent/'alignment_validation.json').write_text(json.dumps(report,indent=2))
+(Path(__file__).resolve().parents[2]/'development/evidence/alignment_validation.json').write_text(json.dumps(report,indent=2))
 names=['denim','shoe','shirt','skin'];colors=[(48,63,91),(32,29,27),(55,94,78),(184,137,104)]
 for name,rgb in zip(names,colors):
  header=struct.pack('<BBBHHBHHHHBB',0,0,2,0,0,0,0,0,4,4,24,32);(model/(name+'.tga')).write_bytes(header+bytes([rgb[2],rgb[1],rgb[0]])*16)

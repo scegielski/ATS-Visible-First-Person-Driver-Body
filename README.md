@@ -29,4 +29,4 @@ Native hooks support the fingerprinted ATS executable only. A game update may re
 
 ## Project scope
 
-Future work includes additional vehicle calibrations and investigating parked-vehicle exit and walking. Those features are not implemented. Historical experimental DLLs, asset-building scripts and validation receipts remain available for development; use the current installer for installation.
+Future work includes additional vehicle calibrations and investigating parked-vehicle exit and walking. Those features are not implemented. Historical experimental DLLs remain under `releases/`; asset-building scripts and checkpoint JSON reports are grouped under `development/scripts/` and `development/evidence/`. These are development resources; use the current installer for installation.

@@ -2,11 +2,11 @@
 from pathlib import Path
 import struct,json,math,zipfile
 import numpy as np
-root=Path(__file__).resolve().parent
+root=Path(__file__).resolve().parents[2]
 BRAKE_REACH=.14
 LEFT_REST_SHIFT=.06
 source=(root/'stock-reference/ford_mustang_67_ani.pma').read_bytes()
-bones=json.loads((root/'steering_integration_audit.json').read_text())['driver_bones']
+bones=json.loads((root/'development/evidence/steering_integration_audit.json').read_text())['driver_bones']
 frames,count=struct.unpack_from('<2I',source,4);assert (frames,count)==(47,61)
 _,ids,transforms,_,_=struct.unpack_from('<5I',source,64)
 mapping=source[ids:transforms];assert list(mapping)==list(range(61))
@@ -139,4 +139,4 @@ with zipfile.ZipFile(root/'releases/ATS-VisibleDriverBody-Mustang-0.4.0-throttle
   out.writestr(name,block)
  out.writestr('model/spf_stock_driver/steering_pedals.pma',data)
 report={'frames':total,'blocks':blocks,'duration_seconds':(total-1)/24,'brake_reach_left_m':BRAKE_REACH,'left_rest_shift_m':LEFT_REST_SHIFT,'left_leg_static_all_frames':True,'brake_hover_lift_m':.005,'transition_peak_lift_m':.0175,'ankle_press_degrees':12,'modified_brake_bones':[54,55,57],'modified_static_left_bones':[48,49,51],'gas_except_static_left_tracks_byte_exact':True,'steering_tracks_byte_exact':True,'other_bones_unchanged':True,'leg_lengths_preserved':True,'ankle_target_error_under_m':.00002,'brake_toe_height_delta_m':float(pressed[58][1,3]-hover[58][1,3]),'runtime_validated':False}
-(root/'brake_reach_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
+(root/'development/evidence/brake_reach_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))

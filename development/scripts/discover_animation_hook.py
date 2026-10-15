@@ -1,7 +1,7 @@
 """Offline candidate discovery. Never patches the executable or attaches to ATS."""
 from pathlib import Path
 import sys, re, struct, hashlib, json, bisect
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'work/discovery-deps'))
 import pefile
 from capstone import Cs, CS_ARCH_X86, CS_MODE_64

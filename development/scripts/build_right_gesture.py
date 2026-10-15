@@ -2,9 +2,9 @@
 from pathlib import Path
 import struct,json,math
 import numpy as np
-root=Path(__file__).resolve().parent
-scope={'__file__':str(root/'build_window_gesture.py')}
-exec((root/'build_window_gesture.py').read_text().split('lines=')[0],scope)
+root=Path(__file__).resolve().parents[2]
+scope={'__file__':str(root/'development/scripts/build_window_gesture.py')}
+exec((root/'development/scripts/build_window_gesture.py').read_text().split('lines=')[0],scope)
 fk=scope['fk'];rotation=scope['rotation'];quaternion=scope['quaternion'];between=scope['between']
 neutral=scope['neutral'];bones=scope['bones'];mesh=scope['mesh'];mirror=np.diag([-1.,1.,1.])
 reference_world=fk(neutral)
@@ -57,4 +57,4 @@ assert np.dot(middle,[0.,1.,0.])>0
 w=fk(poses[1]);middle=w[34][:3,3]-w[32][:3,3]
 assert np.dot(middle,[0.,1.,0.])<0
 report={'gesture_bones':selected,'middle_bones':[32,33,34],'finger_down_intermediate':True,'raised_final':True,'wrist_target_m':target.tolist(),'rightward_hand_offset_m':.0762,'arm_lengths_preserved':True,'left_arm_and_pedals_unchanged':True,'default_hotkey':'F11 (configurable)','visual_test_pending':True}
-(root/'right_gesture_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
+(root/'development/evidence/right_gesture_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))

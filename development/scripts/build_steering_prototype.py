@@ -1,9 +1,9 @@
 """Build an experimental private arm clip; leave the seated-hold package intact."""
 from pathlib import Path
 import json,struct,zipfile
-root=Path(__file__).resolve().parent
+root=Path(__file__).resolve().parents[2]
 source=(root/'stock-reference/ford_mustang_67_ani.pma').read_bytes()
-bones=json.loads((root/'steering_integration_audit.json').read_text())['driver_bones']
+bones=json.loads((root/'development/evidence/steering_integration_audit.json').read_text())['driver_bones']
 arms={4,25}
 for bone in bones:
  if bone['parent'] in arms:arms.add(bone['index'])
@@ -29,5 +29,5 @@ with zipfile.ZipFile(archive,'w',compression=zipfile.ZIP_STORED) as out:
   out.writestr(name,data)
  out.writestr('model/spf_stock_driver/steering_arms.pma',clip)
 report={'frames':frames,'bones':count,'animated_arm_bones':sorted(arms),'neutral_frame_preserved':True,'other_tracks_frozen_at_neutral':True,'runtime_validated':False}
-(root/'steering_prototype_validation.json').write_text(json.dumps(report,indent=2))
+(root/'development/evidence/steering_prototype_validation.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report));print(archive.name)

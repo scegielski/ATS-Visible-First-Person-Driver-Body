@@ -3,9 +3,9 @@ from pathlib import Path
 import ast,struct,json,math
 import numpy as np
 from thumb_wrap_solver import solve_thumb_wrap
-root=Path(__file__).resolve().parent
-bones=json.loads((root/'steering_integration_audit.json').read_text())['driver_bones']
-helpers=ast.parse((root/'build_brake_prototype.py').read_text())
+root=Path(__file__).resolve().parents[2]
+bones=json.loads((root/'development/evidence/steering_integration_audit.json').read_text())['driver_bones']
+helpers=ast.parse((root/'development/scripts/build_brake_prototype.py').read_text())
 exec(compile(ast.Module(body=[n for n in helpers.body if isinstance(n,ast.FunctionDef) and n.name in ('rotation','between','quaternion','fk')],type_ignores=[]),'pose_helpers','exec'))
 source=(root/'stock-reference/ford_mustang_67_ani.pma').read_bytes();offset=struct.unpack_from('<I',source,72)[0]
 neutral=[np.array(struct.unpack_from('<14f',source,offset+i*56)) for i in range(61)]
@@ -124,7 +124,7 @@ for i in selected:
  lines.append(f' {{{i},{{{values(open_pose)}}},{{{values(intermediate)}}},{{{values(gesture)}}}}},')
 lines.append('}};');(root/'native-diagnostics/WindowGestureTargets.hpp').write_text('\n'.join(lines)+'\n')
 report={'wrist_target_m':target.tolist(),'leftward_hand_offset_m':.0762,'gesture_bones':selected,'middle_finger_extended':True,'intermediate_middle_finger_down':True,'extension_after_arrival':True,'middle_finger_vertical':False,'middle_finger_slightly_curled':True,'middle_joint_curl_degrees':[15,10,8],'total_roll_degrees':math.degrees(roll),'forearm_roll_degrees':math.degrees(roll)/3,'wrist_roll_degrees':math.degrees(roll)*2/3,'rotation_split':'one third forearm, two thirds wrist','extra_upward_wrist_tilt_degrees':10,'hand_straighten_degrees':8,'additional_palm_turn_degrees':30,'index_curl_degrees':[85,80,25],'thumb_turn':'base aimed toward folded index middle segment','other_fingers_curled':True,'arm_lengths_preserved':True,'right_arm_and_pedals_unchanged':True,'alignment_visual_test_pending':True,'thumb_wrap':'all three joints fit outside folded finger capsule proxies','thumb_clearance_check':thumb_report,'thumb_tip_target_m':thumb_target.tolist(),'initial_spf_hotkey':'F10 (configurable)','target_method':'neutral wrist midpoint plus 18 cm up and 8 cm forward of neutral wrist midpoint, with clavicle protraction'}
-(root/'window_gesture_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
+(root/'development/evidence/window_gesture_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
 
 
 

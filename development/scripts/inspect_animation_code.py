@@ -1,7 +1,7 @@
 """Export an executable code window with literal and direct-call annotations."""
 from pathlib import Path
 import sys,struct
-ROOT=Path(__file__).resolve().parent
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'work/discovery-deps'))
 import pefile
 from capstone import Cs,CS_ARCH_X86,CS_MODE_64

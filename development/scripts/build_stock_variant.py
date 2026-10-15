@@ -5,7 +5,7 @@ Only private mod paths are written; stock game archives remain unchanged.
 from pathlib import Path
 import struct,re,shutil,json
 from stock_assets import Archive,hashpath
-root=Path(__file__).parent;stage=root/'package';dest=stage/'model/spf_stock_driver';dest.mkdir(parents=True,exist_ok=True)
+root=Path(__file__).resolve().parents[2];stage=root/'package';dest=stage/'model/spf_stock_driver';dest.mkdir(parents=True,exist_ok=True)
 game=Path('C:/Program Files (x86)/Steam/steamapps/common/American Truck Simulator')
 arc=Archive(game/'base_share.scs');base='asset/character/human/driver/man/'
 original=arc.read(base+'driver.pmg');mesh=bytearray(original);removed=[];hands=[]
@@ -37,7 +37,7 @@ assert list(pose[92:153])==list(range(61))
 assert pose[153:153+61*56]==frame and pose[153+61*56:]==frame
 (dest/'seat_hold.pma').write_bytes(pose)
 import runpy
-runpy.run_path(str(root/'make_locator_only_mount.py'))
+runpy.run_path(str(root/'development/scripts/make_locator_only_mount.py'))
 materials=[];textures=set()
 for path in sorted(set(re.findall(rb'/automat/[a-z0-9/]+\.mat',bytes(pmd)))):
  path=path.decode().lstrip('/');data=arc.read(path);assert data;materials.append(path)
@@ -45,4 +45,4 @@ for path in sorted(set(re.findall(rb'/automat/[a-z0-9/]+\.mat',bytes(pmd)))):
   path=texture.decode().lstrip('/');assert hashpath(path) in arc.entries; textures.add(path)
 assert textures
 report={'stock_skeleton_bones':61,'stock_animation_frames':47,'seated_hold_frames':2,'removed_head_triangles_by_piece':removed,'retained_hand_triangles_by_piece':hands,'stock_materials_verified':materials,'stock_texture_objects_verified':sorted(textures),'skeleton_preserved_byte_exact':True,'animation_architecture':'animated_hookup with neutral seated hold, not rigid baked geometry','steering_synchronization':False,'in_game_verified':False}
-(root/'stock_driver_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))
+(root/'development/evidence/stock_driver_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report,indent=2))

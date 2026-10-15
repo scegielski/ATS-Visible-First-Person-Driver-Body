@@ -2,10 +2,10 @@
 from pathlib import Path
 import ast,json,struct,math
 import numpy as np
-root=Path(__file__).resolve().parent
-bones=json.loads((root/'steering_integration_audit.json').read_text())['driver_bones']
+root=Path(__file__).resolve().parents[2]
+bones=json.loads((root/'development/evidence/steering_integration_audit.json').read_text())['driver_bones']
 # Reuse the tested quaternion and FK helpers without executing the brake builder.
-helper_tree=ast.parse((root/'build_brake_prototype.py').read_text())
+helper_tree=ast.parse((root/'development/scripts/build_brake_prototype.py').read_text())
 exec(compile(ast.Module(body=[n for n in helper_tree.body if isinstance(n,ast.FunctionDef) and n.name in ('rotation','between','quaternion','fk')],type_ignores=[]),'pose_helpers','exec'))
 source=(root/'stock-reference/ford_mustang_67_ani.pma').read_bytes()
 offset=struct.unpack_from('<I',source,72)[0]
@@ -81,4 +81,4 @@ for i in selected:
 lines.append('}};')
 (root/'native-diagnostics/HornPoseTargets.hpp').write_text('\n'.join(lines)+'\n')
 report={'gesture_bones':selected,'wheel_center_estimate_m':center.tolist(),'palm_press_distance_m':.012,'vertical_adjustment_m':-.095,'left_adjustment_m':.005,'forward_adjustment_m':0.,'latest_backward_adjustment_m':.025,'latest_right_adjustment_m':.025,'additional_vertical_adjustment_m':0.,'palm_normal_estimate':wheel_normal.tolist(),'palm_parallel_to_wheel_plane':True,'fingers_point_up_in_wheel_plane':True,'finger_pose':'open bind-pose rotations, blended from current grip during reach','arm_lengths_preserved':True,'other_bones_unchanged':True,'runtime_pose_layout_validated':True,'visual_horn_alignment_validated':False,'center_method':'midpoint of neutral wrists lowered 9.5 cm total, moved 0.5 cm left, original depth restored following VR feedback'}
-(root/'horn_pose_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
+(root/'development/evidence/horn_pose_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))

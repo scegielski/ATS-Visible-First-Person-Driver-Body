@@ -1,7 +1,7 @@
 """Build solid controller axes as a separate private animated accessory."""
 from pathlib import Path
 import struct,zipfile,json,re
-root=Path(__file__).resolve().parent
+root=Path(__file__).resolve().parents[2]
 source=Path('C:/Users/scegi/OneDrive/Documents/American Truck Simulator/mod/ATS-VisibleDriverBody-Mustang-0.1.0.scs')
 destination=root/'releases/ATS-VisibleDriverBody-Mustang-0.18.0-radio-interaction-box-test.scs'
 chars='\x000123456789abcdefghijklmnopqrstuvwxyz_'

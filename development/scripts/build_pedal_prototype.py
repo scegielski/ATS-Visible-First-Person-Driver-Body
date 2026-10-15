@@ -2,9 +2,9 @@
 from pathlib import Path
 import struct,json,math,zipfile
 import numpy as np
-root=Path(__file__).resolve().parent
+root=Path(__file__).resolve().parents[2]
 source=(root/'stock-reference/ford_mustang_67_ani.pma').read_bytes()
-bones=json.loads((root/'steering_integration_audit.json').read_text())['driver_bones']
+bones=json.loads((root/'development/evidence/steering_integration_audit.json').read_text())['driver_bones']
 frames,count=struct.unpack_from('<2I',source,4)
 assert (frames,count)==(47,61)
 _,ids,transforms,_,_=struct.unpack_from('<5I',source,64)
@@ -70,4 +70,4 @@ with zipfile.ZipFile(root/'releases/ATS-VisibleDriverBody-Mustang-0.3.0-steering
   out.writestr(name,block)
  out.writestr('model/spf_stock_driver/steering_throttle.pma',data)
 report={'frames':total,'steering_frames_per_level':frames,'throttle_levels':levels,'ankle_degrees':12,'bone_modified':57,'toe_height_delta_m':float(pressed_toe[1]-world[58][1,3]),'arm_tracks_preserved_all_levels':True,'other_tracks_preserved':True,'duration_seconds':(total-1)/24,'runtime_validated':False}
-(root/'throttle_prototype_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))
+(root/'development/evidence/throttle_prototype_validation.json').write_text(json.dumps(report,indent=2));print(json.dumps(report))

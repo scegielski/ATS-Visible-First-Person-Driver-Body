@@ -5,7 +5,7 @@ minimal writer removes the dummy geometry after conversion.
 """
 from pathlib import Path
 import struct
-root=Path(__file__).parent;dest=root/'package/model/spf_stock_driver'
+root=Path(__file__).resolve().parents[2];dest=root/'package/model/spf_stock_driver'
 chars='\x000123456789abcdefghijklmnopqrstuvwxyz_'
 def token(s):return sum(chars.index(c)*38**i for i,c in enumerate(s))
 header=bytearray(112)

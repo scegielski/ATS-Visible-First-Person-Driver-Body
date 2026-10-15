@@ -1,7 +1,7 @@
 """Export selected candidate functions for manual control-flow/ABI review."""
 from pathlib import Path
 import sys,json
-ROOT=Path(__file__).resolve().parent
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'work/discovery-deps'))
 import pefile
 from capstone import Cs,CS_ARCH_X86,CS_MODE_64
