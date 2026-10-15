@@ -1,3 +1,4 @@
+#include "NativeMenuCursor.hpp"
 #include <Windows.h>
 #include <bcrypt.h>
 #include <SPF_Plugin.h>
@@ -269,7 +270,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.34.8");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.35.1");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -287,6 +288,19 @@ void OnLoad(const SPF_Load_API* api) {
 }
 extern "C" {void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;void MenuModeObserveStub();void MenuSurfaceObserveStub();}
 extern "C" void ReportMenuLaser(int owner,int leftHit,int rightHit,float leftTrigger,float rightTrigger,int button,unsigned sent,unsigned requested) noexcept {char text[192];std::snprintf(text,sizeof(text),"MENU_LASER owner=%d hit=%d,%d trigger=%.3f,%.3f button=%d mouse_events=%u/%u",owner,leftHit,rightHit,leftTrigger,rightTrigger,button,sent,requested);Log(SPF_LOG_INFO,text);}
+using NativeCursorEmit=void(__fastcall*)(uintptr_t,uint64_t,const NativeMenuCursorEvent*);NativeCursorEmit nativeCursorEmit=nullptr;
+extern "C" bool ApplyNativeMenuCursor(float u,float v) noexcept {
+ if(!enabled.load() || !nativeCursorEmit)return false;
+ auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t inputRoot=0,input=0,vt=0,window=0;unsigned char alternate=0;float rect[4]{};NativeMenuCursorEvent event;
+ if(!SafeRead(base+0x368de98,&inputRoot,8)||!SafeRead(inputRoot+0x100,&input,8)||!SafeRead(input,&vt,8)||vt!=base+0x2204e88||!SafeRead(input+0x170,&window,8)||!window||!SafeRead(base+0x368e14c,&alternate,1)||!SafeRead(base+(alternate?0x2d0a1f8:0x2d0a1e8),rect,sizeof(rect))||!BuildNativeMenuCursorEvent(u,v,rect,event))return false;
+ __try {
+  auto position=reinterpret_cast<float*>(input+0x340);float oldX=position[0],oldY=position[1];position[0]=event.x;position[1]=event.y;
+  auto delta=reinterpret_cast<float*>(input+0x338);delta[0]=event.x-oldX;delta[1]=event.y-oldY;
+  *reinterpret_cast<unsigned char*>(input+0x335)=1;*reinterpret_cast<unsigned char*>(input+0x336)=1;
+  nativeCursorEmit(input,0,&event);
+ } __except(EXCEPTION_EXECUTE_HANDLER){return false;}
+ static uint64_t report=0;auto now=GetTickCount64();if(now-report>=2000){report=now;char text[180];std::snprintf(text,sizeof(text),"MENU_NATIVE_CURSOR uv=%.3f,%.3f position=%.1f,%.1f viewport=%.0f,%.0f",u,v,event.x,event.y,rect[1]-rect[0],rect[2]-rect[3]);Log(SPF_LOG_INFO,text);}return true;
+}
 thread_local bool nativeMenuGame=false;
 extern "C" void CaptureMenuMode(uint32_t inGame) noexcept {nativeMenuGame=(inGame&255)!=0;}
 extern "C" void CaptureMenuSurface(uintptr_t frame) noexcept {
@@ -328,6 +342,8 @@ void Activated(const SPF_Core_API* api) {
  constexpr char menuModePattern[]="0F 28 D8 48 8D 4D 8C 0F 57 C9 F3 0F 11 9D 00 09 00 00";
  constexpr char menuSurfacePattern[]="45 8B C6 48 8D 55 D4 48 8B CE E8 ?? ?? ?? ?? 48 8D 8D A0 03 00 00";
  if(hooks->Hook_FindPattern(menuModePattern)==base+0x42c826 && hooks->Hook_FindPattern(menuSurfacePattern)==base+0x42d144){hooks->Hook_Register(kName,"MenuMode","Observe VR menu context",reinterpret_cast<void*>(MenuModeObserveStub),&gMenuModeOriginal,menuModePattern,true);hooks->Hook_Register(kName,"MenuSurface","Observe final VR menu surface with eye translation removed",reinterpret_cast<void*>(MenuSurfaceObserveStub),&gMenuSurfaceOriginal,menuSurfacePattern,true);}else Log(SPF_LOG_WARN,"MENU_LASER surface signatures unavailable; air mouse retained.");
+ constexpr char cursorEmitPattern[]="48 89 5C 24 10 48 89 6C 24 18 48 89 74 24 20 57 41 54 41 56 48 83 EC 70 48 8D B1 98 00 00 00";
+ if(hooks->Hook_FindPattern(cursorEmitPattern)==base+0x269650)nativeCursorEmit=reinterpret_cast<NativeCursorEmit>(base+0x269650);else Log(SPF_LOG_WARN,"MENU_NATIVE_CURSOR signature unavailable; relative input retained.");
  expectedReturn=base+0x9e2552;
  resetAnimation=reinterpret_cast<ResetAnimation>(base+0x15e0130);
  enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15e07d0);
@@ -644,7 +660,7 @@ void Update() {
   Log(SPF_LOG_INFO,text);
  }
 }
-void Unload() { enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
+void Unload() { nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.

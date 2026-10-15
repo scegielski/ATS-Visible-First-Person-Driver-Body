@@ -1,21 +1,21 @@
 {
-  "checkpoint": "0.34.8 relative menu laser pointer",
-  "user_validation": "User reports current version is almost working and requests checkpoint before internal cursor experiments. Earlier relative version under-traveled in both axes; direct Windows positioning produced no movement.",
+  "checkpoint": "0.35.1 native absolute menu pointer",
+  "user_validation": "User confirms alignment seems pretty good after curved panel correction; reports delayed availability on startup.",
   "automated_validation": [
     "DriverDiagnosticRegression passed",
     "ControllerLayerRegression passed"
   ],
   "installed": true,
   "limitations": [
-    "Exact cursor-to-laser alignment remains unresolved",
-    "Relative gain 1.5 is a trial value",
-    "Native internal cursor positioning not implemented",
-    "Complete menu click coverage remains unverified"
+    "Pointers currently wait for SPF plugin initialization",
+    "Early startup support remains follow-up"
   ],
   "features": [
     "Controller axes, straight beams and hit dots",
     "Final native menu surface capture and eye-offset removal",
     "Stable per-controller ownership",
-    "Live independent horizontal and vertical gains"
+    "Live independent horizontal and vertical gains",
+    "Native absolute input position events with validated viewport",
+    "Elliptical curved-panel intersection matching native mesh and renderer"
   ]
 }

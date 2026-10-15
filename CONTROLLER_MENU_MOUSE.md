@@ -9,3 +9,11 @@ Cursor movement currently uses smoothed relative mouse input. Direct Windows cur
 The grip-and-rotate air mouse remains a fallback when the native menu surface is unavailable. Version-specific native hooks retain their executable and signature guards. Controller input reads do not add OpenXR synchronization calls.
 
 Validation: both regression suites pass, including ray/surface geometry, eye-offset removal, pointer ownership, stationary movement, independent gain, reverse travel, and invalid edits. The user reports the relative-pointer version is almost working, but exact cursor/laser alignment remains unresolved. No claim of pixel-exact positioning or complete click coverage is made. Plugin 0.34.8 is installed with matching release binary.
+
+## Native absolute cursor (0.35.1)
+
+Supported ATS builds now use the native input cursor and absolute-position event queue. The guarded path checks the executable signature, input object vtable, window, and viewport before writing position and submitting the event. Relative input remains a fallback. Native positioning uses the game's actual viewport rather than desktop dimensions and bypasses relative gain.
+
+The curved panel follows the native mesh generator and renderer: angle is `2*(u-.5)/radius`, X is scaled by half width, Y by half height, and Z by full width. Its cross section is elliptical. Tests reconstruct rendered points across horizontal/vertical coordinates and several radii, then recover their UVs. The user confirmed alignment looks good in VR.
+
+Startup limitation: the observed launch began at 09:21:48; SPF preload finished at 09:22:19, SDK initialization began at 09:23:59, and our first menu surface appeared at 09:24:01. Native pointer updates followed within one second. Early menu startup is a separate follow-up.

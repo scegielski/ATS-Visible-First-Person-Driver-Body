@@ -7,7 +7,7 @@ inline MenuLaserHit IntersectMenuLaser(const MenuLaserSurface& s,DriverIK::V ori
  using namespace DriverIK;MenuLaserHit out;if(!std::isfinite(s.width)||!std::isfinite(s.height)||!std::isfinite(s.radius)||s.width<=0||s.height<=0)return out;
  auto inv=Inverse(s.rotation);auto o=Rotate(inv,Sub(origin,s.center)),d=Rotate(inv,Unit(direction));float t=-1,u=0;
  if(s.radius<=0){if(std::abs(d[2])<1e-6f)return out;t=-o[2]/d[2];if(t<=0)return out;u=.5f+(o[0]+d[0]*t)/s.width;}
- else {float r=std::max(s.radius,.63661977f),R=r*s.width;float a=d[0]*d[0]+d[2]*d[2],b=2*(o[0]*d[0]+(o[2]-R)*d[2]),c=o[0]*o[0]+(o[2]-R)*(o[2]-R)-R*R,disc=b*b-4*a*c;if(a<1e-8f||disc<0)return out;for(float candidate:{(-b-std::sqrt(disc))/(2*a),(-b+std::sqrt(disc))/(2*a)}){if(candidate<=0)continue;auto h=Add(o,Mul(d,candidate));float candidateU=.5f+std::atan2(h[0],R-h[2])*r;if(candidateU>=0 && candidateU<=1 && (t<0||candidate<t)){t=candidate;u=candidateU;}}}
+ else {float r=std::max(s.radius,.63661977f),R=r*s.width;float a=4*d[0]*d[0]+d[2]*d[2],b=2*(4*o[0]*d[0]+(o[2]-R)*d[2]),c=4*o[0]*o[0]+(o[2]-R)*(o[2]-R)-R*R,disc=b*b-4*a*c;if(a<1e-8f||disc<0)return out;for(float candidate:{(-b-std::sqrt(disc))/(2*a),(-b+std::sqrt(disc))/(2*a)}){if(candidate<=0)continue;auto h=Add(o,Mul(d,candidate));float candidateU=.5f+std::atan2(2*h[0],R-h[2])*r*.5f;if(candidateU>=0 && candidateU<=1 && (t<0||candidate<t)){t=candidate;u=candidateU;}}}
  if(t<=0 || t>10 || u<0 || u>1)return out;float v=.5f-(o[1]+d[1]*t)/s.height;if(v<0||v>1)return out;return {true,u,v,t,Add(origin,Mul(Unit(direction),t))};
 }
 void PublishControllerMenuSurface(const float* transform,const float* size,float radius);
