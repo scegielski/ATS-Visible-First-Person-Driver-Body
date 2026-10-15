@@ -237,7 +237,7 @@ bool PollMenuLaser(bool menu){
  auto h=Convert(poses[0]);valid=valid && h.valid;MenuLaserHit hits[2]{};std::array<ControllerMeshPose,64> modelPoses{};EnsureMenuLasers();
  for(unsigned side=0;side<2;++side){auto index=valid?systemVR->GetTrackedDeviceIndexForControllerRole(side?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand):vr::k_unMaxTrackedDeviceCount;auto hand=index<vr::k_unMaxTrackedDeviceCount?MenuAimPose(index,poses[index]):Tracked{};
   if(!valid || !hand.valid){if(markerOverlay){for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);if(menuBeams[side])markerOverlay->HideOverlay(menuBeams[side]);if(menuDots[side])markerOverlay->HideOverlay(menuDots[side]);}continue;}
-  auto ray=MenuRayInHeadSpace(hand.point,hand.rotation,h.point,h.rotation);auto start=ray.origin;auto direction=ray.direction;hits[side]=IntersectMenuLaser(menuSurface,start,direction);float length=hits[side].hit?hits[side].distance:2.f;if(ShowMenuControllerModel(side,index,poses[index],h,modelPoses)){if(markerOverlay)for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);}else ShowAxes(side,index);
+  auto ray=MenuRayInHeadSpace(hand.point,hand.rotation,h.point,h.rotation);auto start=ray.origin;auto direction=ray.direction;hits[side]=IntersectMenuLaser(menuSurface,start,direction);float length=hits[side].hit?hits[side].distance:2.f;ShowMenuControllerModel(side,index,poses[index],h,modelPoses);if(markerOverlay)for(auto handle:markers[side])if(handle)markerOverlay->HideOverlay(handle);
   ShowControllerPointer(side,hand,h,length,hits[side].hit);
  }
  SubmitMenuModelPoses(modelPoses);

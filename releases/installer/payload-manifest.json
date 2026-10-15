@@ -1,6 +1,6 @@
 {
   "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
-  "sha256": "5f616d6047ea2f63722d5aea74a154bf07537b089e1f38eaa744e713563988f0",
+  "sha256": "b0aba71c49cc95aca8f0eaf9ca8e4a2ebfc5e1a54aa1e0ea2c646c58ad582b1c",
   "payload": {
     "version": "0.39.2",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
@@ -9,7 +9,7 @@
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "4c9f79dee05e19ff043d5a5d23953fc515942fa33de4df7ea0b430099ce96282",
+        "sha256": "4af529516cfae92cea86e7f2663da342cda71b1508bc12441eb65edd176e40e3",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -297,7 +297,7 @@
         "source": "plugin/licenses/nlohmann-json-MIT.txt",
         "destination": "plugin",
         "target": "licenses/nlohmann-json-MIT.txt",
-        "sha256": "6f48a03625699eea99e599744efea0bf9c9dd67a669e65554df1cd726b8a2477",
+        "sha256": "75aeb27a3350badd6d36b51469d05c1dd092699ce12bae41016aa19bfcba653c",
         "mutable": false,
         "onlyIfMissing": false
       },
