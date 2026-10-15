@@ -1,0 +1,13 @@
+{
+  "user_validation": "User confirmed menu works.",
+  "automated_validation": [
+    "DriverDiagnosticRegression passed",
+    "ControllerLayerRegression passed"
+  ],
+  "prototype": "Relative controller rotation while grip held; trigger click/drag and thumbstick scroll.",
+  "limitations": [
+    "No direct VR panel ray mapping",
+    "Menu and pause detection require runtime coverage beyond the tested menu"
+  ],
+  "native_compatibility": "Separate preceding commit"
+}

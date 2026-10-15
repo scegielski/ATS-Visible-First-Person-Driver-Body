@@ -8,6 +8,7 @@
 #include "InteractionBoxEditor.hpp"
 #include "MirrorInteraction.hpp"
 #include "NativeControllerInput.hpp"
+#include "ControllerMenuMouse.hpp"
 #include "vendor/openvr.h"
 #include <mutex>
 #include <cstdio>
@@ -182,3 +183,25 @@ ControllerRadioCommand TakeControllerRadioCommand(){std::lock_guard lock(guard);
 void QueueControllerRadioTuneSound(){std::lock_guard lock(guard);radioTunePending=true;}
 
 void QueueControllerRadioClickSound(bool playing){std::lock_guard lock(guard);radioClickPending=playing?1:-1;}
+
+// Menu cursor prototype: controller rotation acts as a relative air mouse.
+void PollControllerMenuMouse(bool menu){
+ static ControllerMenuMouse mouse;static int owner=-1;static uint64_t last=0;static float remainderX=0,remainderY=0;
+ std::lock_guard lock(guard);auto now=GetTickCount64();float dt=last?(now-last)*.001f:0;last=now;
+ DWORD pid=0;GetWindowThreadProcessId(GetForegroundWindow(),&pid);menu=menu && pid==GetCurrentProcessId();
+ bool pressed[2]{},mode[2]{},thumb[2]{};float grip[2]{},trigger[2]{},inward[2]{},axes[4]{};
+ bool valid=menu && PollNativeControllerButtons(pressed,grip,trigger,mode,thumb,inward);
+ if(valid)ReadControllerStickAxes(axes);
+ if(!systemVR && menu && now-attempt>=5000){attempt=now;Connect();}
+ vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount]{};if(systemVR && valid)systemVR->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding,0,poses,vr::k_unMaxTrackedDeviceCount);
+ if(owner<0 && valid){if(grip[1]>.6f)owner=1;else if(grip[0]>.6f)owner=0;}
+ bool held=owner>=0 && valid && grip[owner]>.4f;float yaw=0,pitch=0;
+ if(held && systemVR){auto index=systemVR->GetTrackedDeviceIndexForControllerRole(owner?vr::TrackedControllerRole_RightHand:vr::TrackedControllerRole_LeftHand);if(index>=vr::k_unMaxTrackedDeviceCount)held=false;else{auto pose=Convert(poses[index]);held=pose.valid;if(held){auto d=DriverIK::Rotate(pose.rotation,{0,0,-1});yaw=std::atan2(d[0],-d[2]);pitch=std::atan2(d[1],std::hypot(d[0],d[2]));}}}else held=false;
+ auto output=mouse.Step(held,held,yaw,pitch,owner<0?0:trigger[owner],owner<0?0:axes[owner*2+1],dt);
+ INPUT events[4]{};UINT count=0;
+ if(held){remainderX+=output.dx;remainderY+=output.dy;LONG dx=static_cast<LONG>(remainderX),dy=static_cast<LONG>(remainderY);remainderX-=dx;remainderY-=dy;if(dx||dy){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dx=dx;e.mi.dy=dy;e.mi.dwFlags=MOUSEEVENTF_MOVE;}}
+ if(output.button){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=output.button>0?MOUSEEVENTF_LEFTDOWN:MOUSEEVENTF_LEFTUP;}
+ if(output.wheel){auto& e=events[count++];e.type=INPUT_MOUSE;e.mi.dwFlags=MOUSEEVENTF_WHEEL;e.mi.mouseData=static_cast<DWORD>(output.wheel*WHEEL_DELTA);}
+ if(count)SendInput(count,events,sizeof(INPUT));
+ if(!held){owner=-1;remainderX=remainderY=0;}
+}

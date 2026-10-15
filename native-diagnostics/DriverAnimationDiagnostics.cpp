@@ -25,6 +25,7 @@
 #include "HeadTorso.hpp"
 #include "GestureHeadFollow.hpp"
 #include "ControllerRuntime.hpp"
+#include "NativeControllerInput.hpp"
 #include "NativeRecenter.hpp"
 #include "SignalTargets.hpp"
 #include "DriverSamples.hpp"
@@ -267,7 +268,7 @@ bool HashExecutable(char (&hex)[65]) {
 }
 
 void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api) {
- api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.31.5");
+ api->Info_SetName(h,kName); api->Info_SetVersion(h,"0.33.0");
  api->Info_SetMinFrameworkVersion(h,"1.2.5");
  api->Info_SetAuthor(h,"Local driver animation diagnostics");
  api->Info_SetDescriptionLiteral(h,"Live steering, independent pedals, game horn and independent left/right middle-finger gestures with live pose files.");
@@ -519,7 +520,12 @@ void PollObservedHead() {
  char text[384];std::snprintf(text,sizeof(text),"HEAD_TRACKING valid=1 samples=%llu rejected=%llu flags=%llu position_m=%.4f,%.4f,%.4f delta_m=%.4f,%.4f,%.4f quat_xyzw=%.5f,%.5f,%.5f,%.5f",static_cast<unsigned long long>(headAccepted.load()),static_cast<unsigned long long>(headRejected.load()),static_cast<unsigned long long>(pose.flags),pose.position[0],pose.position[1],pose.position[2],pose.position[0]-baseline.position[0],pose.position[1]-baseline.position[1],pose.position[2]-baseline.position[2],pose.orientation[0],pose.orientation[1],pose.orientation[2],pose.orientation[3]);Log(SPF_LOG_INFO,text);
 }
 void Update() {
- if(!enabled.load()) return;
+ if(!enabled.load()) {
+  const bool paused=core && core->gameworld && core->gameworld->GW_IsGamePaused && core->gameworld->GW_IsGamePaused();
+  PollControllerMenuMouse(paused);
+  static uint64_t menuLog=0;auto now=GetTickCount64();if(now-menuLog>=2000){menuLog=now;char text[128];std::snprintf(text,sizeof(text),"MENU_MOUSE unsupported-build mode paused=%d native_input_status=%d",paused?1:0,NativeControllerInputStatus());Log(SPF_LOG_INFO,text);}
+  return;
+ }
  PollBodyVisibilityMode();PollInteriorHeadBackshift();
  PollObservedHead();
  if(core && core->camera && core->camera->Cam_GetInteriorSeatPos){float x=0,y=0,z=0;if(core->camera->Cam_GetInteriorSeatPos(&x,&y,&z))SetControllerSceneCamera(x,y,z);}
@@ -527,7 +533,9 @@ void Update() {
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
- PollControllers(cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
+ const bool menuMouse=core && core->gameworld && core->gameworld->GW_IsGamePaused && (core->gameworld->GW_IsGamePaused() || !cameraValid || !telemetryTick.load() || GetTickCount64()-telemetryTick.load()>250);
+ PollControllerMenuMouse(menuMouse);
+ PollControllers(!menuMouse && cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
  PollGesturePoseFile();PollGestureHeadFollowGain();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
  const bool engineValid=ReadPlayerEngine(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,engineState);
@@ -621,7 +629,7 @@ void Update() {
   Log(SPF_LOG_INFO,text);
  }
 }
-void Unload() { enabled.store(false); Reset(); CloseControllers(); }
+void Unload() { enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.
