@@ -1,6 +1,6 @@
 {
   "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
-  "sha256": "399835d44e41260e8b6560223ea283806fe03b9313b2bc06cc595b3faffc7a26",
+  "sha256": "2d3e097e19ca36ebfbc525314e7f1888617f07f59dd4b843456c244ad2034599",
   "payload": {
     "version": "0.39.2",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
@@ -9,7 +9,7 @@
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "7ce57fab028b3c09392d07e5a8181b5438dd720752c0deb24eb1f958b4790241",
+        "sha256": "57b2ad9e0abd89e2c87465c62e58ed36d5b35bb10fbc430dedf0b9bc9fb2868a",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -202,6 +202,22 @@
         "destination": "plugin",
         "target": "sounds/controller_right_ring.wav",
         "sha256": "5c54075cf1f70da9cb50563b9b84ddb4369ae6bf190353411fd67439f5ab1f9c",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_setup_disabled.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_setup_disabled.wav",
+        "sha256": "b68b85ab3f435bc3dd8efbaf29c29b4de2ed7970ca3b9c55256754e4f7832e50",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_setup_enabled.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_setup_enabled.wav",
+        "sha256": "07cb50d9232802a25212774e42d9e92a6595b4c1db9af63451451a8ff925b17d",
         "mutable": false,
         "onlyIfMissing": false
       },

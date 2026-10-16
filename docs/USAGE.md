@@ -60,3 +60,7 @@ Paths below are relative to the dedicated SPF plugin folder, `bin/win_x64/plugin
 | `config/settings.json` | SPF-owned preferences and keybindings |
 
 General tracking, timing, visibility, elbow and wrist settings are compiled into the DLL. There is no installed `driver_body.ini`. Pose edits reload in about half a second; invalid edits retain the last valid pose. The INI section names and formats must be preserved. Updates retain existing Mustang configurations.
+
+Double-press right controller A to toggle cabin setup mode (F9 remains available). Left X retains finger selection; right A is reserved for setup.
+
+Changing setup mode through double-press A or F9 speaks “Setup mode enabled” or “Setup mode disabled”.
