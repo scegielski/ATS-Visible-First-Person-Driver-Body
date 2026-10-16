@@ -1,0 +1,8 @@
+{
+  "labels": "2048-pixel ring texture with antialiased Segoe UI text",
+  "native_tests": "All six suites pass",
+  "in_game_validation": "User confirmed working and requested commit and push on 2026-10-15",
+  "feature": "Left radial MAP toggle and sharper labels",
+  "installer": "0.39.16",
+  "map_binding": "M scan-code pulse matching current ATS profile"
+}

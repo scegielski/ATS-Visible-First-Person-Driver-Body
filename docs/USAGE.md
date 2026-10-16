@@ -65,8 +65,10 @@ Double-press right controller A to toggle cabin setup mode (F9 remains available
 
 Changing setup mode through double-press A or F9 speaks “Setup mode enabled” or “Setup mode disabled”.
 
-Radial menus use eight segments with a 1024-pixel antialiased texture. Press and hold a controller thumbstick button to open its ring, tilt while holding to highlight an octant, then release the button to select that octant. Release at center to cancel. Tilting without holding does not show a menu. Selection gives vibration.
+Radial menus use eight segments with a 2048-pixel antialiased texture with smoothly rendered Segoe UI labels. Press and hold a controller thumbstick button to open its ring, tilt while holding to highlight an octant, then release the button to select that octant. Release at center to cancel. Tilting without holding does not show a menu. Selection gives vibration.
 
 The left ring right segment toggles Finger editing mode, which defaults off and announces enabled or disabled. While editing, X/A select fingers and Y/B toggle the corresponding trigger assignment, speaking Enabled or Disabled with vibration. Exiting editing retains assignments. Y/B thumb closure, double-B recenter, double-A setup and X/Y keyboard shortcuts are suspended while editing to prevent conflicts; normal controls return when editing is off.
 
 While a radial menu is held open, newly highlighted octants play a short note. Left uses C major; right uses C natural minor. Both ascend clockwise from tonic at top to the upper octave. Holding one octant does not repeat; center is silent.
+
+The left radial top segment (MAP) sends a brief M key press to toggle the world map, matching the current profile binding. Hold left thumbstick click, tilt up, and release; repeat to close.
