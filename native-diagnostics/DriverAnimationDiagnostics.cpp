@@ -999,7 +999,7 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
 
  const bool privateModel=!std::strcmp(path,"/model/spf_stock_driver/driver.pmd");
  const bool duplicateAccessory=privateModel && nativeDriverRenderReady && confirmedPlayerDriverModel.load() && confirmedPlayerDriverModel.load()==expectedPlayerDriverModel.load();
- const bool privateBody=(hideBody.load() && (privateModel||borrowed)) || duplicateAccessory;
+ const bool privateBody=(hideBody.load() && (privateModel||borrowed)) || duplicateAccessory || (borrowed&&!SnapshotVehicleSteeringPose().driverVisible);
  const bool privateHead=(privateModel||borrowed) && !privateBody && (!bodyCameraValid.load() || bodyCameraType.load()==2);
  const auto now=GetTickCount64(),tick=playerDriverTick.load();
  const bool playerStock=hideStockDriver.load() && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && tick && now-tick<=750 && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd");

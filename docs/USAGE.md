@@ -144,3 +144,5 @@ The user confirmed the dedicated Setup radial menu and undo/redo behavior in VR.
 ### Align the VR viewpoint to the driver
 
 In Setup, point both controllers into empty space away from setup boxes, release both grips, then hold both grips and move the controllers together. The interior camera follows that translation so you can align your viewpoint with the native driver head. Release either grip to save the camera offset in that vehicle pose file. Existing box grabbing and two-hand resizing retain priority when a box is selected. Body placement, resting-hand offsets and box placements are unchanged; camera alignment participates in per-vehicle Undo/Redo. New vehicle profiles keep the game camera until adjusted.
+
+Setup adds HIDE/SHOW HEAD at the top of the left radial and HIDE/SHOW DRIVER at the right. Head visibility affects the cabin head; hiding the driver hides the whole native driver while keeping controller tracking and setup boxes available. Both toggles save per vehicle and participate in Undo/Redo. Hidden normal Map and Finger Editing actions do not fire from these Setup segments.

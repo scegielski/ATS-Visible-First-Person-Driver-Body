@@ -6,6 +6,7 @@
 struct VehicleSteeringPose {
  DriverIK::V offset[2]{};
  bool cameraConfigured=false;DriverIK::V cameraSeat{};
+ bool driverVisible=true;
  bool headVisible=true;
  float headBackshift=0;
 };
@@ -38,6 +39,7 @@ inline bool ParseVehicleSteeringPose(const std::string& text,const VehicleBoxIde
   if(seen.size()!=2)return false;
  }
  found=sections.find("camera");if(found!=sections.end()){seen.clear();std::istringstream camera(found->second);while(std::getline(camera,line)){auto first=line.find_first_not_of(" \t\r");if(first==std::string::npos||line[first]=='#'||line[first]==';')continue;std::istringstream row(line);std::string key,extra;row>>key;if(!seen.insert(key).second)return false;if(key=="enabled"){int value;if(!(row>>value)||(value!=0&&value!=1))return false;candidate.cameraConfigured=value!=0;}else if(key=="seat_offset"){for(float& v:candidate.cameraSeat)if(!(row>>v)||!std::isfinite(v))return false;if(DriverIK::Length(candidate.cameraSeat)>2.00001f)return false;}else return false;if(row>>extra)return false;}if(seen.size()!=2)return false;}
+ found=sections.find("body");if(found!=sections.end()){std::istringstream body(found->second);std::string key,extra;int visible;if(!(body>>key>>visible)||key!="visible"||(visible!=0&&visible!=1)||(body>>extra))return false;candidate.driverVisible=visible!=0;}
  output=candidate;return true;
 }
 inline std::string DefaultVehicleSteeringPose(const VehicleBoxIdentity& id){
@@ -47,7 +49,7 @@ struct LiveVehicleSteeringPose {
  VehicleBoxIdentity identity;VehicleSteeringPose settings;std::string prior;
  bool Save(const std::filesystem::path& config){
   auto path=VehiclePosePath(config,identity);std::string before;DriverSettingSections sections;if(path.empty()||!ReadDriverSettingsFile(path,before)||before!=prior||!ParseDriverSettings(before,sections)||!identity.MatchesMetadata(sections["vehicle"]))return false;
-  std::ostringstream grips;grips<<std::setprecision(9);for(unsigned side=0;side<2;++side){grips<<(side?"right_offset":"left_offset");for(float v:settings.offset[side])grips<<' '<<v;grips<<'\n';}sections["steering_grips"]=grips.str();std::ostringstream camera;camera<<std::setprecision(9)<<"enabled "<<(settings.cameraConfigured?1:0)<<"\nseat_offset";for(float v:settings.cameraSeat)camera<<' '<<v;camera<<'\n';sections["camera"]=camera.str();auto text=SerializeDriverSettings(sections);VehicleSteeringPose checked;if(!ParseVehicleSteeringPose(text,identity,checked))return false;
+  std::ostringstream grips;grips<<std::setprecision(9);for(unsigned side=0;side<2;++side){grips<<(side?"right_offset":"left_offset");for(float v:settings.offset[side])grips<<' '<<v;grips<<'\n';}sections["steering_grips"]=grips.str();std::ostringstream camera;camera<<std::setprecision(9)<<"enabled "<<(settings.cameraConfigured?1:0)<<"\nseat_offset";for(float v:settings.cameraSeat)camera<<' '<<v;camera<<'\n';sections["camera"]=camera.str();std::ostringstream head;head<<std::setprecision(9)<<"visible "<<(settings.headVisible?1:0)<<"\nbackshift_m "<<settings.headBackshift<<'\n';sections["head"]=head.str();sections["body"]="visible "+std::to_string(settings.driverVisible?1:0)+"\n";auto text=SerializeDriverSettings(sections);VehicleSteeringPose checked;if(!ParseVehicleSteeringPose(text,identity,checked))return false;
   auto temporary=path;temporary+=L".pose.tmp";{std::ofstream file(temporary,std::ios::binary|std::ios::trunc);if(!file)return false;file<<text;file.flush();if(!file.good())return false;}std::string latest;std::error_code ec;if(!ReadDriverSettingsFile(path,latest)||latest!=before){std::filesystem::remove(temporary,ec);return false;}if(!MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))return false;prior=text;return true;
  }
  bool Poll(const std::filesystem::path& config,const VehicleBoxIdentity& id){

@@ -1,15 +1,15 @@
 {
-  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.42.exe",
-  "sha256": "7a9852c8c0319df0e02f20c1414cdaaa6284ca7eb6a67bce3417d06c92c5fc4c",
+  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.43.exe",
+  "sha256": "ead9b3b07afcb9334bc132c70c462b5fc7437a9e3867a1eb1599b72f2289cde2",
   "payload": {
-    "version": "0.39.42",
+    "version": "0.39.43",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
     "files": [
       {
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "1bd251936b20cc4845ef4bd09111d785e8350bfa2592aa70e7e6cdc7958ca136",
+        "sha256": "4f0e8886f420702cfcf1ab26b37882524356318e5e6effd3a1d4f48ca09141ff",
         "mutable": false,
         "onlyIfMissing": false
       },
