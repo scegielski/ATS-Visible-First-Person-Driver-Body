@@ -1022,3 +1022,7 @@ Added four labeled, grip-editable Setup targets for left/right elbows and knees.
 ### Camera gesture direction and priority
 
 Double-grip camera adjustment reverses all three controller movement axes. It takes priority over contact or laser box grabbing, saving an interrupted box edit before anchoring the camera. Both grips must be released before box grabbing resumes. The former two-grip resize gesture no longer fires, and the help text reflects camera priority. All seven native suites pass, including axis direction, grab takeover, release blocking, and unchanged position anchoring. The user confirmed the installed behavior in VR and requested this checkpoint commit.
+
+### Visibility controls moved to the right Setup radial
+
+Moved head visibility to upper-left and driver visibility to upper-right on the right Setup radial. Both controls and their hit routes are removed from the left Setup radial. Existing highlight controls remain in place, and the visibility labels and spoken cues reflect the saved state. All seven native suites pass. The user verified both toggles and their audio in VR and requested a commit.
