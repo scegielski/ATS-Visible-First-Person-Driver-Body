@@ -17,6 +17,7 @@
 #include <SPF_Camera_API.h>
 #include "BodyVisibility.hpp"
 #include "PlayerExteriorDriver.hpp"
+#include "NativeDriverRender.hpp"
 #include "GameHorn.hpp"
 #include "GameEngine.hpp"
 #include "GameWindow.hpp"
@@ -102,6 +103,15 @@ std::atomic<int> bodyVisibilityMode{1};std::atomic<float> interiorHeadBackshift{
 std::atomic<bool> hideStockDriver{false};
 std::atomic<uintptr_t> expectedPlayerDriverController{0},expectedPlayerDriverModel{0},confirmedPlayerDriverModel{0};
 std::atomic<uint64_t> playerDriverTick{0},playerDriverMatches{0},hiddenStockFrames{0},hiddenHeadFrames{0};
+using NativeDriverRenderFn=void(__fastcall*)(uintptr_t,uintptr_t);
+NativeDriverRenderFn originalCabinModelRender=nullptr;
+bool nativeDriverRenderReady=false;
+void __fastcall RenderCabinModelWithBody(uintptr_t model,uintptr_t view);
+void RefreshBorrowedDriverPose();
+struct NativeRigAudit{uintptr_t model=0;DriverIK::V wrists[2]{};};
+thread_local NativeRigAudit nativeRigAudit;
+
+
 std::atomic<uint64_t> boneSamples{0},hornOverrides{0},hornFaults{0};
 std::atomic<uint64_t> hornTick{0};
 std::atomic<bool> gameHornValid{false};
@@ -214,6 +224,29 @@ bool ReadModelPath(uintptr_t model,char (&path)[192]) noexcept {
  }
  return false;
 }
+bool IsBorrowedPlayerBody(uintptr_t model,const char* path) {
+ return nativeDriverRenderReady && model && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd");
+}
+bool UseAnimatedBody(uintptr_t model,const char* path) {
+ if(IsBorrowedPlayerBody(model,path))return true;
+ return !std::strcmp(path,"/model/spf_stock_driver/driver.pmd") && !(nativeDriverRenderReady && confirmedPlayerDriverModel.load() && confirmedPlayerDriverModel.load()==expectedPlayerDriverModel.load());
+}
+void __fastcall RenderCabinModelWithBody(uintptr_t model,uintptr_t view) {
+ originalCabinModelRender(model,view);
+ const auto now=GetTickCount64(),tick=telemetryTick.load();
+ if(!view || !enabled.load() || !bodyCameraValid.load() || bodyCameraType.load()!=2 || !tick || now<tick || now-tick>250)return;
+ char path[192]{};if(!ReadModelPath(model,path)||!IsCabinBodyAnchor(path))return;
+ auto body=expectedPlayerDriverModel.load(),controller=expectedPlayerDriverController.load();
+ uintptr_t current=0,table=0,draw=0;auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+ if(!body||body==model||body!=confirmedPlayerDriverModel.load()||!controller||!SafeRead(controller+8,&current,8)||current!=body||!SafeRead(body,&table,8)||!SafeRead(table+0x90,&draw,8)||draw!=base+0x15e3f80)return;
+ uint32_t frame=0;if(!SafeRead(base+0x369eaec,&frame,4))return;
+ static thread_local NativeBodyViewLedger bodyViews;if(!bodyViews.Take(frame,worldGeneration.load(),view))return;
+ // Submit in the interior model's own view, not the exterior vehicle's shadow /
+ // mirror passes. ATS continues to own and animate the player driver instance.
+ originalCabinModelRender(body,view);
+ static std::atomic<uint64_t> draws{0};auto n=++draws;
+ if(n==1||n%3000==0){uint64_t flags=0;float placement[8]{};SafeRead(view+0x18,&flags,8);SafeRead(body+0x30,placement,sizeof(placement));char text[384];std::snprintf(text,sizeof(text),"NATIVE_BODY interior-anchored draws=%llu anchor=%s flags=%llx position=%.4f,%.4f,%.4f frame=%u",n,path,flags,placement[0],placement[1],placement[2],frame);Log(SPF_LOG_INFO,text);}
+}
 void ObserveModel(uintptr_t model,uint32_t index,float requested) noexcept {
  if(!model || !std::isfinite(requested))return;
  std::lock_guard lock(sampleMutex);
@@ -231,6 +264,14 @@ void ObserveModel(uintptr_t model,uint32_t index,float requested) noexcept {
   std::memcpy(item.path,path,sizeof(path));return;
  }
 }
+SPF_Telemetry_Handle* vehicleTelemetry=nullptr;
+void VehicleConstants(const SPF_TruckConstants* data,void*){if(!data)return;std::string brand(data->brand_id,strnlen_s(data->brand_id,sizeof(data->brand_id))),model(data->id,strnlen_s(data->id,sizeof(data->id)));SetControllerVehicleIdentity(brand.c_str(),model.c_str());
+ bool valid=SetControllerVehicleCamera({data->cabin_position.x,data->cabin_position.y,data->cabin_position.z},{data->head_position.x,data->head_position.y,data->head_position.z});
+ static std::string prior;static DriverIK::V priorHead{};DriverIK::V position{data->head_position.x,data->head_position.y,data->head_position.z};if(prior!=model||position!=priorHead){prior=model;priorHead=position;char text[256];std::snprintf(text,sizeof(text),"VEHICLE_CAMERA valid=%d cabin=%.4f,%.4f,%.4f head=%.4f,%.4f,%.4f",valid?1:0,data->cabin_position.x,data->cabin_position.y,data->cabin_position.z,position[0],position[1],position[2]);Log(SPF_LOG_INFO,text);}
+}
+extern "C" void ReportControllerVehiclePose(const char* path,int status) noexcept{char text[1024];std::snprintf(text,sizeof(text),"VEHICLE_POSE file=%s status=%d (1=live -1=invalid edit retained prior settings)",path,status);Log(status<0?SPF_LOG_WARN:SPF_LOG_INFO,text);}
+extern "C" void ReportControllerSetupGraphics(int state,unsigned boxes) noexcept{char text[160];std::snprintf(text,sizeof(text),"SETUP_GRAPHICS state=%d boxes=%u (0=hidden 1=independent stereo 2=bridge update needed)",state,boxes);Log(state==2?SPF_LOG_WARN:SPF_LOG_INFO,text);}
+extern "C" void ReportControllerVehicleBoxes(const char* model,const char* file,int status) noexcept{char text[1024];std::snprintf(text,sizeof(text),"VEHICLE_BOXES model=%s file=%s status=%d (1=loaded 2=Mustang migrated -1=load failed -2=old save blocked)",model,file,status);Log(status<0?SPF_LOG_WARN:SPF_LOG_INFO,text);}
 void Controls(const SPF_Controls* data,void*) {
  if(!data) return;
  userSteering.store(data->userInput.steering,std::memory_order_relaxed);
@@ -254,6 +295,7 @@ void TruckSignals(const SPF_TruckData* data,void*) {
  if(direction){signalDirection.store(direction);signalEventTick.store(GetTickCount64());signalSequence.fetch_add(1);char text[128];std::snprintf(text,sizeof(text),"SIGNAL_EVENT direction=%s",direction==1?"left":"right");Log(SPF_LOG_INFO,text);}
 }
 void Reset() {
+ SetControllerVehicleIdentity("","");
  ResetIntegratedAdjustments();
  controllerRecenterTick.store(0);headCalibration.Reset();nativeRecenterGate={nativeRecenterSequence.load(),0,0};recenterFeedbackGate={nativeRecenterSequence.load(),0,0};{std::lock_guard lock(headDriveMutex);headDrive={};}
  {std::lock_guard lock(signalGateMutex);signalGate.Cancel();}
@@ -436,6 +478,11 @@ void Activated(const SPF_Core_API* api) {
  enableAnimation=reinterpret_cast<EnableAnimation>(base+0x15e07d0);
  durationQuery=reinterpret_cast<DurationQuery>(base+0x359e70);
  frameQuery=reinterpret_cast<FrameQuery>(base+0x359ee0);
+ constexpr char nativeCabinModelRenderPattern[]="48 89 5C 24 08 57 48 83 EC 20 48 8B DA 48 8B F9 E8 3B 04 00 00 45 33 C0 48 8B D3 48 8B CF";
+ if(hooks->Hook_FindPattern(nativeCabinModelRenderPattern)==base+0x15e3f80){
+  nativeDriverRenderReady=hooks->Hook_Register(kName,"BorrowedCabinBody","Draw engine-owned player body in the interior model view",reinterpret_cast<void*>(RenderCabinModelWithBody),reinterpret_cast<void**>(&originalCabinModelRender),nativeCabinModelRenderPattern,true)!=nullptr;
+  Log(SPF_LOG_INFO,nativeDriverRenderReady?"NATIVE_BODY interior-anchored engine-owned renderer registered; no model creation":"NATIVE_BODY renderer registration failed; accessory fallback retained");
+ }
  driverHook=hooks->Hook_Register(kName,"DriverUpdate","Observe driver update",reinterpret_cast<void*>(DriverObserveStub),&gDriverOriginal,kDriverPattern,true);
  advanceHook=hooks->Hook_Register(kName,"DriverSample","Observe animation advancement",reinterpret_cast<void*>(AdvanceObserveStub),&gAdvanceOriginal,kAdvancePattern,true);
  boneHook=hooks->Hook_Register(kName,"BonePose","Observe private bone pose before hierarchy assembly",reinterpret_cast<void*>(BoneObserveStub),&gBoneOriginal,kBonePattern,true);
@@ -467,7 +514,8 @@ void Activated(const SPF_Core_API* api) {
   Log(SPF_LOG_ERROR,"DIAG: incomplete hook registration; observers remain inactive.");return;
  }
  if(core->telemetry) {
-  auto context=core->telemetry->Tel_GetContext(kName);
+  auto context=core->telemetry->Tel_GetContext(kName);vehicleTelemetry=context;
+  if(core->telemetry->Tel_RegisterForTruckConstants)core->telemetry->Tel_RegisterForTruckConstants(context,VehicleConstants,nullptr);
   core->telemetry->Tel_RegisterForControls(context,Controls,nullptr);
   core->telemetry->Tel_RegisterForTruckData(context,TruckSignals,nullptr);
  }
@@ -647,16 +695,18 @@ void Update() {
   static uint64_t menuLog=0;auto now=GetTickCount64();if(now-menuLog>=2000){menuLog=now;char text[128];std::snprintf(text,sizeof(text),"MENU_MOUSE unsupported-build mode paused=%d native_input_status=%d",paused?1:0,NativeControllerInputStatus());Log(SPF_LOG_INFO,text);}
   return;
  }
+ static uint64_t vehiclePoll=0;auto vehicleNow=GetTickCount64();if(vehicleNow-vehiclePoll>=500&&telemetryTick.load()&&vehicleNow-telemetryTick.load()<250&&core&&core->telemetry&&vehicleTelemetry&&core->telemetry->Tel_GetTruckConstants){vehiclePoll=vehicleNow;SPF_TruckConstants constants{};core->telemetry->Tel_GetTruckConstants(vehicleTelemetry,&constants,sizeof(constants));VehicleConstants(&constants,nullptr);}
  PollBodyVisibilityMode();PollInteriorHeadBackshift();
  PollObservedHead();
  if(core && core->camera && core->camera->Cam_GetInteriorSeatPos){float x=0,y=0,z=0;if(core->camera->Cam_GetInteriorSeatPos(&x,&y,&z))SetControllerSceneCamera(x,y,z);}
  static uint64_t markerCameraLog=0;auto cameraStamp=GetTickCount64();if(cameraStamp-markerCameraLog>=1000 && core && core->camera && core->camera->Cam_GetInteriorSeatPos){markerCameraLog=cameraStamp;float x=0,y=0,z=0;if(core->camera->Cam_GetInteriorSeatPos(&x,&y,&z)){char text[128];std::snprintf(text,sizeof(text),"MARKER_CAMERA_FRAME seat_offset=%.4f,%.4f,%.4f",x,y,z);Log(SPF_LOG_INFO,text);}}
  SPF_CameraType cameraType{};const bool cameraValid=core && core->camera && core->camera->Cam_GetCurrentCamera && core->camera->Cam_GetCurrentCamera(&cameraType);
- bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
+ bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(!nativeDriverRenderReady && bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
  const bool menuMouse=core && core->gameworld && core->gameworld->GW_IsGamePaused && (core->gameworld->GW_IsGamePaused() || !cameraValid || !telemetryTick.load() || GetTickCount64()-telemetryTick.load()>250);
  PollControllers(!menuMouse && cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
  PollControllerMenuMouse(menuMouse);
+ RefreshBorrowedDriverPose();
  {static uint64_t report=0,previous=0;auto now=GetTickCount64();if(now-report>=2000){report=now;auto calls=mapWidgetCalls.load();char msg[180];std::snprintf(msg,sizeof(msg),"MENU_MAP_PROBE menu=%d calls=%llu delta=%llu recent=%d widget_vtable_rva=%llx",menuMouse?1:0,calls,calls-previous,mapWidgetTick.load() && now-mapWidgetTick.load()<250?1:0,mapWidgetVtable.load()?mapWidgetVtable.load()-reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)):0);previous=calls;Log(SPF_LOG_INFO,msg);}}
  PollGesturePoseFile();PollGestureHeadFollowGain();PollHeadTrackingGain();PollHeadTrackingLimits();UpdateHeadTorso();PollSignalActivationDelay();PollSignalActuationSeconds();PollLeftElbowInset();PollRightElbowInset();
  PlayerEngineState engineState{};
@@ -768,10 +818,11 @@ void UpdateIgnitionInteractionTarget(const DriverIK::Pose& rotations,uintptr_t p
 extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) noexcept {
  if(!enabled.load() || count!=61 || bounds<0x1e0)return;
  const uintptr_t model=bounds-0x1e0;char path[192]{};
- if(!ReadModelPath(model,path) || std::strcmp(path,"/model/spf_stock_driver/driver.pmd"))return;
+ if(!ReadModelPath(model,path) || !UseAnimatedBody(model,path))return;
  uintptr_t expected=0,pointers[4]{};
  if(!SafeRead(model+0x1c0,&expected,8) || output!=expected || !SafeRead(arrays,pointers,sizeof(pointers)))return;
  privateBodyTick.store(GetTickCount64());
+ if(IsBorrowedPlayerBody(model,path)){static std::atomic<uint64_t> frames{0};auto n=++frames;if(n==1||n%3000==0){char text[128];std::snprintf(text,sizeof(text),"NATIVE_BODY native player rig receives hand/pose updates frames=%llu",n);Log(SPF_LOG_INFO,text);}}
  float arm[4]{},hand[4]{},handPosition[3]{};
  if(!SafeRead(pointers[2]+5*16,arm,sizeof(arm)) || !SafeRead(pointers[2]+7*16,hand,sizeof(hand)) || !SafeRead(pointers[3]+7*12,handPosition,sizeof(handPosition)))return;
  for(float value:arm)if(!std::isfinite(value))return;
@@ -818,6 +869,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   std::array<std::array<float,4>,61> rotations{};
   if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
   for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
+  unsigned gripMask=0;DriverIK::Positions gripPositions{};if(SafeRead(pointers[3],gripPositions.data(),sizeof(gripPositions)))gripMask=ApplyVehicleSteeringGrips(rotations,gripPositions,SnapshotVehicleSteeringPose());
   BlendHornPose(rotations,gestures.horn);
   BlendLiveWindowGesture(rotations,gestures.window);
   if(signal.reach>0)BlendLiveSignal(rotations,signal);
@@ -890,6 +942,8 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    if(valid && SafeRead(pointers[3],positions.data(),sizeof(positions)))controllerMask=ApplyControllers(rotations,positions,!leftActive,!rightActive);
   }
   __try {
+   if(gripMask&1)for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if(gripMask&2)for(unsigned bone:{26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(controllerMask&1){for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);for(unsigned bone=8;bone<=22;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);}
    if(controllerMask&2){for(unsigned bone:{26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);for(unsigned bone=29;bone<=43;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);}
    if(rightElbowApplied)for(unsigned bone: {26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
@@ -911,6 +965,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    if(gestures.window.reach>0)windowGestureOverrides.fetch_add(1);
   } __except(EXCEPTION_EXECUTE_HANDLER){hornFaults.fetch_add(1);}
  }
+ if(IsBorrowedPlayerBody(model,path)){DriverIK::Pose auditPose{};DriverIK::Positions auditPositions{};if(SafeRead(pointers[2],auditPose.data(),sizeof(auditPose))&&SafeRead(pointers[3],auditPositions.data(),sizeof(auditPositions))){auto frame=DriverIK::FK(auditPose,auditPositions);nativeRigAudit={model,{frame.p[7],frame.p[28]}};}}
  const auto sample=boneSamples.fetch_add(1)+1;
  if(sample<=3 || sample%120==0) {
   char text[512];std::snprintf(text,sizeof(text),"HORN_BONE sample=%llu count=%u held=%d arm_quat=%.6f,%.6f,%.6f,%.6f hand_quat=%.6f,%.6f,%.6f,%.6f hand_local=%.6f,%.6f,%.6f bones=%p",
@@ -925,15 +980,19 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  if(!std::strcmp(path,"/model/spf_stock_driver/driver.pmd")){
   static uint64_t logged=0;auto stamp=GetTickCount64();if(stamp-logged>=1000){logged=stamp;DriverPalette observed{};if(SafeRead(output,observed.data(),sizeof(observed))){char text[256];std::snprintf(text,sizeof(text),"MARKER_DRIVER_FRAME root=%.4f,%.4f,%.4f head=%.4f,%.4f,%.4f wrist_left=%.4f,%.4f,%.4f",observed[0][3],observed[0][7],observed[0][11],observed[47][3],observed[47][7],observed[47][11],observed[7][3],observed[7][7],observed[7][11]);Log(SPF_LOG_INFO,text);}}
  }
+ const bool borrowed=IsBorrowedPlayerBody(model,path);
+ if(borrowed&&nativeRigAudit.model==model){static thread_local uint64_t report=0;auto now=GetTickCount64();if(now-report>=1000){report=now;DriverPalette actual{};if(SafeRead(output,actual.data(),sizeof(actual))){auto left=DriverIK::V{actual[7][3],actual[7][7],actual[7][11]},right=DriverIK::V{actual[28][3],actual[28][7],actual[28][11]};char text[192];std::snprintf(text,sizeof(text),"NATIVE_RIG_MAPPING fk_to_palette_error_m=%.6f,%.6f",DriverIK::Length(DriverIK::Sub(left,nativeRigAudit.wrists[0])),DriverIK::Length(DriverIK::Sub(right,nativeRigAudit.wrists[1])));Log(SPF_LOG_INFO,text);}}}
+
  const bool privateModel=!std::strcmp(path,"/model/spf_stock_driver/driver.pmd");
- const bool privateBody=hideBody.load() && privateModel;
- const bool privateHead=privateModel && !privateBody && (!bodyCameraValid.load() || bodyCameraType.load()==2);
+ const bool duplicateAccessory=privateModel && nativeDriverRenderReady && confirmedPlayerDriverModel.load() && confirmedPlayerDriverModel.load()==expectedPlayerDriverModel.load();
+ const bool privateBody=(hideBody.load() && (privateModel||borrowed)) || duplicateAccessory;
+ const bool privateHead=(privateModel||borrowed) && !privateBody && (!bodyCameraValid.load() || bodyCameraType.load()==2);
  const auto now=GetTickCount64(),tick=playerDriverTick.load();
  const bool playerStock=hideStockDriver.load() && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && tick && now-tick<=750 && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd");
  if(!privateBody && !playerStock && !privateHead)return;
  DriverPalette palette{};if(!SafeRead(output,palette.data(),sizeof(palette)))return;
  const auto headBefore=palette[47];
- if(privateHead){if(collapseInteriorHead.load()){if(!CollapseDriverHead(palette,interiorHeadBackshift.load()))return;}else if(!OffsetDriverHead(palette,interiorHeadBackshift.load()))return;}else if(!CollapseDriverPalette(palette))return;
+ if(privateHead){auto settings=SnapshotVehicleSteeringPose();bool collapse=borrowed?!settings.headVisible:collapseInteriorHead.load();float shift=borrowed?settings.headBackshift:interiorHeadBackshift.load();if(collapse){if(!CollapseDriverHead(palette,shift))return;}else if(!OffsetDriverHead(palette,shift))return;}else if(!CollapseDriverPalette(palette))return;
  if(privateHead){
   static float lastLogged=std::numeric_limits<float>::quiet_NaN();const float offset=interiorHeadBackshift.load();
   if(offset!=lastLogged){lastLogged=offset;char message[192];std::snprintf(message,sizeof(message),"INTERIOR_HEAD_APPLIED collapse=%d offset_m=%.3f palette_delta=%.4f,%.4f,%.4f",collapseInteriorHead.load()?1:0,offset,palette[47][3]-headBefore[3],palette[47][7]-headBefore[7],palette[47][11]-headBefore[11]);Log(SPF_LOG_INFO,message);}
@@ -1082,7 +1141,7 @@ void ApplyInteriorSteering(uintptr_t model,uint32_t index,float* replacement) no
  static thread_local float clutchPress=0;
  if(applying || !replacement || index>=4096 || steeringFaults.load())return;
  char path[192]{};
- if(!ReadModelPath(model,path) || std::strcmp(path,"/model/spf_stock_driver/driver.pmd"))return;
+ if(!ReadModelPath(model,path) || !UseAnimatedBody(model,path))return;
  uintptr_t states=0,count=0,animation=0;
  if(!SafeRead(model+0x210,&states,8) || !states ||
     !SafeRead(model+0x218,&count,8) || index>=count || count>4096 ||
@@ -1134,6 +1193,23 @@ void ApplyInteriorSteering(uintptr_t model,uint32_t index,float* replacement) no
   if(hasClutch || hasBrake || hasThrottle) {lastThrottle.store(throttle);throttleOverrides.fetch_add(1);}
  } __except(EXCEPTION_EXECUTE_HANDLER) {steeringFaults.fetch_add(1);}
  applying=false;
+}
+namespace {
+void RefreshBorrowedDriverPose() {
+ if(!enabled.load() || !nativeDriverRenderReady || !gAdvanceOriginal)return;
+ const auto now=GetTickCount64(),tick=telemetryTick.load();
+ auto model=expectedPlayerDriverModel.load(),controller=expectedPlayerDriverController.load();
+ if(!model||!controller||model!=confirmedPlayerDriverModel.load()||!tick||now<tick||now-tick>250)return;
+ uintptr_t current=0;uint32_t index=~0u;
+ if(!SafeRead(controller+8,&current,8)||current!=model||!SafeRead(controller+0x10,&index,4)||index>=4096)return;
+ char path[192]{};if(!ReadModelPath(model,path)||!IsBorrowedPlayerBody(model,path))return;
+ float requested=0;ApplyInteriorSteering(model,index,&requested);
+ // No controller/runtime mutex is held across the engine call. Advancing the
+ // selected steering sample invalidates ATS's cached rig even at rest, allowing
+ // render-time head/hand edits and wrist attachment updates on every frame.
+ using Advance=void(__fastcall*)(uintptr_t,uint32_t,float);
+ reinterpret_cast<Advance>(gAdvanceOriginal)(model,index,requested);
+}
 }
 extern "C" void CaptureAdvance(uintptr_t model,uint32_t index,float requested,uintptr_t returnAddress,float* replacement) noexcept {
  if(!enabled.load()) return;

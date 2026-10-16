@@ -73,8 +73,15 @@ Assert (!(Test-Path $bundle)) 'Retired general INI remains'
 $poses=Join-Path $plugin 'config/mustang_poses.ini';$boxes=Join-Path $plugin 'config/mustang_boxes.ini'
 Assert ((Read $poses).Contains('user pose')) 'User pose did not migrate'
 Assert ((Read $boxes).Contains('user boxes')) 'User boxes did not migrate'
+$vehicleProfile=Join-Path $plugin 'config/vehicles/ford_bronco_boxes.ini'
+$vehiclePose=Join-Path $plugin 'config/vehicles/ford_bronco_poses.ini';Text $vehiclePose 'live vehicle grip offsets'
+Text $vehicleProfile "[vehicle]`nmodel_id vehicle.ford.bronco_24`n[interaction_boxes]`nuser vehicle placement`n"
 Text $poses "[ignition_pose]`nnew user pose`n";Run Install
+Assert ((Read $vehicleProfile).Contains('user vehicle placement')) 'Reinstall replaced generated per-vehicle box profile'
+Assert ((Read $vehiclePose).Contains('live vehicle grip offsets')) 'Reinstall replaced generated per-vehicle pose profile'
 Assert ((Read $poses).Contains('new user pose')) 'Reinstall replaced user vehicle poses'
 Run Uninstall
 Assert ((Read $poses).Contains('new user pose')) 'Uninstall removed user poses'
+Assert ((Read $vehicleProfile).Contains('user vehicle placement')) 'Uninstall removed generated per-vehicle box profile'
+Assert ((Read $vehiclePose).Contains('live vehicle grip offsets')) 'Uninstall removed generated per-vehicle pose profile'
 Write-Output "PASS: compact install/uninstall, replaced-files-only backups, temporary rollback, reinstall repair, settings consolidation and no audio backups, existing-loader preservation, no Steam or mirror-plugin changes. Fixture: $root"

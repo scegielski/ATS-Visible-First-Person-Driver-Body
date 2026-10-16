@@ -1,4 +1,6 @@
 #include "DriverSettings.hpp"
+#include "VehicleBoxProfiles.hpp"
+#include "VehicleSteeringPose.hpp"
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
@@ -26,5 +28,35 @@ int main(){
  for(const auto& [key,value]:parsed){std::string old;REQUIRE(ReadDriverSettingsFile(std::filesystem::path("../../releases")/(key+".txt"),old));auto trim=[](std::string s){s.erase(std::remove(s.begin(),s.end(),'\r'),s.end());auto n=s.find_last_not_of("\r\n");return n==std::string::npos?std::string{}:s.substr(0,n+1);};REQUIRE(trim(value)==trim(old));}
  REQUIRE(ReadDriverSetting(directory/"signal_activation_delay.txt",text)&&text.find("0.22")!=std::string::npos);
  Put(bundle,"[signal_activation_delay]\n9.99\n");REQUIRE(ReadDriverSetting(directory/"signal_activation_delay.txt",text)&&text.find("0.22")!=std::string::npos);
+
+ VehicleBoxIdentity ford{"ford","vehicle.mustang"},other{"kenworth","w900"},similar{"ford","vehicle/mustang"};
+ REQUIRE(!VehicleBoxIdentity{}.Valid());REQUIRE(VehicleBoxPath(directory,{}).empty());
+ REQUIRE(ford.Filename()!=similar.Filename());REQUIRE(ford.Filename()==ford.Filename());
+ VehicleBoxIdentity traversal{"../brand","../../model"};REQUIRE(traversal.Filename().find('/')==std::string::npos);
+ InteractionBoxEditor custom;custom.boxes[0].center={1.25f,2,3};
+ Put(mustang,SerializeDriverSettings({{"interaction_boxes",SerializeInteractionBoxes(custom)}}));
+ std::string original;REQUIRE(ReadDriverSettingsFile(mustang,original));
+ InteractionBoxEditor loaded;std::string placement;bool migrated=false;
+ REQUIRE(InitializeVehicleBoxes(directory,ford,loaded,placement,migrated)&&migrated);REQUIRE(loaded.boxes[0].center[0]==1.25f);
+ REQUIRE(InitializeVehicleBoxes(directory,other,loaded,placement,migrated)&&!migrated);REQUIRE(loaded.boxes[0].center[0]!=1.25f);
+ for(unsigned i=0;i<12;++i){REQUIRE(std::abs(loaded.boxes[i].center[2]+.4f)<1e-5f);REQUIRE(std::abs(loaded.boxes[i].center[1]-(1.6f-.24f*static_cast<float>(i/4)))<1e-5f);for(unsigned axis=0;axis<3;++axis)REQUIRE(std::abs(loaded.boxes[i].half[axis]*loaded.boxes[i].scale*loaded.boxes[i].stretch[axis]-.05f)<1e-6f);}
+ REQUIRE(loaded.boxes[12].center==InteractionBoxEditor{}.boxes[12].center&&loaded.boxes[13].center==InteractionBoxEditor{}.boxes[13].center);
+
+ loaded.boxes[0].center[0]=9;REQUIRE(WriteVehicleBoxes(VehicleBoxPath(directory,other),other,SerializeInteractionBoxes(loaded)));
+ REQUIRE(ReadVehicleBoxes(VehicleBoxPath(directory,ford),ford,loaded,placement)&&loaded.boxes[0].center[0]==1.25f);
+ REQUIRE(ReadVehicleBoxes(VehicleBoxPath(directory,other),other,loaded,placement)&&loaded.boxes[0].center[0]==9);
+ REQUIRE(!ReadVehicleBoxes(VehicleBoxPath(directory,ford),other,loaded,placement));
+ auto vehicleFile=VehicleBoxPath(directory,ford);REQUIRE(ReadDriverSettingsFile(vehicleFile,text));REQUIRE(ParseDriverSettings(text,parsed));parsed["zz_custom"]="preserve me\n";Put(vehicleFile,SerializeDriverSettings(parsed));
+ REQUIRE(ReadVehicleBoxes(vehicleFile,ford,loaded,placement));REQUIRE(WriteVehicleBoxes(vehicleFile,ford,placement));REQUIRE(ReadDriverSettingsFile(vehicleFile,text)&&text.find("preserve me")!=std::string::npos);
+ Put(vehicleFile,"malformed user edit");REQUIRE(!InitializeVehicleBoxes(directory,ford,loaded,placement,migrated));REQUIRE(!WriteVehicleBoxes(vehicleFile,ford,placement));REQUIRE(ReadDriverSettingsFile(vehicleFile,text)&&text=="malformed user edit");
+ VehicleBoxIdentity oldSeed{"ford","vehicle.unused"};auto seedPath=VehicleBoxPath(directory,oldSeed);REQUIRE(WriteVehicleBoxes(seedPath,oldSeed,SerializeInteractionBoxes(InteractionBoxEditor{})));REQUIRE(InitializeVehicleBoxes(directory,oldSeed,loaded,placement,migrated));REQUIRE(SerializeInteractionBoxes(loaded)==SerializeInteractionBoxes(GenericVehicleBoxes()));loaded.boxes[0].center[1]=1.77f;REQUIRE(WriteVehicleBoxes(seedPath,oldSeed,SerializeInteractionBoxes(loaded)));REQUIRE(InitializeVehicleBoxes(directory,oldSeed,loaded,placement,migrated)&&loaded.boxes[0].center[1]==1.77f);std::filesystem::remove(seedPath);
+
+ VehicleSteeringPose grip;REQUIRE(ParseVehicleSteeringPose(DefaultVehicleSteeringPose(other),other,grip)&&grip.headVisible);
+ REQUIRE(!ParseVehicleSteeringPose(DefaultVehicleSteeringPose(other),ford,grip));
+ LiveVehicleSteeringPose liveGrips;REQUIRE(liveGrips.Poll(directory,other));auto gripFile=VehiclePosePath(directory,other);REQUIRE(gripFile!=VehicleBoxPath(directory,other));
+ REQUIRE(ReadDriverSettingsFile(gripFile,text));REQUIRE(ParseDriverSettings(text,parsed));parsed["steering_grips"]="left_offset 0 0 0.02\nright_offset 0 0 0.03\n";parsed["head"]="visible 1\nbackshift_m 0.01\n";Put(gripFile,SerializeDriverSettings(parsed));REQUIRE(liveGrips.Poll(directory,other)&&liveGrips.settings.offset[0][2]==.02f&&liveGrips.settings.offset[1][2]==.03f&&liveGrips.settings.headBackshift==.01f);
+ Put(gripFile,"broken edit");REQUIRE(!liveGrips.Poll(directory,other)&&liveGrips.settings.offset[0][2]==.02f);REQUIRE(liveGrips.Poll(directory,ford)&&liveGrips.settings.offset[0][2]==0);std::filesystem::remove(gripFile);std::filesystem::remove(VehiclePosePath(directory,ford));
+ REQUIRE(ReadDriverSettingsFile(mustang,text)&&text==original);
+ std::filesystem::remove(vehicleFile);std::filesystem::remove(VehicleBoxPath(directory,other));std::filesystem::remove(directory/"vehicles");std::filesystem::remove(mustang);
  std::filesystem::remove(legacy);std::filesystem::remove(bundle);REQUIRE(std::filesystem::remove(directory));std::cout<<"Unified driver settings regression passed\n";
 }

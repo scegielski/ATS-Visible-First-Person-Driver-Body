@@ -2,6 +2,12 @@
 
 See the [README](../README.md) for installation and supported scope.
 
+## Driver body and vehicle support
+
+On the supported ATS build, enabling the plugin renders the game-owned player driver in the cabin without selecting a body accessory. The native vehicle animation supplies the driver's seated placement. The old accessory body is suppressed while the native driver is available. Native object ownership stays with ATS, including vehicle switching and shutdown.
+
+Setup boxes use the independent VR renderer and do not require a body accessory or mesh. New vehicle profiles start with a four-column, three-row grid of ten-centimetre cubes; the row heights are 1.60, 1.36 and 1.12 metres in vehicle space, with depth -0.40 metres. Hand grab boxes also default to ten-centimetre cubes. Existing calibrated profiles are preserved. The twelve cabin boxes are available without a driver; the two hand grab boxes additionally need a valid live wrist pose. Box edits save to the active vehicle's profile.
+
 ## Calibration and hand tracking
 
 Sit normally and use ATS's assigned head-reset control to establish neutral head and torso tracking. Point the left controller at the left hand, or the right controller at the right hand, and press trigger once to engage it. Touching the corresponding grab box also works. Calibration captures that controller's current pose and the hand's current position; subsequent movement is relative to that grab.
@@ -56,7 +62,9 @@ Paths below are relative to the dedicated SPF plugin folder, `bin/win_x64/plugin
 | File | Purpose |
 | --- | --- |
 | `config/mustang_poses.ini` | Live finger, gesture, ignition and turn-signal poses |
-| `config/mustang_boxes.ini` | Live box positions, rotations and sizes; F9 saves here |
+| `config/vehicles/<brand_model_hash>_poses.ini` | Live per-vehicle resting hand offsets and native head visibility/backshift |
+| `config/vehicles/<brand_model_hash>_boxes.ini` | Active vehicle box positions, rotations and sizes; selected from game brand/model IDs; F9 saves here |
+| `config/mustang_boxes.ini` | Preserved Mustang seed; copied into its vehicle profile on first use |
 | `config/settings.json` | SPF-owned preferences and keybindings |
 
 General tracking, timing, visibility, elbow and wrist settings are compiled into the DLL. There is no installed `driver_body.ini`. Pose edits reload in about half a second; invalid edits retain the last valid pose. The INI section names and formats must be preserved. Updates retain existing Mustang configurations.
@@ -82,3 +90,23 @@ Activate uses SPF semantic virtual input registered during plugin OnLoad. It emi
 Left radial lower-right: SETUP MODE ON/OFF. Select it to toggle box setup with the existing spoken cue and vibration. F9 and double-press right A remain available.
 
 Left radial lower-left: VR RECENTER. Select while seated normally; it uses the existing native reset and speaks VR recenter after the reset applies. Double-press right B remains available outside Finger editing mode.
+
+Vehicle box profiles are created automatically when driving telemetry identifies a vehicle. A new non-Mustang vehicle starts with generic boxes: use setup mode to position them. Profiles include all cabin boxes and the two wrist-local grab boxes. Switching vehicles releases hand control and clears pending cabin interactions. Profile edits reload live; invalid files retain the last valid placement. This change covers boxes only: poses and body alignment still use the Mustang configuration. Profiles created at runtime are not overwritten by installer updates.
+
+Setup boxes now render through the controller bridge, independently of the driver-body accessory. The bridge and plugin must be updated together. New vehicles start with twelve labeled cabin boxes arranged in front of the seat for placement with F9 or the controller setup toggle. Box grabbing, rotation, nonuniform scaling and saving work without a body. The two wrist-attached boxes appear only when a real driver skeleton is available. Outside setup mode, controller lasers can operate the configured cabin boxes without a driver body.
+
+The driver body reuses the game-owned native player model and draws it with the interior render context; no accessory is required. The active build does not create or release native body scene objects.
+
+Setup meshes are anchored in OpenXR LOCAL tracking space and rendered using display-time eye poses, rather than game-update head-relative poses. The compositor pass uses the headset-recommended resolution (up to 4096 pixels per dimension) and four-sample antialiasing when supported.
+
+### Live resting-hand placement
+
+Each vehicle gets a separate poses file next to its boxes file. Under `[steering_grips]`, edit `left_offset` and `right_offset`, each with three metre values: X right, Y up, Z backward toward the driver. For example, `left_offset 0 0 0.02` moves the resting left hand two centimetres back. Keep hands disengaged while checking resting wheel grips; re-engage afterward to capture the adjusted grip.
+
+The `[head]` section contains `visible 1` and `backshift_m 0`. Set `visible 0` to collapse the head in the interior camera, or use a small backshift to reposition it instead. Head visibility defaults on. Changes reload within about half a second; malformed edits retain the last valid settings. These offsets supplement the vehicle's own native steering pose; existing finger/gesture definitions still come from `mustang_poses.ini`.
+
+Controller-to-body mapping uses the active vehicle's reported cabin and head origin plus the seat adjustment. Existing box coordinate values remain unchanged when that camera basis changes; they may need repositioning in setup for the corrected vehicle frame.
+
+### Bronco VR validation
+
+The user confirmed accessory-free body visibility, normal shutdown, continuous hand updates, controller-to-hand tracking, sharp and stable independent boxes, and the corrected hand-box rotation and readable labels. Bronco resting hand offsets were tuned live to two centimetres up and five centimetres back and are saved in its vehicle pose profile. The final hand-box transform correction passed all seven native test suites and installer lifecycle tests.

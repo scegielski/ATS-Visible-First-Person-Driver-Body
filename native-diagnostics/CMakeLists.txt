@@ -9,6 +9,7 @@ target_link_libraries(SPF_VisibleFirstPersonDriverBody PRIVATE bcrypt menu_early
 target_compile_definitions(SPF_VisibleFirstPersonDriverBody PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_compile_options(SPF_VisibleFirstPersonDriverBody PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4> $<$<COMPILE_LANGUAGE:CXX>:/EHsc>)
 add_executable(DriverDiagnosticTests Tests.cpp ObserveStubs.asm SignalStubTests.asm)
+target_compile_definitions(DriverDiagnosticTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 enable_testing()
 add_test(NAME DriverDiagnosticRegression COMMAND DriverDiagnosticTests)
 
@@ -39,3 +40,7 @@ add_test(NAME IntegratedAdjustmentRegression COMMAND IntegratedAdjustmentTests "
 add_executable(DriverSettingsTests DriverSettingsTests.cpp)
 target_compile_definitions(DriverSettingsTests PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 add_test(NAME UnifiedDriverSettingsRegression COMMAND DriverSettingsTests)
+
+
+add_executable(IndependentBoxRenderTests IndependentBoxRenderTests.cpp)
+add_test(NAME IndependentBoxRenderRegression COMMAND IndependentBoxRenderTests)

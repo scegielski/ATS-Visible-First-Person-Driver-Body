@@ -17,5 +17,8 @@ inline ControllerModelMatrix ControllerModelIdentity(){return {1,0,0,0,0,1,0,0,0
 inline ControllerModelMatrix ControllerModelMultiply(const ControllerModelMatrix& a,const ControllerModelMatrix& b){ControllerModelMatrix o{};for(unsigned r=0;r<4;++r)for(unsigned c=0;c<4;++c)for(unsigned k=0;k<4;++k)o[r*4+c]+=a[r*4+k]*b[k*4+c];return o;}
 inline ControllerModelMatrix ControllerModelFrom34(const std::array<float,12>& m){auto o=ControllerModelIdentity();for(unsigned r=0;r<3;++r)for(unsigned c=0;c<4;++c)o[c*4+r]=m[r*4+c];return o;}
 inline ControllerModelMatrix ControllerModelProjection(float left,float right,float down,float up,float nearZ=.01f,float farZ=10){ControllerModelMatrix o{};o[0]=2/(right-left);o[5]=2/(up-down);o[8]=(right+left)/(right-left);o[9]=(up+down)/(up-down);o[10]=farZ/(nearZ-farZ);o[11]=-1;o[14]=nearZ*farZ/(nearZ-farZ);return o;}
-struct ControllerModelSnapshot {std::array<std::shared_ptr<const ControllerMeshData>,64> meshes;std::array<ControllerMeshPose,64> poses;uint64_t tick=0;};
+inline constexpr unsigned ControllerModelSlotCount=96;
+inline constexpr unsigned InteractionBoxMeshStart=64,InteractionBoxMeshCount=28;
+struct ControllerModelSnapshot {std::array<std::shared_ptr<const ControllerMeshData>,ControllerModelSlotCount> meshes;std::array<ControllerMeshPose,ControllerModelSlotCount> poses;uint64_t tick=0,setupTick=0;bool setupTrackingSpace=false;};
+inline bool ControllerModelSlotVisible(const ControllerModelSnapshot& state,unsigned slot,uint64_t now){auto stamp=slot<InteractionBoxMeshStart?state.tick:state.setupTick;return slot<ControllerModelSlotCount&&stamp&&now>=stamp&&now-stamp<=250&&state.poses[slot].visible;}
 struct ControllerModelStore {std::mutex mutex;ControllerModelSnapshot state;uint64_t revision=0;bool Snapshot(ControllerModelSnapshot& out){std::unique_lock lock(mutex,std::try_to_lock);if(!lock.owns_lock())return false;out=state;return true;}};

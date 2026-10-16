@@ -1,0 +1,14 @@
+#include "IndependentBoxRender.hpp"
+#include <iostream>
+#include <cstdlib>
+#define CHECK(x) do{if(!(x)){std::cerr<<"FAIL "<<__LINE__<<" "<<#x;std::exit(1);}}while(false)
+bool Near(float a,float b){return std::abs(a-b)<.0001f;}
+int main(){auto mesh=SetupBoxWireMesh();CHECK(mesh.vertices.size()==96&&mesh.indices.size()==432);CHECK(ValidControllerMesh(mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size())));
+ ControllerSceneFrame frame;frame.camera={-.4f,1.2f,.1f};frame.neutral={.1f,0,0};frame.xrHead={.2f,.1f,0};
+ InteractionBox box;box.center={-.3f,1.3f,-.4f};box.half={.05f,.06f,.07f};box.scale=2;box.stretch={1,2,3};auto pose=SetupBoxTrackingPose(box,frame);
+ CHECK(Near(pose.matrix[3],.2f)&&Near(pose.matrix[7],.1f)&&Near(pose.matrix[11],-.5f));CHECK(Near(pose.matrix[0],.1f)&&Near(pose.matrix[5],.24f)&&Near(pose.matrix[10],.42f));
+ auto label=SetupBoxTrackingPose(box,frame,true);CHECK(Near(label.matrix[7],.385f));
+ auto fixed=pose;frame.xrHead={.8f,-.3f,.4f};frame.xrHeadQ={.70710678f,0,.70710678f,0};pose=SetupBoxTrackingPose(box,frame);CHECK(pose.matrix==fixed.matrix);
+ ControllerModelSnapshot state;state.poses[64].visible=true;state.setupTick=1000;CHECK(ControllerModelSlotVisible(state,64,1100));state.tick=1400;CHECK(!ControllerModelSlotVisible(state,64,1400));state.poses[0].visible=true;CHECK(ControllerModelSlotVisible(state,0,1400));state.setupTick=1400;state.tick=0;CHECK(!ControllerModelSlotVisible(state,0,1400)&&ControllerModelSlotVisible(state,64,1400));CHECK(!ControllerModelSlotVisible(state,96,1400));
+ InteractionBoxEditor editor;editor.enabled=true;for(unsigned i=0;i<12;++i)editor.boxes[i].center={2,2,2};BoxGrabInput hands[2]{};hands[0].valid=true;hands[0].position=editor.boxes[12].center;editor.Step(hands,12);hands[0].grip=1;editor.Step(hands,12);CHECK(editor.selected<0);hands[0].grip=0;editor.Step(hands);hands[0].grip=1;editor.Step(hands);CHECK(editor.selected==12);
+ std::cout<<"Independent setup-box geometry, nonuniform scale, tracking-space stability and stale visibility passed\n";}

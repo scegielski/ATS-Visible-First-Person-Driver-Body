@@ -1,3 +1,5 @@
+#include "VehicleSteeringPose.hpp"
+#include "NativeDriverRender.hpp"
 #include "NativeRadialActions.hpp"
 #include "ControllerRadial.hpp"
 #include "HandGrab.hpp"
@@ -216,8 +218,10 @@ int main() {
  rightDrag.Step(true,true,0,0,0,0,.01f);rightDrag.Step(true,true,0,0,1,0,.01f);Check(rightDrag.Step(false,false,0,0,1,0,.01f).button==-1,"tracking loss releases captured right button");
  HandGrabGesture grabGesture;Check(!grabGesture.Step(false,0,true,false,false,1),"grab waits for target and fresh press");Check(!grabGesture.Step(false,1,true,false,false,2),"off-target trigger cannot grab");Check(!grabGesture.Step(false,1,true,false,true,3),"entering hand target with held trigger cannot grab");grabGesture.Step(false,0,true,false,true,4);Check(grabGesture.Step(false,1,true,false,true,5)==1,"fresh targeted trigger engages hand");Check(!grabGesture.Step(true,1,true,false,true,6),"activation press does not release hand");grabGesture.Step(true,0,true,false,false,7);Check(!grabGesture.Step(true,1,true,false,false,10),"first release click starts double press");grabGesture.Step(true,0,true,false,false,20);Check(grabGesture.Step(true,1,true,false,false,100)==-1,"double trigger releases without targeting");grabGesture.Step(false,0,true,true,true,110);Check(!grabGesture.Step(false,1,true,true,true,120),"setup mode suppresses hand engagement");
  InteractionBox localGrab{{.1f,.02f,-.03f},{.04f,.035f,.055f},{1,0,0,0},1.4f,{1,2,3}};auto wristTurn=DriverIK::Q{.70710678f,0,.70710678f,0};auto attachedGrab=AttachHandBox(localGrab,{1,2,3},wristTurn);auto detachedGrab=DetachHandBox(attachedGrab,{1,2,3},wristTurn);Check(DriverIK::Length(DriverIK::Sub(detachedGrab.center,localGrab.center))<1e-5f&&detachedGrab.stretch==localGrab.stretch&&detachedGrab.scale==localGrab.scale,"wrist-local grab box transforms round trip including nonuniform size");
- InteractionBoxEditor handBoxEditor;handBoxEditor.boxes[12]=localGrab;HandBoxAttachments attachments;attachments.Load(handBoxEditor);attachments.valid=true;attachments.wrist[0]={1,2,3};attachments.rotation[0]=wristTurn;handBoxEditor.boxes[12]=attachedGrab;attachments.CaptureEdit(handBoxEditor);auto savedHands=SerializeInteractionBoxes(attachments.Saved(handBoxEditor));InteractionBoxEditor loadedHands;Check(ParseInteractionBoxes(savedHands,loadedHands)&&DriverIK::Length(DriverIK::Sub(loadedHands.boxes[12].center,localGrab.center))<1e-5f,"fourteen-box format saves local hand offsets");
- std::string oldBoxes=SerializeInteractionBoxes(InteractionBoxEditor{});oldBoxes.replace(oldBoxes.find("BOXES 10"),8,"BOXES 9");auto oldEnd=oldBoxes.find("hand_left ");oldBoxes.erase(oldEnd);loadedHands.boxes[12].center={99,99,99};Check(ParseInteractionBoxes(oldBoxes,loadedHands)&&loadedHands.boxes[12].center[0]==.14f,"legacy twelve-box files initialize hand-local defaults instead of retaining world coordinates");
+ InteractionBoxEditor handBoxEditor;handBoxEditor.boxes[12]=localGrab;HandBoxAttachments attachments;attachments.Load(handBoxEditor);attachments.valid=true;attachments.wrist[0]={1,2,3};attachments.rotation[0]=wristTurn;handBoxEditor.boxes[12]=attachedGrab;handBoxEditor.selected=12;attachments.CaptureEdit(handBoxEditor);auto savedHands=SerializeInteractionBoxes(attachments.Saved(handBoxEditor));InteractionBoxEditor loadedHands;Check(ParseInteractionBoxes(savedHands,loadedHands)&&DriverIK::Length(DriverIK::Sub(loadedHands.boxes[12].center,localGrab.center))<1e-5f,"fourteen-box format saves local hand offsets");
+ auto stableLocal=attachments.local[0];handBoxEditor.selected=-1;handBoxEditor.boxes[12].center={99,99,99};for(unsigned i=0;i<1000;++i)attachments.CaptureEdit(handBoxEditor);Check(attachments.local[0].center==stableLocal.center&&attachments.local[0].rotation==stableLocal.rotation,"unedited hand boxes do not accumulate setup transform drift");
+ auto scaledWrist=wristTurn;for(float& v:scaledWrist)v*=.97f;auto normalizedGrab=AttachHandBox(localGrab,{1,2,3},scaledWrist);auto axisX=DriverIK::Rotate(normalizedGrab.rotation,{1,0,0}),axisY=DriverIK::Rotate(normalizedGrab.rotation,{0,1,0});Check(std::abs(DriverIK::Length(axisX)-1)<1e-5f&&std::abs(DriverIK::Dot(axisX,axisY))<1e-5f,"non-unit wrist rotations cannot shear hand boxes");
+ std::string oldBoxes=SerializeInteractionBoxes(InteractionBoxEditor{});oldBoxes.replace(oldBoxes.find("BOXES 10"),8,"BOXES 9");auto oldEnd=oldBoxes.find("hand_left ");oldBoxes.erase(oldEnd);loadedHands.boxes[12].center={99,99,99};Check(ParseInteractionBoxes(oldBoxes,loadedHands)&&loadedHands.boxes[12].center[0]==.07f,"legacy twelve-box files initialize hand-local defaults instead of retaining world coordinates");
  MenuKeyPulse keyPulse;Check(keyPulse.Step(true,true,100)==1,"shortcut key emits key down");Check(keyPulse.Step(true,false,101)==0&&keyPulse.down,"key remains held across frames");Check(keyPulse.Step(true,false,179)==0&&keyPulse.down,"key does not release before 80ms");Check(keyPulse.Step(true,false,180)==-1&&!keyPulse.down,"key emits delayed key up");keyPulse.Step(true,true,200);Check(keyPulse.Step(false,false,201)==-1,"focus loss immediately releases shortcut key");
  MenuDoublePress doubleX,doubleY;doubleX.Step(true,false,90);doubleY.Step(true,false,90);
  Check(!doubleX.Step(true,true,100)&&!doubleX.Step(true,true,110),"single press and holding do not invoke menu key");
@@ -288,6 +292,15 @@ int main() {
  ControllerSceneFrame sceneFrame;sceneFrame.camera={0,1,0};sceneFrame.neutral={2,0,3};sceneFrame.xrHead={2,0,3};auto physical=DriverIK::V{.3f,1.1f,-.4f};auto initialMarker=sceneFrame.Position(physical,{0,1,0},{1,0,0,0});
  sceneFrame.xrHead={2.2f,.1f,3};auto movedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{1,0,0,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,movedMarker))<.00001f,"stationary controller marker stays fixed during head translation across tracking spaces");
  sceneFrame.xrHeadQ={.70710678f,0,.70710678f,0};auto turnedMarker=sceneFrame.Position(physical,{.2f,1.1f,0},{.70710678f,0,.70710678f,0});Check(DriverIK::Length(DriverIK::Sub(initialMarker,turnedMarker))<.00001f,"stationary marker stays fixed during matching head rotation");
+ {
+  ControllerSceneFrame vehicleFrame;vehicleFrame.SetSeatOffset({.02f,.04f,-.1f});
+  Check(vehicleFrame.SetVehicleCamera({0,.3f,0},{-.4f,1.25f,.3f}),"vehicle camera origin accepts SDK cabin and head positions");
+  Check(DriverIK::Length(DriverIK::Sub(vehicleFrame.camera,{-.38f,1.59f,.2f}))<1e-5f,"vehicle camera includes cabin pivot, head position and live seat offset once");
+  auto validCamera=vehicleFrame.camera;Check(!vehicleFrame.SetVehicleCamera({0,0,0},{0,0,0})&&vehicleFrame.camera==validCamera,"missing SDK head position cannot overwrite a valid camera");
+  auto origin=vehicleFrame.Position({0,0,-.3f},{0,0,0},{1,0,0,0});
+  for(float z:{-.15f,-.05f,.05f,.15f}){auto point=vehicleFrame.Position({0,0,-.3f+z},{0,0,0},{1,0,0,0});Check(DriverIK::Length(DriverIK::Sub(DriverIK::Sub(point,origin),{0,0,z}))<1e-5f,"non-Mustang controller depth movement remains one-to-one");}
+  vehicleFrame.ResetVehicleCamera();Check(DriverIK::Length(DriverIK::Sub(vehicleFrame.camera,{-.3847368658f,1.066045642f,.1469421685f}))<1e-5f,"vehicle switch clears the previous vehicle camera origin");
+ }
  ControllerFingerPose routedPose;std::string routeError;std::string routeIndex=changed;auto routePos=routeIndex.find("trigger_finger index");routeIndex.replace(routePos,std::string("trigger_finger index").size(),"trigger_finger index");Check(ParseControllerFingerPose(routeIndex,false,routedPose,routeError) && routedPose[0].triggerControlled && !routedPose[3].triggerControlled,"live routing can select index instead of middle");
  Check(!ParseControllerFingerPose(changed+"trigger_finger thumb\n",false,routedPose,routeError),"duplicate routing rejected without partial pose updates");
  DriverIK::V priorRay{0,0,-1},priorBend{0,-1,0};
@@ -418,6 +431,10 @@ int main() {
  gEngineOriginal=reinterpret_cast<void*>(EngineOriginal);Check(EngineRequestObserveStub(0x12345678,0xabcdef01,0xfedcba00,0x11223344,0x55667788)==0x987654,"engine observer preserves original return");
  suppressEngine=true;Check(EngineRequestObserveStub(0x12345678,0xabcdef01,0xfedcba00,0x11223344,0x55667788)==0 && engineOriginalCalls==1,"deferred engine request skips original exactly once");suppressEngine=false;
  {
+ NativeBodyViewLedger bodyViews;
+ Check(bodyViews.Take(1,1,0x100)&&!bodyViews.Take(1,1,0x100)&&bodyViews.Take(1,1,0x200),"interior submeshes cannot duplicate a body within one view/frame");
+ Check(bodyViews.Take(2,1,0x100)&&bodyViews.Take(2,2,0x100)&&!bodyViews.Take(2,2,0),"new frames and worlds render; missing views do not");
+ Check(IsCabinBodyAnchor("/vehicle/car/ford_bronco_24/interior/standard.pmd")&&!IsCabinBodyAnchor("/vehicle/car/ford_bronco_24/interior/accessory/radio.pmd")&&!IsCabinBodyAnchor("/asset/character/human/driver/man/driver.pmd"),"native body anchors to cabin geometry, excluding accessories and recursion");
  constexpr uintptr_t base=0x100000,game=0x200000,owner=0x300000,vt=0x400000,vehicle=0x500000,model=0x600000;bool wrong=false;
  auto reader=[&](uintptr_t a,void* out,size_t n){uintptr_t value=0;if(a==base+0x36badd0)value=game;else if(a==game+0xaa0)value=owner;else if(a==owner)value=vt;else if(a==vt+0x1b8)value=wrong?0:base+0x4d9cf0;else if(a==owner+0x31b0)value=vehicle;else if(a==vehicle+0x1df8)value=model;else return false;if(n!=8)return false;std::memcpy(out,&value,8);return true;};
  uintptr_t controller=0,candidate=0;Check(ReadPlayerExteriorDriver(base,reader,controller,candidate) && controller==vehicle+0x1df0 && candidate==model,"player exterior identity follows guarded vehicle owner");
@@ -502,6 +519,12 @@ int main() {
     Check(std::abs(twistState.previousTwist-angle)<.0001f,"twist angle remains continuous through 180 degrees");float continuity=0;for(unsigned i=0;i<4;++i)continuity+=candidate[lower][i]*previousForearm[i];Check(std::abs(continuity)>.999f,"forearm roll does not jump at quaternion wrap");previousForearm=candidate[lower];
     for(unsigned bone=0;bone<61;++bone)if(bone!=lower && bone!=wrist)Check(candidate[bone]==pose[bone],"axial share changes only forearm and wrist local rotations");
    }
+  }
+  {
+   auto adjusted=pose;auto before=DriverIK::FK(pose,positions);VehicleSteeringPose grips;grips.offset[0]={0,.005f,.005f};grips.offset[1]={0,-.005f,.005f};
+   Check(ApplyVehicleSteeringGrips(adjusted,positions,grips)==3,"both live vehicle grip offsets solve independently");auto after=DriverIK::FK(adjusted,positions);
+   Check(DriverIK::Length(DriverIK::Sub(after.p[7],DriverIK::Add(before.p[7],grips.offset[0])))<.001f&&DriverIK::Length(DriverIK::Sub(after.p[28],DriverIK::Add(before.p[28],grips.offset[1])))<.001f,"resting hand offsets preserve requested vehicle-space displacement");
+   for(unsigned bone=0;bone<61;++bone)if(bone<5||bone>7&&bone<26||bone>28)Check(adjusted[bone]==pose[bone],"resting hand adjustment preserves torso, fingers, head and legs");
   }
   for(bool right:{false,true}){
    auto candidate=pose;auto before=DriverIK::FK(pose,positions);unsigned wrist=right?28:7;ControllerHand hand;hand.enabled=hand.calibrate=true;

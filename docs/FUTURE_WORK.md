@@ -29,6 +29,8 @@ Keep radial menus accessible: holding thumbstick click opens a ring and temporar
 
 ## Vehicle profiles beyond the Mustang
 
+Box placement profiles now use game brand/model IDs, with separate live files and Mustang seed migration. In-game switching between multiple vehicles still needs validation. The body renderer now reuses ATS's native player driver and vehicle animation instead of creating accessory models; Bronco body visibility is confirmed. Broader rig coverage and vehicle-specific gesture poses remain future work.
+
 Use the active vehicle identity reported by the game to select separate configuration files automatically. Do not select profiles solely by a localized display name or the currently visible body mesh. Investigate which game/SDK identity fields reliably distinguish stock vehicles and mod vehicles before finalizing the lookup key.
 
 Each vehicle profile should own its vehicle-specific data:
