@@ -1010,3 +1010,7 @@ Setup Help now starts hidden, Setup radial menus use a distinct purple palette, 
 ### Exact setup grip boundaries
 
 Removed the remaining eight-centimeter contact-grab margin from cabin setup boxes. All eighteen boxes now use their visible rotated, scaled boundaries for controller-origin contact selection, while laser grabbing remains available. The empty-space camera adjustment uses the same boundary check. All seven native suites pass, including just-inside and just-outside acquisition checks for every box with rotation and nonuniform scale. The user confirmed the installed behavior in VR.
+
+### Setup visibility speech
+
+Added distinct Hide driver, Show driver, Hide head, and Show head spoken cues after successful Setup visibility toggles are saved. All seven native suites pass and the four mono PCM clips were checked for valid non-silent audio. The user confirmed all four cues work in VR.

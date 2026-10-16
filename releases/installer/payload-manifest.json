@@ -1,15 +1,15 @@
 {
-  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.57.exe",
-  "sha256": "05d049f8fba890375976bc9dbf2a3305d78d1016006bd481ad4a644e2af4a074",
+  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.58.exe",
+  "sha256": "7abb46eea9dc630b760454164189949734a1a47e05fe83e93c9462edb11f0f11",
   "payload": {
-    "version": "0.39.57",
+    "version": "0.39.58",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
     "files": [
       {
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "8459701716052a5adfa7d1e3106ee945b3eeb2efc553714ff5864a54ae982ab0",
+        "sha256": "5d62cde65e5e3887ffc8503044e9823bdf67e9e3520794b6ac30f4e6fe4ecffe",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -106,6 +106,22 @@
         "destination": "plugin",
         "target": "sounds/controller_hand_engaged.wav",
         "sha256": "ded9eb15d23c6067d2fae6220f9bc870dd509d849b3016c8e18fb46f292e00ac",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_hide_driver.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_hide_driver.wav",
+        "sha256": "f9109fe68d9c23a733a7cf0c37f9dbedbe6e6957a24385799cacdcfa0f3e6a5e",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_hide_head.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_hide_head.wav",
+        "sha256": "0804c766bdd46445bc96efb870bd7a9c7ae4a166a6c21a61845a3122c0b38ad0",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -362,6 +378,22 @@
         "destination": "plugin",
         "target": "sounds/controller_setup_enabled.wav",
         "sha256": "07cb50d9232802a25212774e42d9e92a6595b4c1db9af63451451a8ff925b17d",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_show_driver.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_show_driver.wav",
+        "sha256": "a9be095ca33cbb758c99924c47e5ab91e6eb2ab9529c05911fcf581c1a3fdbf7",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_show_head.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_show_head.wav",
+        "sha256": "3539de80d6506a951953d990f796bbdfc264fffa305c05165a032bd3dca47997",
         "mutable": false,
         "onlyIfMissing": false
       },
