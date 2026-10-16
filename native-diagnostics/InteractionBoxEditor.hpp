@@ -5,7 +5,7 @@
 struct InteractionBox {
  DriverIK::V center{},half{.04f,.04f,.04f};DriverIK::Q rotation{1,0,0,0};float scale=1;DriverIK::V stretch{1,1,1};
 };
-struct BoxGrabInput {DriverIK::V position{};DriverIK::Q rotation{1,0,0,0};bool valid=false;float grip=0;};
+struct BoxGrabInput {DriverIK::V position{};DriverIK::Q rotation{1,0,0,0};bool valid=false;float grip=0;int rayBox=-1;float rayDistance=2;};
 inline constexpr unsigned InteractionBoxCount=16;
 inline constexpr const char* InteractionBoxNames[InteractionBoxCount]={"ignition","horn","mirror_left","mirror_center","mirror_right","seat","window_left","window_right","steering_wheel","lights","wipers","radio","hand_left","hand_right","dashboard","infotainment"};
 struct InteractionBoxEditor {
@@ -17,7 +17,7 @@ struct InteractionBoxEditor {
  void Step(const BoxGrabInput (&in)[2],unsigned selectableCount=InteractionBoxCount,bool handsAvailable=true){
   bool held[2]{},edge[2]{};for(unsigned i=0;i<2;++i){held[i]=in[i].valid && in[i].grip>(down[i]?.3f:.65f);edge[i]=held[i]&&!down[i];if(!in[i].valid)down[i]=true;else if(in[i].grip<.3f)down[i]=false;else if(held[i])down[i]=true;}
   if(!enabled){Release();return;}
-  if(selected<0){float nearest=1e9f;for(unsigned side=0;side<2;++side)if(edge[side])for(unsigned box=0;box<std::min(selectableCount,InteractionBoxCount);++box){if(!handsAvailable&&(box==12||box==13))continue;auto local=DriverIK::Rotate(DriverIK::Inverse(boxes[box].rotation),DriverIK::Sub(in[side].position,boxes[box].center));bool isNear=true;for(unsigned j=0;j<3;++j)isNear=isNear && std::abs(local[j])<=boxes[box].half[j]*boxes[box].scale*boxes[box].stretch[j]+.08f;float d=DriverIK::Length(local);if(isNear && d<nearest){nearest=d;selected=box;owner=side;}}if(selected>=0)Anchor(owner,in[owner]);}
+  if(selected<0){float nearest=1e9f;for(unsigned side=0;side<2;++side)if(edge[side])for(unsigned box=0;box<std::min(selectableCount,InteractionBoxCount);++box){if(!handsAvailable&&(box==12||box==13))continue;auto local=DriverIK::Rotate(DriverIK::Inverse(boxes[box].rotation),DriverIK::Sub(in[side].position,boxes[box].center));bool isNear=true;for(unsigned j=0;j<3;++j)isNear=isNear && std::abs(local[j])<=boxes[box].half[j]*boxes[box].scale*boxes[box].stretch[j]+.08f;float d=DriverIK::Length(local);if(isNear && d<nearest){nearest=d;selected=box;owner=side;}}if(selected<0){float distance=1e9f;for(unsigned side=0;side<2;++side){int box=in[side].rayBox;if(edge[side]&&box>=0&&static_cast<unsigned>(box)<std::min(selectableCount,InteractionBoxCount)&&(handsAvailable||(box!=12&&box!=13))&&std::isfinite(in[side].rayDistance)&&in[side].rayDistance>=0&&in[side].rayDistance<distance){selected=box;owner=side;distance=in[side].rayDistance;}}}if(selected>=0)Anchor(owner,in[owner]);}
   if(selected<0)return;
   if(!held[0]&&!held[1]){Release();return;}
   if(held[0]&&held[1]){

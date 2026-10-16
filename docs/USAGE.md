@@ -118,3 +118,7 @@ DASHBOARD and INFOTAINMENT each cycle the corresponding native game display mode
 The controller infotainment cycle inserts the native Parking Cameras action when the ordinary mode sequence wraps. Selecting the infotainment box again while parking cameras are active requests the native camera toggle instead of advancing a camera subview. Native camera availability and driving restrictions remain controlled by ATS. This extension requires the verified native infotainment-state hook.
 
 While targeting INFOTAINMENT, nudge either controller thumbstick up to cycle the native navigation zoom mode. Return the stick to center between changes; setup mode and an open radial menu suppress this shortcut.
+
+In setup mode, hold grip while either touching a box or aiming the controller laser at it within two metres. Remote grabs retain the box offset instead of snapping it to the controller; move or rotate the controller, then release grip to save. Existing two-controller resizing remains available.
+
+The user confirmed laser-based setup grabbing works in VR after installation. All seven native regression suites pass, including remote-grab selection, retained offset, continued movement after leaving the ray target, and tracking-loss release.
