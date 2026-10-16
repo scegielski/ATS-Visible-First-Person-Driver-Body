@@ -18,6 +18,23 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+
+INSTALLER_DOWNLOAD_ROOT = ('https://raw.githubusercontent.com/scegielski/'
+                           'ATS-Visible-First-Person-Driver-Body/main/releases/installer/')
+
+
+def readme_for_installer(text, version):
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        raise ValueError('Installer version must have three numeric components')
+    filename = f'SPF-Visible-First-Person-Driver-Body-Setup-{version}.exe'
+    link = f'[Windows installer ({version})]({INSTALLER_DOWNLOAD_ROOT}{filename})'
+    updated, count = re.subn(r'\[Windows installer(?: \([^)]*\))?\]\([^)]*\.exe(?:\?raw=1)?\)',
+                             lambda match: link, text)
+    if count != 1:
+        raise ValueError('README must contain exactly one Windows installer download link')
+    return updated
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--iscc', type=Path, default=ROOT / 'work/inno/ISCC.exe')
@@ -32,6 +49,8 @@ def main():
         parser.error('Version must contain three numeric components')
     if tuple(map(int, version.split('.'))) <= latest:
         parser.error('Installer version must be newer than every existing distributed build')
+    readme = ROOT / 'README.md'
+    updated_readme = readme_for_installer(readme.read_text(encoding='utf-8'), version)
     exe = output / f'SPF-Visible-First-Person-Driver-Body-Setup-{version}.exe'
     stage = ROOT / f'work/installer-payload-{version}'
     # Explicit staging root only; no recursive delete is required for rebuilding.
@@ -82,6 +101,8 @@ def main():
     receipt = dict(installer=exe.name, sha256=sha(exe), payload=package,
                    tested='Automated fixture lifecycle; live install pending')
     (output / 'payload-manifest.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    # Publish the download link only after compilation and the receipt succeed.
+    readme.write_text(updated_readme, encoding='utf-8')
     print(f'Created {exe.name}: {exe.stat().st_size:,} bytes, {len(files)} payload files')
 
 

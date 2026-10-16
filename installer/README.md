@@ -77,3 +77,5 @@ Normal Steam loading via system-wide registration was validated separately on th
 prior build; compatibility with other OpenXR games has not been established.
 
 Each build automatically advances the installer patch version. Pass `--version X.Y.Z` to start a newer release series. Existing or older versions are rejected; the filename, Windows product version, installed package version and payload receipt use the same version. Keep previously distributed installers when building releases.
+
+After a successful installer build, the builder updates the main README download label and direct executable URL to the same version automatically, including explicit `--version` releases. Missing or duplicate README download links fail validation before compilation. Failed builds leave the README unchanged. Run the link-update tests with `python -m unittest discover -s installer -p "test_build_installer.py"`.
