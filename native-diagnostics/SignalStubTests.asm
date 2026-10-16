@@ -1,3 +1,9 @@
+EXTERN RadialActivateObserveStub:PROC
+EXTERN RadialCameraObserveStub:PROC
+EXTERN RadialHudObserveStub:PROC
+EXTERN RadialServicesObserveStub:PROC
+EXTERN RadialQuickObserveStub:PROC
+EXTERN RadialMapObserveStub:PROC
 EXTERN NativeRecenterObserveStub:PROC
 EXTERN XRActionAttachStub:PROC
 EXTERN HeadObserveStub:PROC
@@ -7,6 +13,104 @@ EXTERN LightsRequestStub:PROC
 EXTERN SignalLeftRequestStub:PROC
 EXTERN SignalRightRequestStub:PROC
 .code
+RadialHudTest PROC FRAME
+ push rsi
+ .pushreg rsi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rsi, rcx
+ mov rcx, rdx
+ jmp RadialHudObserveStub
+RadialHudTest ENDP
+RadialHudContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop rsi
+ ret
+RadialHudContinuation ENDP
+RadialCameraTest PROC FRAME
+ push rsi
+ .pushreg rsi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rsi, rcx
+ mov rcx, rdx
+ jmp RadialCameraObserveStub
+RadialCameraTest ENDP
+RadialCameraContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop rsi
+ ret
+RadialCameraContinuation ENDP
+RadialActivateTest PROC FRAME
+ push rsi
+ .pushreg rsi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rsi, rcx
+ mov rcx, rdx
+ jmp RadialActivateObserveStub
+RadialActivateTest ENDP
+RadialActivateContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop rsi
+ ret
+RadialActivateContinuation ENDP
+
+RadialMapTest PROC FRAME
+ push rsi
+ .pushreg rsi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rsi, rcx
+ mov rcx, rdx
+ jmp RadialMapObserveStub
+RadialMapTest ENDP
+RadialMapContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop rsi
+ ret
+RadialMapContinuation ENDP
+RadialQuickTest PROC FRAME
+ push rbx
+ .pushreg rbx
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rbx, rcx
+ mov rcx, rdx
+ jmp RadialQuickObserveStub
+RadialQuickTest ENDP
+RadialQuickContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop rbx
+ ret
+RadialQuickContinuation ENDP
+RadialServicesTest PROC FRAME
+ push rsi
+ .pushreg rsi
+ sub rsp, 20h
+ .allocstack 20h
+ .endprolog
+ mov rsi, rcx
+ mov rcx, rdx
+ jmp RadialServicesObserveStub
+RadialServicesTest ENDP
+RadialServicesContinuation PROC
+ mov rax, rcx
+ add rsp, 20h
+ pop rsi
+ ret
+RadialServicesContinuation ENDP
+
 RadioInputTest PROC FRAME
  push rsi
  .pushreg rsi

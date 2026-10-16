@@ -1,3 +1,6 @@
+#include <SPF_VirtInput_API.h>
+#include "MenuKeyPulse.hpp"
+#include "NativeRadialActions.hpp"
 #include "DriverSettings.hpp"
 #include "IntegratedAdjustments.hpp"
 #include "EarlyMenuCursor.hpp"
@@ -55,6 +58,12 @@
 extern "C" {
 void* gDriverOriginal=nullptr;
 void* gEngineOriginal=nullptr;void* gHornControlOriginal=nullptr;void HornControlObserveStub();
+void* gRadialHudOriginal=nullptr;void RadialHudObserveStub();
+void* gRadialCameraOriginal=nullptr;void RadialCameraObserveStub();
+void* gRadialActivateOriginal=nullptr;void RadialActivateObserveStub();
+void* gRadialMapOriginal=nullptr;void RadialMapObserveStub();
+void* gRadialQuickOriginal=nullptr;void RadialQuickObserveStub();
+void* gRadialServicesOriginal=nullptr;void RadialServicesObserveStub();
 void* gRecenterOriginal=nullptr;void NativeRecenterObserveStub();
 void* gHeadOriginal=nullptr;void HeadObserveStub();
 void* gXRActionAttachOriginal=nullptr;void XRActionAttachStub();
@@ -71,6 +80,10 @@ void DriverObserveStub();
 void AdvanceObserveStub();
 }
 namespace {
+using NativeDialogActionFn=bool(__fastcall*)(uintptr_t,uintptr_t,unsigned,uintptr_t);NativeDialogActionFn originalRadialDialogAction=nullptr;
+bool __fastcall NativeRadialDialogAction(uintptr_t object,uintptr_t source,unsigned event,uintptr_t payload);
+SPF_VirtualDevice_Handle* activateDevice=nullptr;std::atomic<bool> activateDeviceReady{false};MenuKeyPulse activatePulse;
+std::atomic<uint64_t> radialActionTicks[7]{};bool radialActionsReady=false;
 thread_local bool controllerIgnitionCycle=false;
 constexpr char kName[]="SPF_VisibleFirstPersonDriverBody";
 constexpr char kHash[]="c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4";
@@ -297,6 +310,9 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
 void OnLoad(const SPF_Load_API* api) {
  LoadIntegratedAdjustments(api);
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
+ activateDevice=nullptr;activateDeviceReady.store(false);activatePulse={};
+ if(api&&api->input){auto input=api->input;if(input->Virt_CreateDevice&&input->Virt_AddButton&&input->Virt_Register&&input->Virt_PressButton&&input->Virt_ReleaseButton){activateDevice=input->Virt_CreateDevice(kName,"controller_actions","VR Controller Actions",SPF_INPUT_DEVICE_TYPE_SEMANTICAL);if(activateDevice){input->Virt_AddButton(activateDevice,"activate","Activate");activateDeviceReady.store(input->Virt_Register(activateDevice));}}}
+ Log(SPF_LOG_INFO,activateDeviceReady.load()?"RADIAL_ACTIVATE semantic input device registered.":"RADIAL_ACTIVATE semantic device unavailable; restart ATS with plugin enabled.");
 }
 extern "C" {void* gMapWidgetOriginal=nullptr;void MapWidgetObserveStub();}
 std::atomic<uint64_t> mapWidgetCalls{0},mapWidgetTick{0},worldMapWidgetTick{0};std::atomic<uintptr_t> mapWidgetVtable{0};
@@ -388,6 +404,25 @@ void Activated(const SPF_Core_API* api) {
  else Log(SPF_LOG_WARN,"HEAD_TRACKING: view-site signature mismatch; observer disabled.");
  if(hooks->Hook_FindPattern(kNativeRecenterPattern)==base+0x428852)nativeRecenterHook=hooks->Hook_Register(kName,"NativeHeadRecenter","Observe ATS head-reset input without consuming it",reinterpret_cast<void*>(NativeRecenterObserveStub),&gRecenterOriginal,kNativeRecenterPattern,true);
  else Log(SPF_LOG_WARN,"HEAD_RECENTER native input-site signature mismatch; observer disabled.");
+ constexpr char radialDialogPattern[]="48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 20 48 8B D9 4D 8B F1 41 8B C8 41 8B E8 48 8B FA 83 E9 01 0F 84 01 01 00 00 83 E9 01 0F";
+ SPF_Hook_Handle* radialDialogHook=nullptr;
+ if(hooks->Hook_FindPattern(radialDialogPattern)==base+0xfc6ed0)radialDialogHook=hooks->Hook_Register(kName,"RadialMapDialogAction","Route native navmap request through open map dialog",reinterpret_cast<void*>(NativeRadialDialogAction),reinterpret_cast<void**>(&originalRadialDialogAction),radialDialogPattern,true);
+ constexpr char radialMapPattern[]="48 8B 8E C8 01 00 00 48 85 C9 74 1B 83 B9 F8 00 00 00 02 75 12";
+ constexpr char radialQuickPattern[]="48 8B 8B 88 02 00 00 48 85 C9 0F 84 C7 00 00 00 83 B9 F8 00 00 00 02";
+ constexpr char radialServicesPattern[]="48 8B 8E 78 02 00 00 48 85 C9 74 4B 83 B9 F8 00 00 00 02 75 42";
+ if(hooks->Hook_FindPattern(radialMapPattern)==base+0x68b1a7 && hooks->Hook_FindPattern(radialQuickPattern)==base+0x68a69f && hooks->Hook_FindPattern(radialServicesPattern)==base+0x68b2fe){
+ auto map=hooks->Hook_Register(kName,"RadialMapAction","Merge radial request with native navmap binding",reinterpret_cast<void*>(RadialMapObserveStub),&gRadialMapOriginal,radialMapPattern,true);
+ auto quick=hooks->Hook_Register(kName,"RadialQuickInfoAction","Merge radial request with native advmouse binding",reinterpret_cast<void*>(RadialQuickObserveStub),&gRadialQuickOriginal,radialQuickPattern,true);
+ auto services=hooks->Hook_Register(kName,"RadialServicesAction","Merge radial request with native services binding",reinterpret_cast<void*>(RadialServicesObserveStub),&gRadialServicesOriginal,radialServicesPattern,true);
+ constexpr char radialHudPattern[]="48 8B 8E B8 01 00 00 48 85 C9 74 4D 83 B9 F8 00 00 00 02 75 44 E8 05 85 B6 FF 48 8D";
+ constexpr char radialCameraPattern[]="48 8B 89 A0 EB 01 00 49 8B DA 48 85 C9 74 12 83 B9 F8 00 00 00 02 75 09 E8 EF 97 C0 FF";
+ constexpr char radialActivatePattern[]="48 8B BB 98 09 00 00 48 8B CF E8 68 0C E5 FF 80 BB F4 08 00 00 00 0F 85 65 01 00 00 48";
+ SPF_Hook_Handle *hud=nullptr,*camera=nullptr;
+ if(hooks->Hook_FindPattern(radialHudPattern)==base+0x68ada1)hud=hooks->Hook_Register(kName,"RadialHudAction","Merge native showhud binding",reinterpret_cast<void*>(RadialHudObserveStub),&gRadialHudOriginal,radialHudPattern,true);
+ if(hooks->Hook_FindPattern(radialCameraPattern)==base+0x5e9ab4)camera=hooks->Hook_Register(kName,"RadialCameraActions","Merge native camcycle and cam1 bindings",reinterpret_cast<void*>(RadialCameraObserveStub),&gRadialCameraOriginal,radialCameraPattern,true);
+
+ radialActionsReady=map&&quick&&services&&radialDialogHook&&hud&&camera;
+ }else Log(SPF_LOG_ERROR,"RADIAL_ACTION native binding signatures mismatch; actions unavailable.");
  constexpr char mapWidgetPattern[]="48 89 5C 24 10 55 57 41 56 48 8D 6C 24 B9 48 81 EC 00 01 00 00";
  if(hooks->Hook_FindPattern(mapWidgetPattern)==base+0x1012ac0)hooks->Hook_Register(kName,"MapWidgetProbe","Observe map widget updates without changing input",reinterpret_cast<void*>(MapWidgetObserveStub),&gMapWidgetOriginal,mapWidgetPattern,true);
  constexpr char menuModePattern[]="0F 28 D8 48 8D 4D 8C 0F 57 C9 F3 0F 11 9D 00 09 00 00";
@@ -599,7 +634,12 @@ void PollObservedHead() {
  if(generation!=worldGeneration.load() || baseline.space!=pose.space){baseline=pose;generation=worldGeneration.load();Log(SPF_LOG_INFO,"HEAD_TRACKING baseline captured in interior camera; observation only.");}
  char text[384];std::snprintf(text,sizeof(text),"HEAD_TRACKING valid=1 samples=%llu rejected=%llu flags=%llu position_m=%.4f,%.4f,%.4f delta_m=%.4f,%.4f,%.4f quat_xyzw=%.5f,%.5f,%.5f,%.5f",static_cast<unsigned long long>(headAccepted.load()),static_cast<unsigned long long>(headRejected.load()),static_cast<unsigned long long>(pose.flags),pose.position[0],pose.position[1],pose.position[2],pose.position[0]-baseline.position[0],pose.position[1]-baseline.position[1],pose.position[2]-baseline.position[2],pose.orientation[0],pose.orientation[1],pose.orientation[2],pose.orientation[3]);Log(SPF_LOG_INFO,text);
 }
+void UpdateActivateSemanticInput(){
+ if(!load||!load->input||!activateDevice||!activateDeviceReady.load())return;auto now=GetTickCount64();auto requested=radialActionTicks[6].exchange(0);DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);bool active=enabled.load()&&foreground==GetCurrentProcessId();int edge=activatePulse.Step(active,requested&&now>=requested&&now-requested<=500,now);
+ if(edge>0){load->input->Virt_PressButton(activateDevice,"activate");Log(SPF_LOG_INFO,"RADIAL_ACTIVATE semantic activate pressed.");}else if(edge<0){load->input->Virt_ReleaseButton(activateDevice,"activate");Log(SPF_LOG_INFO,"RADIAL_ACTIVATE semantic activate released.");}
+}
 void Update() {
+ UpdateActivateSemanticInput();
  PollIntegratedAdjustments();
  if(!enabled.load()) {
   const bool paused=core && core->gameworld && core->gameworld->GW_IsGamePaused && core->gameworld->GW_IsGamePaused();
@@ -711,7 +751,7 @@ void Update() {
   Log(SPF_LOG_INFO,text);
  }
 }
-void Unload() { CloseIntegratedAdjustments(); earlyMenuStopped.store(true); nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
+void Unload() { if(activateDevice&&activateDeviceReady.load()&&load&&load->input&&activatePulse.down)load->input->Virt_ReleaseButton(activateDevice,"activate");activatePulse={};activateDeviceReady.store(false);activateDevice=nullptr;radialActionTicks[6].store(0);CloseIntegratedAdjustments(); earlyMenuStopped.store(true); nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.
@@ -924,6 +964,27 @@ extern "C" void CaptureRadioInput(uintptr_t context) noexcept {
  if(action==-2){nativeRadioPause(radio);uint32_t flags=0;if(SafeRead(radio+0xf0,&flags,sizeof(flags)))QueueControllerRadioClickSound((flags&1)==0);Log(SPF_LOG_INFO,"RADIO_BOX play/pause toggled on current station.");}else if(action>=0){nativeRadioSelect(radio,static_cast<uint64_t>(action));uintptr_t started=0;if(SafeRead(radio+0xe8,&started,sizeof(started)) && started)QueueControllerRadioClickSound(true);Log(SPF_LOG_INFO,"RADIO_BOX playback started on selected station.");}else Log(SPF_LOG_WARN,"RADIO_BOX play/pause unavailable until station list loads.");
  }
  if(command.volume!=0)nativeRadioVolume(context,command.volume);
+}
+namespace {
+bool __fastcall NativeRadialDialogAction(uintptr_t object,uintptr_t source,unsigned event,uintptr_t payload){
+ auto original=originalRadialDialogAction;if(!original)return false;
+ auto request=radialActionTicks[0].load(),now=GetTickCount64();uintptr_t table=0,predicate=0;auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+ if(enabled.load()&&request&&now>=request&&now-request<=500&&IsWorldMapMenuActive()&&SafeRead(object,&table,sizeof(table))&&SafeRead(table+0x190,&predicate,sizeof(predicate))&&predicate==base+0xfacb40){
+  if(radialActionTicks[0].compare_exchange_strong(request,0)){const uint64_t action[3]={0x7c3ccd92,0,0};Log(SPF_LOG_INFO,"RADIAL_ACTION navmap delivered to open map dialog.");return original(object,source,16,reinterpret_cast<uintptr_t>(action));}
+ }
+ return original(object,source,event,payload);
+}
+}
+extern "C" bool RequestNativeRadialAction(unsigned action) noexcept {
+ if(action>=7||!enabled.load()||(action==6?!activateDeviceReady.load():!radialActionsReady))return false;DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);if(foreground!=GetCurrentProcessId())return false;radialActionTicks[action].store(GetTickCount64());if(action==6)Log(SPF_LOG_INFO,"RADIAL_ACTIVATE request queued.");return true;
+}
+extern "C" void CaptureNativeRadialAction(uintptr_t owner,unsigned action) noexcept {
+ if(action>=7||!enabled.load())return;if(action==0&&IsWorldMapMenuActive())return;auto request=radialActionTicks[action].load();if(!request)return;auto now=GetTickCount64();if(now<request||now-request>500){radialActionTicks[action].store(0);return;}
+ constexpr uintptr_t offsets[]={0x1c8,0x288,0x278,0x1b8,0x1eba0,0,0x2e0};uintptr_t binding=0,table=0;unsigned original=0;auto base=reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));uintptr_t wrapper=0;
+ if(action==5){uint64_t count=0;if(!SafeRead(owner+0x1ebb0,&wrapper,sizeof(wrapper))||!wrapper||!SafeRead(owner+0x1ebb8,&count,sizeof(count))||count<1||count>10)return;}else wrapper=owner+offsets[action]-8;
+ if(!SafeRead(wrapper,&table,sizeof(table))||table!=base+0x2201430||!SafeRead(wrapper+8,&binding,sizeof(binding))||!binding||!SafeRead(binding+0xf8,&original,sizeof(original))||original>3){if(action==6){static uint64_t last=0;if(last!=request){last=request;char message[160];std::snprintf(message,sizeof(message),"RADIAL_ACTIVATE binding rejected table_rva=%llx binding_present=%d state=%u",static_cast<unsigned long long>(table-base),binding!=0,original);Log(SPF_LOG_WARN,message);}}return;}
+ if(action==6){unsigned char mode=0,latched=0;SafeRead(owner+0x210,&mode,1);SafeRead(owner+0x2fa,&latched,1);char message[128];std::snprintf(message,sizeof(message),"RADIAL_ACTIVATE owner_mode=%u latch=%u",mode,latched);Log(SPF_LOG_INFO,message);}
+ auto merged=MergeNativeRadialAction(original,request,now);SIZE_T written=0;if(original==merged||WriteProcessMemory(GetCurrentProcess(),reinterpret_cast<void*>(binding+0xf8),&merged,sizeof(merged),&written)&&written==sizeof(merged)){radialActionTicks[action].store(0);char message[128];std::snprintf(message,sizeof(message),"RADIAL_ACTION native binding action=%u before=%u delivered=%u",action,original,merged);Log(SPF_LOG_INFO,message);}
 }
 extern "C" bool RequestControllerHeadReset() noexcept {
  if(!enabled.load()||!nativeRecenterHook){Log(SPF_LOG_WARN,"HEAD_RECENTER controller request unavailable before native hook activation.");return false;}

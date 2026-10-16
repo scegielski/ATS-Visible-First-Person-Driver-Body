@@ -27,3 +27,13 @@ struct ControllerRadialNote {
  int previous=-1;
  bool Step(bool open,int segment){if(!open||segment<0||segment>7){previous=-1;return false;}if(previous==segment)return false;previous=segment;return true;}
 };
+inline int ControllerRadialAction(unsigned side,int segment){
+ if(side==0&&segment==0)return 0;
+ if(side==1&&segment==6)return 1;
+ if(side==1&&segment==0)return 2;
+ if(side==1&&segment==2)return 3;
+ if(side==1&&segment==4)return 4;
+ if(side==1&&segment==5)return 5;
+ if(side==1&&segment==1)return 6;
+ return -1;
+}

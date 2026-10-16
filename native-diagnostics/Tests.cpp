@@ -1,3 +1,4 @@
+#include "NativeRadialActions.hpp"
 #include "ControllerRadial.hpp"
 #include "HandGrab.hpp"
 #include "MenuKeyPulse.hpp"
@@ -61,6 +62,8 @@ void* gRecenterOriginal=nullptr;
 void* gMapWidgetOriginal=nullptr;
 void* gMenuModeOriginal=nullptr;void* gMenuSurfaceOriginal=nullptr;
 void* gRadioInputOriginal=nullptr;
+void* gRadialHudOriginal=nullptr;void* gRadialCameraOriginal=nullptr;void* gRadialActivateOriginal=nullptr;
+void* gRadialMapOriginal=nullptr;void* gRadialQuickOriginal=nullptr;void* gRadialServicesOriginal=nullptr;
 void* gWipersOriginal=nullptr;
 void* gLightsOriginal=nullptr;
 void* gSignalLeftOriginal=nullptr;void* gSignalRightOriginal=nullptr;
@@ -78,6 +81,14 @@ extern "C" void RadioInputContinuation();
 extern "C" void CaptureMenuMode(uint32_t) noexcept {}
 extern "C" void CaptureMenuSurface(uintptr_t) noexcept {}
 extern "C" void CaptureMapWidget(uintptr_t) noexcept {}
+static unsigned radialObserved=99;
+extern "C" void CaptureNativeRadialAction(uintptr_t owner,unsigned action) noexcept {if(owner!=123)std::abort();radialObserved=action;}
+extern "C" uint64_t RadialHudTest(uintptr_t,uint64_t);extern "C" void RadialHudContinuation();
+extern "C" uint64_t RadialCameraTest(uintptr_t,uint64_t);extern "C" void RadialCameraContinuation();
+extern "C" uint64_t RadialActivateTest(uintptr_t,uint64_t);extern "C" void RadialActivateContinuation();
+extern "C" uint64_t RadialMapTest(uintptr_t,uint64_t);extern "C" void RadialMapContinuation();
+extern "C" uint64_t RadialQuickTest(uintptr_t,uint64_t);extern "C" void RadialQuickContinuation();
+extern "C" uint64_t RadialServicesTest(uintptr_t,uint64_t);extern "C" void RadialServicesContinuation();
 extern "C" void CaptureRadioInput(uintptr_t context) noexcept {if(context!=123)std::abort();}
 extern "C" uint64_t WipersTest(uintptr_t,uint64_t,uint64_t,uint64_t*);
 extern "C" uint64_t LightsTest(uintptr_t,uint64_t,uint64_t,uint64_t*);
@@ -142,6 +153,15 @@ extern "C" void XRActionAttachContinuation();
 extern "C" {extern void* gHornControlOriginal;uint64_t HornControlObserveStub(uintptr_t,uint64_t,uint64_t,uint64_t);}
 extern "C" uint64_t HornControlTestContinuation(uintptr_t object,uint64_t held,uint64_t air,uint64_t transform){Check(object==123 && air==456 && transform==789,"horn observer preserves receiver and other arguments");return held;}
 int main() {
+ Check(ControllerRadialAction(1,2)==3&&ControllerRadialAction(1,4)==4&&ControllerRadialAction(1,5)==5&&ControllerRadialAction(1,1)==6,"right HUD next interior activate octants");
+ gRadialHudOriginal=reinterpret_cast<void*>(RadialHudContinuation);Check(RadialHudTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==3,"HUD native stub state");gRadialCameraOriginal=reinterpret_cast<void*>(RadialCameraContinuation);Check(RadialCameraTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==5,"camera native stub state");gRadialActivateOriginal=reinterpret_cast<void*>(RadialActivateContinuation);Check(RadialActivateTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==6,"activate native stub state");
+
+ gRadialMapOriginal=reinterpret_cast<void*>(RadialMapContinuation);Check(RadialMapTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==0,"native map stub preserves registers and owner");gRadialQuickOriginal=reinterpret_cast<void*>(RadialQuickContinuation);Check(RadialQuickTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==1,"native quick info stub preserves registers and owner");gRadialServicesOriginal=reinterpret_cast<void*>(RadialServicesContinuation);Check(RadialServicesTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==2,"native services stub preserves registers and owner");
+
+ Check(MergeNativeRadialAction(0,100,150)==2&&MergeNativeRadialAction(2,100,150)==2,"native radial binding presses merge without duplicate physical press");Check(MergeNativeRadialAction(1,0,150)==1&&MergeNativeRadialAction(0,100,700)==0&&MergeNativeRadialAction(0,200,100)==0,"native radial rejects absent expired or reversed-time requests");
+
+ Check(ControllerRadialAction(0,0)==0&&ControllerRadialAction(1,6)==1&&ControllerRadialAction(1,0)==2,"radial map F1 F7 routing");Check(ControllerRadialAction(0,6)==-1&&ControllerRadialAction(1,7)==-1,"unassigned radial octants send no keys");
+
  ControllerRadialNote noteTest;Check(!noteTest.Step(false,0)&&noteTest.Step(true,0),"radial note begins on highlighted segment");Check(!noteTest.Step(true,0)&&noteTest.Step(true,1),"radial notes only on segment changes");Check(!noteTest.Step(true,-1)&&noteTest.Step(true,1),"center reentry repeats note");Check(!noteTest.Step(false,1)&&noteTest.Step(true,1),"reopening repeats note");
 
  ControllerFingerMode buttonFinger;buttonFinger.mask=0;buttonFinger.finger=0;Check(!buttonFinger.ToggleButton(true,false),"editing inactive button ignored");Check(!buttonFinger.ToggleButton(true,true),"held button on entering editing ignored");buttonFinger.ToggleButton(false,true);Check(buttonFinger.ToggleButton(true,true)&&buttonFinger.Selected(),"Y B enables selected finger");Check(!buttonFinger.ToggleButton(true,true),"Y B hold does not repeat");buttonFinger.ToggleButton(false,true);Check(buttonFinger.ToggleButton(true,true)&&!buttonFinger.Selected(),"Y B disables selected finger");

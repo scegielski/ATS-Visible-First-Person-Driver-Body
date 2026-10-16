@@ -1,0 +1,7 @@
+{
+  "in_game_validation": "User validated map open/close, Quick Info, Services and Adjustments, HUD, next camera, interior camera, and finally semantic Activate",
+  "native_tests": "All six suites passed; action mapping and hook register preservation covered",
+  "activate_runtime": "Registered semantic device; logs confirm press and release; user confirmed at in-game prompt",
+  "installer": "0.39.22",
+  "feature": "Native radial action bindings and semantic Activate"
+}

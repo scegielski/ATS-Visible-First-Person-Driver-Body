@@ -71,4 +71,10 @@ The left ring right segment toggles Finger editing mode, which defaults off and 
 
 While a radial menu is held open, newly highlighted octants play a short note. Left uses C major; right uses C natural minor. Both ascend clockwise from tonic at top to the upper octave. Holding one octant does not repeat; center is silent.
 
-The left radial top segment (MAP) sends a brief M key press to toggle the world map, matching the current profile binding. Hold left thumbstick click, tilt up, and release; repeat to close.
+The left radial top segment (MAP) requests ATS’s native navmap binding to toggle the world map, independent of the keyboard mapping. Hold left thumbstick click, tilt up, and release; repeat to close.
+
+Right radial left: QUICK INFO (F1). Right radial top: SERVICES AND ADJUSTMENTS (F7). Hold stick click, tilt to the segment and release; each selection requests the corresponding native advmouse or services action without generating keyboard input.
+
+Right radial native actions: top Services and Adjustments; upper-right Activate; right HUD Widgets; bottom Next Camera; lower-left Interior Camera; left Quick Info. All use game action bindings rather than keyboard events. HUD toggles visibility; camera cycling follows the native game order and availability.
+
+Activate uses SPF semantic virtual input registered during plugin OnLoad. It emits a short activate press/release through the game input system and does not depend on a primary keyboard binding. Startup must have the plugin enabled for device registration. The other radial actions retain their validated native binding hooks.
