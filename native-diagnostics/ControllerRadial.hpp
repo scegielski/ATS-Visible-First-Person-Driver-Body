@@ -16,3 +16,7 @@ struct ControllerRadialConfirm {
  }
  bool Flash(int highlighted,uint64_t now)const{return selected==highlighted&&now<flashUntil;}
 };
+struct ControllerFingerSetupMode {
+ bool enabled=false;
+ bool Select(unsigned side,int segment){if(side!=0||segment!=2)return false;enabled=!enabled;return true;}
+};

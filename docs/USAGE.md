@@ -65,5 +65,10 @@ Double-press right controller A to toggle cabin setup mode (F9 remains available
 
 Changing setup mode through double-press A or F9 speaks “Setup mode enabled” or “Setup mode disabled”.
 
-Radial-menu visual prototype (1024-pixel antialiased texture): tilt either thumbstick to show a eight-segment ring near that controller, with the dominant direction highlighted; center the stick to hide it. Segments have no new actions assigned yet.
-Click the thumbstick while highlighting a radial segment to confirm it. A brief white flash and vibration confirm selection. Holding does not repeat; no actions are assigned yet.
+Radial-menu visual prototype (1024-pixel antialiased texture): tilt either thumbstick to show a eight-segment ring near that controller, with the dominant direction highlighted; center the stick to hide it. The left ring right segment toggles Finger editing mode.
+Click the thumbstick while highlighting a radial segment to confirm it. A brief white flash and vibration confirm selection. Holding does not repeat; the left ring right segment toggles Finger editing mode.
+
+Finger editing mode defaults off. Tilt the left stick right and click it to enable or disable editing, with a spoken confirmation. While enabled, X/A select fingers and Y/B toggle the selected finger trigger assignment. Disabling editing retains assignments and normal finger animation. Double-A setup and X/Y keyboard shortcuts are suspended while editing to avoid conflicts.
+Finger trigger-assignment toggles speak Enabled or Disabled instead of beeping; haptic feedback remains.
+
+In Finger editing mode, X/A select and Y/B toggle the corresponding finger assignment. Thumbstick directions only navigate radial menus. Y/B thumb closure and double-B recenter are suspended while editing; normal controls return when editing is off.

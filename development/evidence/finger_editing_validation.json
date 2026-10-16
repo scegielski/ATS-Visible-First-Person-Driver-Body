@@ -1,0 +1,7 @@
+{
+  "native_tests": "All six suites pass",
+  "feedback": "Spoken Enabled and Disabled, mode announcements, contrast-preserving label",
+  "in_game_validation": "User confirmed radial toggle and X/A selection with Y/B assignment toggles on 2026-10-15",
+  "installer": "0.39.11",
+  "feature": "Togglable Finger editing mode"
+}
