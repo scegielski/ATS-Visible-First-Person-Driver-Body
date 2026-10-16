@@ -203,7 +203,7 @@ void PollControllers(bool active,uint64_t generation){
 
  RecordSetupHistory();
  if(active&&sceneFresh&&vehicleBoxesReady&&now-lastBodyInteractionTick>150){handBoxes.valid=false;for(unsigned side=0;side<2;++side){controls[side].enabled=false;weights[side]=0;}float actionTrigger[2]{fingerTrigger[0],fingerTrigger[1]};DriverIK::World empty{};UpdateCabinInteractionsLocked(empty,0,actionTrigger,false);}
- SubmitSetupBoxes(active&&sceneFresh&&vehicleBoxesReady&&boxEditor.enabled);
+ SubmitSetupBoxes(active&&sceneFresh&&vehicleBoxesReady&&boxEditor.enabled,active&&sceneFresh&&vehicleBoxesReady&&!boxEditor.enabled&&!resetDialogActive);
 
 }
 unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positions,bool allowLeft,bool allowRight){
@@ -252,6 +252,7 @@ void UpdateCabinInteractionsLocked(const DriverIK::World& handWorld,unsigned mas
  bool sceneFresh=head.valid && sceneXRFrameTick && sceneMarkerTick-sceneXRFrameTick<250 && sceneCameraTick && sceneMarkerTick-sceneCameraTick<250;
  bool hornFresh=vehicleBoxesReady && (boxEditor.authored[1]||(hornTargetTick && sceneMarkerTick-hornTargetTick<250));
  if(boxEditor.enabled)drawBox(49,hornBox);
+ cabinHoverTargets[0]=cabinHoverTargets[1]=-1;cabinHoverTick=sceneMarkerTick;
  ControllerContactVolume volumes[2]{};InteractionRayHit rayHits[2]{};
  for(unsigned side=0;side<2;++side){unsigned wrist=side?28:7;auto offset=side?handBoxOffset:leftHandBoxOffset;auto palm=DriverIK::Add(handWorld.p[wrist],DriverIK::Rotate(handWorld.q[wrist],offset));
   auto raw=actualSceneFrame.Position(hands[side].point,head.point,head.rotation);auto rawQ=actualSceneFrame.Orientation(hands[side].rotation,head.rotation);
@@ -260,7 +261,7 @@ void UpdateCabinInteractionsLocked(const DriverIK::World& handWorld,unsigned mas
   // Hand-attached grab boxes provide the setup hand markers.
   if(!controls[side].enabled){
    auto aim=controllerAim[side].valid?controllerAim[side]:hands[side];auto aimOrigin=actualSceneFrame.Position(aim.point,head.point,head.rotation);auto aimQ=actualSceneFrame.Orientation(aim.rotation,head.rotation);auto direction=DriverIK::Rotate(aimQ,{0,0,-1});rayHits[side]=RayInteractionBoxes(boxEditor,aimOrigin,direction);
-   cabinLaserDistance[side]=rayHits[side].distance;cabinLaserHit[side]=rayHits[side].box>=0;cabinLaserTick[side]=GetTickCount64();
+   cabinHoverTargets[side]=rayHits[side].box;cabinLaserDistance[side]=rayHits[side].distance;cabinLaserHit[side]=rayHits[side].box>=0;cabinLaserTick[side]=GetTickCount64();
    InteractionBox laser{DriverIK::Add(aimOrigin,DriverIK::Mul(direction,rayHits[side].distance*.5f)),{.0015f,.0015f,.5f},aimQ,1,{1,1,std::max(.001f,rayHits[side].distance)}};if(!cabinLaserReady[side])drawBox(53+side,laser);
   }
   const auto& lightsBox=boxEditor.boxes[9];bool lightsHit=controls[side].enabled?IgnitionBoxesOverlap(lightsBox.center,DriverIK::V{lightsBox.half[0]*lightsBox.scale*lightsBox.stretch[0],lightsBox.half[1]*lightsBox.scale*lightsBox.stretch[1],lightsBox.half[2]*lightsBox.scale*lightsBox.stretch[2]},volume.center,volume.rotation,{.04f,.035f,.055f},lightsBox.rotation):rayHits[side].box==9;

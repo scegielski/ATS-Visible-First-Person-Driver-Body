@@ -1,6 +1,7 @@
 // Uses the bridge's existing stereo compositor renderer. No game scene objects.
 using SetupPoseSubmit=int(__cdecl*)(const ControllerMeshPose*,uint32_t);
 using SetupMeshUpload=int(__cdecl*)(unsigned,const ControllerMeshVertex*,uint32_t,const uint16_t*,uint32_t,const uint8_t*,uint32_t,uint32_t,uint32_t,uint32_t);
+int cabinHoverTargets[2]{-1,-1};uint64_t cabinHoverTick=0;
 SetupPoseSubmit setupPoseSubmit=nullptr;bool setupMeshesReady=false;
 ControllerMeshData SetupLabelMesh(unsigned box){
  ControllerMeshData mesh;mesh.vertices={{{-1,-1,0},{0,0,1},{0,1}},{{1,-1,0},{0,0,1},{1,1}},{{-1,1,0},{0,0,1},{0,0}},{{1,1,0},{0,0,1},{1,0}}};mesh.indices={0,1,2,1,3,2};mesh.width=1024;mesh.height=128;mesh.mips=1;mesh.texture.resize(mesh.width*mesh.height*4);
@@ -18,11 +19,13 @@ bool EnsureSetupMeshes(){
  for(unsigned i=0;i<InteractionBoxCount;++i){auto wire=SetupBoxWireMesh();for(unsigned c=0;c<3;++c)wire.texture[c]=colors[i][c];auto label=SetupLabelMesh(i);if(label.texture.empty())return false;
   for(unsigned part=0;part<2;++part){const auto& mesh=part?label:wire;if(upload(InteractionBoxMeshStart+i+part*InteractionBoxCount,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,0,1))return false;}
  }
+ for(unsigned side=0;side<2;++side){auto mesh=InteractionHoverFillMesh();if(upload(InteractionHoverMeshStart+side*2,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,0,1))return false;}
  setupMeshesReady=true;return true;
 }
-void SubmitSetupBoxes(bool active){
+void SubmitSetupBoxes(bool active,bool hover=false){
  std::array<ControllerMeshPose,InteractionBoxMeshCount> poses{};
  if(active&&EnsureSetupMeshes())for(unsigned i=0;i<InteractionBoxCount;++i){if((i==12||i==13||i>=16)&&!handBoxes.valid)continue;for(unsigned part=0;part<2;++part){auto pose=SetupBoxTrackingPose(boxEditor.boxes[i],actualSceneFrame,part!=0);for(float v:pose.matrix)if(!std::isfinite(v)||std::abs(v)>10)pose.visible=false;poses[i+part*InteractionBoxCount]=pose;}}
+ if(hover&&EnsureSetupMeshes()){auto now=GetTickCount64();auto highlight=InteractionHoverPoses(boxEditor,actualSceneFrame,cabinHoverTargets,cabinHoverTick&&now>=cabinHoverTick&&now-cabinHoverTick<150,handBoxes.valid);std::copy(highlight.begin(),highlight.end(),poses.begin()+InteractionHoverMeshStart-InteractionBoxMeshStart);}
  if(setupPoseSubmit)setupPoseSubmit(poses.data(),static_cast<uint32_t>(poses.size()));
  static int prior=-1;int state=active?(setupMeshesReady?1:2):0;if(state!=prior){prior=state;ReportControllerSetupGraphics(state,handBoxes.valid?18:14);}
 }

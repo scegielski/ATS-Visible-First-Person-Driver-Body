@@ -998,3 +998,7 @@ Restored accelerator, staged brake transfer, and independent clutch animation af
 ### Foot setup and live controller control
 
 Added wrist-style LEFT FOOT and RIGHT FOOT setup boxes, with per-vehicle resting offsets, backward-compatible box profiles, and Undo/Redo. Outside Setup, a targeted trigger press engages the corresponding foot with relative controller position and rotation; double-trigger releases it. Release blends back to the saved resting position and current pedal pose over 0.35 seconds. Tracking loss, Setup entry, and vehicle changes clear live foot ownership. All seven native suites pass, covering migration, persistence, leg-only IK, calibration, rotation, and the return transition. The user confirmed the installed controls and smooth return work in VR.
+
+### Soft pointer-target highlights
+
+Outside Setup, the nearest box hit by either cabin laser receives a soft cyan volume highlight. Three crossed stacks sample a feathered density field with fading boundaries; no outline or cube faces are shown. Duplicate targets draw once, unavailable joints and stale tracking hide highlights, and Setup and menus suppress them. The effect highlights the box volume rather than clipping to vehicle geometry. The renderer uses transparency without depth writes and preserves the game's graphics state. All seven native suites pass, including stereo hover output and density falloff. The user confirmed the installed soft highlight looks good in VR.
