@@ -48,7 +48,7 @@ inline void CalibrateControllerHand(ControllerHand& hand,const DriverIK::Pose& p
   float yaw=std::atan2(2*(headRotation[0]*headRotation[2]+headRotation[1]*headRotation[3]),1-2*(headRotation[2]*headRotation[2]+headRotation[1]*headRotation[1]));
   hand.basis={std::cos(yaw/2),0,-std::sin(yaw/2),0};hand.origin=point;hand.originRotation=rotation;hand.anchor=world.p[wrist];hand.anchorRotation=world.q[wrist];hand.bodyOrientation=world.q[3];hand.haveBend=false;hand.neutralWrist=pose[wrist];hand.haveTwist=false;hand.calibrate=false;
 }
-inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& positions,bool right,ControllerHand& hand,DriverIK::V point,DriverIK::Q rotation,DriverIK::Q headRotation,float blend,float seconds=1.f/90.f,DriverIK::V bodyGuide={0,0,0},float twistShare=.5f,bool rigidControllerOffset=false){
+inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& positions,bool right,ControllerHand& hand,DriverIK::V point,DriverIK::Q rotation,DriverIK::Q headRotation,float blend,float seconds=1.f/90.f,DriverIK::V bodyGuide={0,0,0},float twistShare=.5f,bool rigidControllerOffset=false,bool guideIsWorld=false){
  using namespace DriverIK;
  if(!hand.enabled || !std::isfinite(blend) || !std::isfinite(seconds) || seconds<0 || !std::isfinite(twistShare) || twistShare<0 || twistShare>1)return false;
  if(Length(bodyGuide)<1e-5f)bodyGuide=ControllerElbowGuides{}.values[right?1:0];for(float x:bodyGuide)if(!std::isfinite(x))return false;
@@ -67,7 +67,7 @@ inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& 
  Q relative=Product(orientation,Inverse(world.q[wrist]));orientation=Product(Fraction(relative,blend),world.q[wrist]);
  V direction=Unit(Sub(target,world.p[upper]));
  if(!hand.haveBend){hand.priorDirection=direction;V reference=Sub(world.p[lower],world.p[upper]);hand.priorBend=Unit(Sub(reference,Mul(direction,Dot(reference,direction))));}
- V preferred=Rotate(Product(world.q[3],Inverse(hand.bodyOrientation)),bodyGuide);
+ V preferred=guideIsWorld?bodyGuide:Rotate(Product(world.q[3],Inverse(hand.bodyOrientation)),bodyGuide);
  V animated=Sub(world.p[lower],world.p[upper]);preferred=Add(Mul(preferred,blend),Mul(animated,1-blend));
  V bend=StableControllerBend(direction,preferred,hand.priorDirection,hand.priorBend,seconds);
  auto candidate=pose;V pole=Add(world.p[upper],Mul(bend,.5f));

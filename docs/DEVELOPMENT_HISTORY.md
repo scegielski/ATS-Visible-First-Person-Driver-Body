@@ -1014,3 +1014,7 @@ Removed the remaining eight-centimeter contact-grab margin from cabin setup boxe
 ### Setup visibility speech
 
 Added distinct Hide driver, Show driver, Hide head, and Show head spoken cues after successful Setup visibility toggles are saved. All seven native suites pass and the four mono PCM clips were checked for valid non-silent audio. The user confirmed all four cues work in VR.
+
+### Editable elbow and knee bend targets
+
+Added four labeled, grip-editable Setup targets for left/right elbows and knees. Their vehicle-relative placements save in the active vehicle's box profile, participate in Undo/Redo, and initialize from the native rig without replacing older placements. Bend edits preserve palm and foot endpoints, apply to resting and controller-driven limbs, and are excluded from normal-mode laser targeting. The profile format now supports twenty-two boxes. All seven native suites pass, including migration, target persistence, unrelated-bone preservation, and IK endpoint checks. The user checked the installed change in VR and requested a commit.
