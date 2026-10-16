@@ -42,6 +42,7 @@
 #include "DriverSamples.hpp"
 #include "SteeringPose.hpp"
 #include "PedalMotion.hpp"
+#include "NativePedalPose.hpp"
 #include "HornPose.hpp"
 #include "WindowGesture.hpp"
 #include "LiveGesturePose.hpp"
@@ -839,6 +840,8 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  if(!SafeRead(pointers[2]+5*16,arm,sizeof(arm)) || !SafeRead(pointers[2]+7*16,hand,sizeof(hand)) || !SafeRead(pointers[3]+7*12,handPosition,sizeof(handPosition)))return;
  for(float value:arm)if(!std::isfinite(value))return;
  for(float value:hand)if(!std::isfinite(value))return;
+ static thread_local PedalMotion nativePedals;
+ static thread_local float nativeClutch=0;
  static thread_local LeftArmGestures gestures;
  static thread_local SignalMotion signal;static thread_local uint64_t seenSignal=0,seenSignalCancels=0;
  static thread_local WindowGestureMotion rightMotion;
@@ -847,7 +850,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  static thread_local uintptr_t priorModel=0;
  static thread_local uint64_t priorGeneration=0,priorTick=0;
  const uint64_t now=GetTickCount64(),generation=worldGeneration.load();
- if(priorModel!=model || priorGeneration!=generation){gestures={};rightMotion={};ignition={};signal={};seenSignal=signalSequence.load();seenEngineStart=engineStartSequence.load();priorTick=now;priorModel=model;priorGeneration=generation;}
+ if(priorModel!=model || priorGeneration!=generation){nativePedals={};nativeClutch=0;gestures={};rightMotion={};ignition={};signal={};seenSignal=signalSequence.load();seenEngineStart=engineStartSequence.load();priorTick=now;priorModel=model;priorGeneration=generation;}
  const float dt=std::clamp(static_cast<float>(now-priorTick)/1000.f,0.f,.05f);priorTick=now;
  const auto inputTick=hornTick.load(),telTick=telemetryTick.load();
  const bool held=hornHeld.load() && !ControllerHornBoxHeld() && inputTick && now-inputTick<=250 && telTick && now-telTick<=250;
@@ -881,6 +884,14 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   std::array<std::array<float,4>,61> rotations{};
   if(!SafeRead(pointers[2],rotations.data(),sizeof(rotations)))return;
   for(const auto& q:rotations){float norm=0;for(float v:q){if(!std::isfinite(v))return;norm+=v*v;}if(norm<.98f || norm>1.02f)return;}
+  const bool nativePedalApplied=IsBorrowedPlayerBody(model,path);
+  if(nativePedalApplied){
+   const bool fresh=telTick && now>=telTick && now-telTick<=250;
+   const float gas=fresh?PedalValue(userThrottle.load()):0,brake=fresh?PedalValue(userBrake.load()):0,clutch=fresh?PedalValue(userClutch.load()):0;
+   nativePedals.Step(gas,brake,dt);nativeClutch=Approach(nativeClutch,clutch,dt/.1f);
+   ApplyNativePedals(rotations,nativePedals,nativeClutch);
+   lastThrottle.store(gas);lastBrake.store(brake);lastClutch.store(clutch);lastClutchPress.store(nativeClutch);lastTransfer.store(nativePedals.transfer);lastAnklePress.store(nativePedals.press);
+  }
   unsigned gripMask=0;DriverIK::Positions gripPositions{};if(SafeRead(pointers[3],gripPositions.data(),sizeof(gripPositions)))gripMask=ApplyVehicleSteeringGrips(rotations,gripPositions,SnapshotVehicleSteeringPose());
   BlendHornPose(rotations,gestures.horn);
   BlendLiveWindowGesture(rotations,gestures.window);
@@ -954,6 +965,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    if(valid && SafeRead(pointers[3],positions.data(),sizeof(positions)))controllerMask=ApplyControllers(rotations,positions,!leftActive,!rightActive);
   }
   __try {
+   if(nativePedalApplied){for(unsigned bone:NativePedalBones)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);throttleOverrides.fetch_add(1);brakeOverrides.fetch_add(1);clutchOverrides.fetch_add(1);}
    if(gripMask&1)for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(gripMask&2)for(unsigned bone:{26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(controllerMask&1){for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);for(unsigned bone=8;bone<=22;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);}

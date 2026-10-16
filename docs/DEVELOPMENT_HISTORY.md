@@ -393,7 +393,7 @@ Optional diagnostic controls remain available: `collapse` maps the head and neck
 
 #### Verified render-palette layout
 
-The live buffer and original assembly routine establish row-major affine matrices with translations at elements 3, 7 and 11. Previous tests incorrectly used column-major translation entries 12–14, which actually belong to the homogeneous row. That caused offsets to change W rather than XYZ and made collapsed head vertices fall to zero, producing the reported stretched polygons. An earlier root-axis change did not resolve this layout mistake.
+The live buffer and original assembly routine establish row-major affine matrices with translations at elements 3, 7 and 11. Previous tests incorrectly used column-major translation entries 12ï¿½14, which actually belong to the homogeneous row. That caused offsets to change W rather than XYZ and made collapsed head vertices fall to zero, producing the reported stretched polygons. An earlier root-axis change did not resolve this layout mistake.
 
 The render hook sees world bone transforms before subsequent inverse-bind multiplication. Collapse uses the neck matrix origin directly rather than transforming its bind position again. Corrected head collapse and intact offsets retain a (0,0,0,1) homogeneous row. Whole-body palette collapse also uses the verified translation entries and correct root origin.
 
@@ -453,7 +453,7 @@ max_lean_degrees 40
 lateral_m 0.60
 ```
 
-All three range settings accept finite, non-negative values without arbitrary upper caps. Older two-line files default lateral range to 0.24 metres. Backward input remains capped at 0.08 metres and vertical input at ±0.08 metres before gain. The limits constrain input rather than guarantee equal physical torso displacement: hips stay fixed and spine motion distributes the lean.
+All three range settings accept finite, non-negative values without arbitrary upper caps. Older two-line files default lateral range to 0.24 metres. Backward input remains capped at 0.08 metres and vertical input at ï¿½0.08 metres before gain. The limits constrain input rather than guarantee equal physical torso displacement: hips stay fixed and spine motion distributes the lean.
 
 #### Validation and references
 
@@ -558,7 +558,7 @@ The installed 0.9.0 plugin watches config/gesture_pose.txt in its own SPF_Driver
 
 The file begins with SPF_GESTURE_POSE 1. Each bone row has its index, then four open/reach quaternion values and four held-gesture quaternion values, in w x y z order. Comment lines identify bone names. All 21 left-arm and finger rows must remain present. Current F10 controls, formation timing, horn priority and pedal animation are unchanged.
 
-Only these left-arm bones are allowed: shoulder 4, upper arm 5, forearm 6, hand 7, finger joints 8–22 and twist bones 23–24. Missing/duplicate bones, extra values, invalid numbers, zero/non-unit quaternions and files larger than 64 KiB are rejected. Small normalization drift is corrected. Failed or partial edits retain the last valid pose. If no valid file has loaded, the compiled pose remains active. Removing the file retains the last valid loaded pose.
+Only these left-arm bones are allowed: shoulder 4, upper arm 5, forearm 6, hand 7, finger joints 8ï¿½22 and twist bones 23ï¿½24. Missing/duplicate bones, extra values, invalid numbers, zero/non-unit quaternions and files larger than 64 KiB are rejected. Small normalization drift is corrected. Failed or partial edits retain the last valid pose. If no valid file has loaded, the compiled pose remains active. Removing the file retains the last valid loaded pose.
 
 File reading and parsing occur outside the animation hook. A validated immutable snapshot is published atomically so the hook sees a complete pose. Log messages beginning POSE_RELOAD identify accepted generations or rejected edits.
 
@@ -721,7 +721,7 @@ The user confirmed the right gesture and both final offsets look good: left 3 in
 Ordered from most feasible to most uncertain, based on the current validated Mustang implementation. This is a planning list, not a commitment to begin implementation.
 
 1. **Vehicle-specific animation calibrations, where needed.** Add profiles for different cars and trucks to align steering grips, pedals, horn targets, and gestures with their cabins. Existing editable poses provide a starting point; automatic profile selection and support for different rigs still need investigation.
-2. **Ignition animation — implemented and visually validated.** When the engine-start button is pressed, the driver releases the wheel with the right hand, drops the hand down and forward to the ignition, turns the key, and returns to the current steering grip. Reuse the arm pose system, identify a reliable game engine-start trigger, and calibrate the key position for each supported vehicle.
+2. **Ignition animation ï¿½ implemented and visually validated.** When the engine-start button is pressed, the driver releases the wheel with the right hand, drops the hand down and forward to the ignition, turns the key, and returns to the current steering grip. Reuse the arm pose system, identify a reliable game engine-start trigger, and calibrate the key position for each supported vehicle.
 3. **Head-driven seated torso movement.** Use calibrated VR head movement to estimate restrained upper-body leaning and turning, keeping the hips seated. Arm IK should preserve wheel or controller hand targets. Head tracking access and runtime torso control need validation.
 4. **Motion-controller hands.** Read tracked controller poses, calibrate VR space to the cabin, and solve arm IK each frame. Keep physical-wheel driving animations available.
 5. **Toggle between controller tracking and driving animations.** Provide a configurable SPF action with a smooth return to the current steering grips, an optional instant snap, and a tracking-loss fallback. Depends on controller-hand support.
@@ -990,3 +990,7 @@ The user confirmed the 0.8.10 thumb looks good, but reported curled fingertips i
 Version 0.8.12 follows the user screenshot: the index finger is further eased to 80/75/20-degree curls, the whole hand turns 8 degrees left to reduce its rightward lean, and the middle finger base compensates to preserve a vertical raised finger. Confirmed thumb joint rotations remain unchanged relative to the hand. The user accepts slight index/thumb overlap. The hand target, other fingers and faster timing are preserved. Pose and native tests pass; installed after ATS exited and launch requested. This refinement is uncommitted and awaits visual confirmation.
 
 Final checkpoint: the user confirmed the 0.9.2 direct-return version works great. The latest plugin, three-keyframe live pose file, generated targets, source and validation records are saved together for commit. Earlier release files remain as diagnostic checkpoints.
+
+### Native driver pedal restoration
+
+Restored accelerator, staged brake transfer, and independent clutch animation after the accessory-free body transition. Pedal rotation deltas are extracted from the previously validated clip and applied only to the native driver's leg bones, retaining the active vehicle's resting pose. No accessory is required. All seven native suites pass, including neutral-pose preservation, independent gas/clutch movement, brake transfer, and isolation from other bones. The user confirmed the installed restoration works in VR.

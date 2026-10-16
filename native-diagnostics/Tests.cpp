@@ -1,3 +1,4 @@
+#include "NativePedalPose.hpp"
 #include "SetupHelp.hpp"
 #include "CameraSeatDrag.hpp"
 #include "SetupHistory.hpp"
@@ -162,6 +163,10 @@ extern "C" void XRActionAttachContinuation();
 extern "C" {extern void* gHornControlOriginal;uint64_t HornControlObserveStub(uintptr_t,uint64_t,uint64_t,uint64_t);}
 extern "C" uint64_t HornControlTestContinuation(uintptr_t object,uint64_t held,uint64_t air,uint64_t transform){Check(object==123 && air==456 && transform==789,"horn observer preserves receiver and other arguments");return held;}
 int main() {
+ DriverIK::Pose pedalNeutral{};for(auto& q:pedalNeutral)q={1,0,0,0};auto pedalPose=pedalNeutral;PedalMotion nativeTestMotion;ApplyNativePedals(pedalPose,nativeTestMotion,0);for(unsigned bone=0;bone<61;++bone)Check(std::abs(pedalPose[bone][0]-1)<1e-5f,"native pedals preserve neutral pose");
+ nativeTestMotion.press=1;pedalPose=pedalNeutral;ApplyNativePedals(pedalPose,nativeTestMotion,1);Check(std::abs(pedalPose[57][0]-1)>1e-4f&&std::abs(pedalPose[51][0]-1)>1e-4f,"native gas and clutch move independently");for(unsigned bone=0;bone<61;++bone)if(bone!=54&&bone!=55&&bone!=57&&bone!=51)Check(pedalPose[bone]==pedalNeutral[bone],"native pedal animation leaves all other bones untouched");
+ nativeTestMotion.transfer=1;pedalPose=pedalNeutral;ApplyNativePedals(pedalPose,nativeTestMotion,0);Check(std::abs(pedalPose[54][0]-1)>1e-4f&&pedalPose[51]==pedalNeutral[51],"native brake transfers right leg while leaving released clutch unchanged");
+
  Check(ControllerRadialRecenterSelection(0,5)&&!ControllerRadialRecenterSelection(1,5)&&!ControllerRadialRecenterSelection(0,3),"VR recenter only on left lower-left octant");
 
  Check(ControllerRadialSetupSelection(0,3)&&!ControllerRadialSetupSelection(1,3)&&!ControllerRadialSetupSelection(0,2),"left lower-right radial setup slot only");InteractionBoxEditor setupToggleTest;setupToggleTest.selected=1;Check(setupToggleTest.Toggle()==1&&setupToggleTest.enabled&&setupToggleTest.selected==-1&&setupToggleTest.dirty,"setup toggle releases and marks active edit for saving");Check(setupToggleTest.Toggle()==2&&!setupToggleTest.enabled,"setup radial toggle disables");
