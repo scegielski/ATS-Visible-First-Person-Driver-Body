@@ -1,0 +1,8 @@
+{
+  "in_game_validation": "User confirmed hold/release behavior, then requested commit after testing installed per-hand audio build",
+  "feature": "Hold-to-open radial menus and per-hand scale cues",
+  "installer": "0.39.14",
+  "right_scale": "C natural minor, clockwise from top tonic",
+  "left_scale": "C major, clockwise from top tonic",
+  "native_tests": "All six suites pass; hold/release selection, center cancellation, tracking reset, and note-change gating covered"
+}

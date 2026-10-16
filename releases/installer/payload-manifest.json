@@ -1,15 +1,15 @@
 {
-  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.11.exe",
-  "sha256": "43b33633df399293438db3cc7a945095542d209c23f010f269f835e1996c97aa",
+  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.14.exe",
+  "sha256": "e89c5df9bc461e5e2a6148863dad269bc12a31bdbcf075001310a2deab31a37b",
   "payload": {
-    "version": "0.39.11",
+    "version": "0.39.14",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
     "files": [
       {
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "92c89c3add5d09504aa9d1f0e0b985587170ce5c73c84e463fbabd7f0f9fe925",
+        "sha256": "26fd44dcacfbdaf311c021d1971a04f167b9fc62865f41d1e318c43b0e37fc91",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -154,6 +154,134 @@
         "destination": "plugin",
         "target": "sounds/controller_left_ring.wav",
         "sha256": "0c27e15043da8b5ba90aa18074cd5b5446b6d21a7039d37ce24660789de4ee68",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_0.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_0.wav",
+        "sha256": "6219039e782fef3e2cf4986e7294534dc07cc69405a7e88dab2b8013967a017b",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_1.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_1.wav",
+        "sha256": "65dc39078d44f2f87d4f6ed67b98cdb5c8aba8d48f892c5b84ccca84143ac9ae",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_2.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_2.wav",
+        "sha256": "a9e2ff303a3d6330a3b8263d068a2e198942c0f78c018f7466885f7321b7f7bb",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_3.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_3.wav",
+        "sha256": "343d33368dfc5a3be338d799c784d6e5390a8955aa2666c049751cfcc992ea14",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_4.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_4.wav",
+        "sha256": "b36baf56447f46ff15d476ec5666cfb79ddab1d0f766706e4d3f2a8b71bef63d",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_5.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_5.wav",
+        "sha256": "b5dd9501b5cf4d3abc43dc7e36e3bc994fd5f40bc8cb3aef003709d71fd1ddeb",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_6.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_6.wav",
+        "sha256": "aa3b614fd119d8cc65265c3d9b364739ec781b17cfc410415684e0bc7d8754c8",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_left_note_7.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_left_note_7.wav",
+        "sha256": "0ba602a7f6f39d411fe4a192082190ba470efef120a0e17fc6a7fdd093d15563",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_0.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_0.wav",
+        "sha256": "6219039e782fef3e2cf4986e7294534dc07cc69405a7e88dab2b8013967a017b",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_1.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_1.wav",
+        "sha256": "65dc39078d44f2f87d4f6ed67b98cdb5c8aba8d48f892c5b84ccca84143ac9ae",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_2.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_2.wav",
+        "sha256": "77fba1c14e5ab570d11ceffa3c4232f6ae82f9ee2ba1a202577c217db105a507",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_3.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_3.wav",
+        "sha256": "343d33368dfc5a3be338d799c784d6e5390a8955aa2666c049751cfcc992ea14",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_4.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_4.wav",
+        "sha256": "b36baf56447f46ff15d476ec5666cfb79ddab1d0f766706e4d3f2a8b71bef63d",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_5.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_5.wav",
+        "sha256": "13f70850b9f848f80ef43778f21dec40dffe7c805307034fafc3a7cd0081b478",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_6.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_6.wav",
+        "sha256": "8b206f6879bf97e61a21e2e64b8d8d261c68770c3ddc49b65f600c003fd9aed5",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_radial_right_note_7.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_radial_right_note_7.wav",
+        "sha256": "0ba602a7f6f39d411fe4a192082190ba470efef120a0e17fc6a7fdd093d15563",
         "mutable": false,
         "onlyIfMissing": false
       },
