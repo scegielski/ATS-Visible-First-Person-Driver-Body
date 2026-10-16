@@ -1,10 +1,14 @@
 #ifndef Payload
   #error Define Payload and OutputRoot when compiling
 #endif
+#ifndef SetupVersion
+  #error Define a unique SetupVersion through build_installer.py
+#endif
 [Setup]
 AppId={{012984B8-7167-4DDC-B6E6-DA662F4924EB}
 AppName=SPF Visible First Person Driver Body
-AppVersion=0.39.2
+AppVersion={#SetupVersion}
+VersionInfoVersion={#SetupVersion}
 AppPublisher=scegielski
 DefaultDirName={code:DefaultPluginDirectory}
 UsePreviousAppDir=no
@@ -15,7 +19,7 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputRoot}
-OutputBaseFilename=SPF-Visible-First-Person-Driver-Body-Setup-0.39.2
+OutputBaseFilename=SPF-Visible-First-Person-Driver-Body-Setup-{#SetupVersion}
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

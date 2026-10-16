@@ -1,6 +1,6 @@
 # Compact Windows installer
 
-`releases/installer/SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe`
+The uniquely versioned setup executable under `releases/installer/`
 packages the integrated 0.39.0 body/controller plugin, OpenXR bridge/manifest,
 OpenVR helper, tested body archive, embedded general defaults and Mustang configurations, sounds and licenses.
 SteamVR controller models are loaded at runtime, not bundled.
@@ -75,3 +75,5 @@ adjustment plugin. The builder verifies an explicit SHA-256 payload manifest.
 The unsigned installer was run against the live game. Follow-up fixes enabled the saved SPF plugin state and avoid shutting down the shared SteamVR client on plugin unload. The latest split configuration and integrated adjustments still need a complete live VR regression check.
 Normal Steam loading via system-wide registration was validated separately on the
 prior build; compatibility with other OpenXR games has not been established.
+
+Each build automatically advances the installer patch version. Pass `--version X.Y.Z` to start a newer release series. Existing or older versions are rejected; the filename, Windows product version, installed package version and payload receipt use the same version. Keep previously distributed installers when building releases.

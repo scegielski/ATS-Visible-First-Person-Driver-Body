@@ -21,8 +21,19 @@ def sha(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--iscc', type=Path, default=ROOT / 'work/inno/ISCC.exe')
+    parser.add_argument('--version', help='New three-part installer version; existing versions cannot be overwritten')
     args = parser.parse_args()
-    stage = ROOT / 'work/installer-payload-0.39.2'
+    output = ROOT / 'releases/installer'
+    versions = [tuple(map(int, match.groups())) for path in output.glob('*.exe')
+                if (match := re.fullmatch(r'SPF-Visible-First-Person-Driver-Body-Setup-(\d+)\.(\d+)\.(\d+)\.exe', path.name))]
+    latest = max(versions, default=(0, 39, 2))
+    version = args.version or '.'.join(map(str, (*latest[:2], latest[2] + 1)))
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        parser.error('Version must contain three numeric components')
+    if tuple(map(int, version.split('.'))) <= latest:
+        parser.error('Installer version must be newer than every existing distributed build')
+    exe = output / f'SPF-Visible-First-Person-Driver-Body-Setup-{version}.exe'
+    stage = ROOT / f'work/installer-payload-{version}'
     # Explicit staging root only; no recursive delete is required for rebuilding.
     stage.mkdir(parents=True, exist_ok=True)
     files = []
@@ -62,13 +73,12 @@ def main():
     (stage / 'layer-template.json').write_text(json.dumps(template, indent=2) + '\n')
     source = (ROOT / 'native-diagnostics/DriverAnimationDiagnostics.cpp').read_text()
     supported = re.search(r'kHash\[\]="([a-f0-9]{64})"', source).group(1)
-    package = dict(version='0.39.2', supportedExe=supported, files=files)
+    package = dict(version=version, supportedExe=supported, files=files)
     (stage / 'package.json').write_text(json.dumps(package, indent=2) + '\n')
     output = ROOT / 'releases/installer'
     output.mkdir(parents=True, exist_ok=True)
     subprocess.run([str(args.iscc), '/Qp', '/DPayload=' + str(stage),
-                    '/DOutputRoot=' + str(output), str(ROOT / 'installer/DriverBody.iss')], check=True)
-    exe = output / 'SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe'
+                    '/DOutputRoot=' + str(output), '/DSetupVersion=' + version, str(ROOT / 'installer/DriverBody.iss')], check=True)
     receipt = dict(installer=exe.name, sha256=sha(exe), payload=package,
                    tested='Automated fixture lifecycle; live install pending')
     (output / 'payload-manifest.json').write_text(json.dumps(receipt, indent=2) + '\n')

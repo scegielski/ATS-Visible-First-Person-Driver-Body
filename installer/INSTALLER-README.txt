@@ -1,4 +1,4 @@
-SPF Visible First Person Driver Body - Setup 0.39.2
+SPF Visible First Person Driver Body - Setup
 
 Close ATS before setup or uninstall. Steam can remain open. SPF Framework and a
 working ATS OpenXR VR launch configuration are prerequisites. Steam launch options
