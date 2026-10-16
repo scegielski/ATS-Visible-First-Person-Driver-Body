@@ -1038,3 +1038,6 @@ The normal left radial now has Map at top, Setup at right, Finger Editing at lef
 ### Matching foot grab feedback
 
 Foot engagement and double-trigger release now use the same queued sound and controller vibration path as hand engagement and release. No additional audio assets are needed. All seven native suites pass, and the user confirmed the installed feedback works in VR.
+### Explicit Setup camera adjustment mode
+
+Added Adjust Camera in the left Setup radial's upper-left segment, with spoken enabled/disabled cues. The mode starts off and clears when Setup closes or the active vehicle changes. With it off, grip box movement and two-grip resizing work normally; with it on, both grips adjust the camera and box/limb edits are suspended. Camera positions still save per vehicle and support Undo/Redo. All seven native suites pass, and the user confirmed the installed toggle, audio, and restored resizing in VR.

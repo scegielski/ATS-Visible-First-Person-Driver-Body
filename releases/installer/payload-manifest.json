@@ -1,15 +1,15 @@
 {
-  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.64.exe",
-  "sha256": "7b1dd179459fcc411935cce4ea6825bda648c53c8df0d452608777be5832ea08",
+  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.65.exe",
+  "sha256": "0afc521fb99e05058a82f1c707e978ab8cb8ec44bcf040762ce960c33f46c0cd",
   "payload": {
-    "version": "0.39.64",
+    "version": "0.39.65",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
     "files": [
       {
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "b22a053237f2adef9dfc5ef260c981c6386fdaa64e19e6eea4d1a6bfe5384971",
+        "sha256": "4f6924312f994b1382e6185709a2a3475e1ad642c232f13e1d0041a279b87d4c",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -59,6 +59,22 @@
         "target": "config/mustang_poses.ini",
         "sha256": "2699ac82f0664b09867eebd80f1114d458f86cbf0b98f376657b9332970f6d7f",
         "mutable": true,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_camera_adjustment_disabled.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_camera_adjustment_disabled.wav",
+        "sha256": "c1fd3f0f142fd9b7a3a0d1e038a8746342df99a5dc7c90908d7e4f2c41bfb8fc",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_camera_adjustment_enabled.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_camera_adjustment_enabled.wav",
+        "sha256": "238f6977e886e381e305fcf9432f77b2addfa7355053ec0bb66966ece2f2d596",
+        "mutable": false,
         "onlyIfMissing": false
       },
       {
