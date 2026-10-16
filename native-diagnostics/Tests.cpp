@@ -153,6 +153,10 @@ extern "C" void XRActionAttachContinuation();
 extern "C" {extern void* gHornControlOriginal;uint64_t HornControlObserveStub(uintptr_t,uint64_t,uint64_t,uint64_t);}
 extern "C" uint64_t HornControlTestContinuation(uintptr_t object,uint64_t held,uint64_t air,uint64_t transform){Check(object==123 && air==456 && transform==789,"horn observer preserves receiver and other arguments");return held;}
 int main() {
+ Check(ControllerRadialRecenterSelection(0,5)&&!ControllerRadialRecenterSelection(1,5)&&!ControllerRadialRecenterSelection(0,3),"VR recenter only on left lower-left octant");
+
+ Check(ControllerRadialSetupSelection(0,3)&&!ControllerRadialSetupSelection(1,3)&&!ControllerRadialSetupSelection(0,2),"left lower-right radial setup slot only");InteractionBoxEditor setupToggleTest;setupToggleTest.selected=1;Check(setupToggleTest.Toggle()==1&&setupToggleTest.enabled&&setupToggleTest.selected==-1&&setupToggleTest.dirty,"setup toggle releases and marks active edit for saving");Check(setupToggleTest.Toggle()==2&&!setupToggleTest.enabled,"setup radial toggle disables");
+
  Check(ControllerRadialAction(1,2)==3&&ControllerRadialAction(1,4)==4&&ControllerRadialAction(1,5)==5&&ControllerRadialAction(1,1)==6,"right HUD next interior activate octants");
  gRadialHudOriginal=reinterpret_cast<void*>(RadialHudContinuation);Check(RadialHudTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==3,"HUD native stub state");gRadialCameraOriginal=reinterpret_cast<void*>(RadialCameraContinuation);Check(RadialCameraTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==5,"camera native stub state");gRadialActivateOriginal=reinterpret_cast<void*>(RadialActivateContinuation);Check(RadialActivateTest(123,0x1122334455667788ull)==0x1122334455667788ull&&radialObserved==6,"activate native stub state");
 

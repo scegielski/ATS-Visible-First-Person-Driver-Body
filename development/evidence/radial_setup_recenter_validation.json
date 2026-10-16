@@ -1,0 +1,8 @@
+{
+  "recenter": "Left lower-left; existing native reset and spoken completion cue",
+  "in_game_validation": "User confirmed VR recenter and setup enabled/disabled cues on 2026-10-15",
+  "native_tests": "All six suites passed; slot routing and setup edit release covered",
+  "setup": "Left lower-right; existing F9 and double-A retained",
+  "installer": "0.39.24",
+  "feature": "Left radial setup and VR recenter"
+}

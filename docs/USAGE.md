@@ -78,3 +78,7 @@ Right radial left: QUICK INFO (F1). Right radial top: SERVICES AND ADJUSTMENTS (
 Right radial native actions: top Services and Adjustments; upper-right Activate; right HUD Widgets; bottom Next Camera; lower-left Interior Camera; left Quick Info. All use game action bindings rather than keyboard events. HUD toggles visibility; camera cycling follows the native game order and availability.
 
 Activate uses SPF semantic virtual input registered during plugin OnLoad. It emits a short activate press/release through the game input system and does not depend on a primary keyboard binding. Startup must have the plugin enabled for device registration. The other radial actions retain their validated native binding hooks.
+
+Left radial lower-right: SETUP MODE ON/OFF. Select it to toggle box setup with the existing spoken cue and vibration. F9 and double-press right A remain available.
+
+Left radial lower-left: VR RECENTER. Select while seated normally; it uses the existing native reset and speaks VR recenter after the reset applies. Double-press right B remains available outside Finger editing mode.

@@ -11,7 +11,8 @@ inline constexpr const char* InteractionBoxNames[InteractionBoxCount]={"ignition
 struct InteractionBoxEditor {
  InteractionBox boxes[InteractionBoxCount]{{},{ {},{.06f,.05f,.05f},{1,0,0,0},1.25f },{{-.85f,1.2f,-.35f},{.07f,.07f,.05f}},{{-.15f,1.4f,-.5f},{.07f,.05f,.05f}},{{.65f,1.2f,-.35f},{.07f,.07f,.05f}},{{-.38f,.52f,-.08f},{.06f,.06f,.06f}},{{-.75f,.7f,.05f},{.06f,.06f,.06f}},{{.65f,.7f,.05f},{.06f,.06f,.06f}},{{-.38f,.65f,-.35f},{.06f,.06f,.06f}},{{-.48f,.7f,-.6f},{.04f,.04f,.04f}},{{-.48f,.8f,-.6f},{.04f,.04f,.04f}},{{.05f,.7f,-.5f},{.07f,.04f,.04f}},{{.14f,0,0},{.04f,.035f,.055f}},{{-.14f,-.02f,0},{.04f,.035f,.055f}}};bool authored[InteractionBoxCount]{},enabled=false,keyDown=false,dirty=false;bool down[2]{true,true};int selected=-1,owner=-1;bool two=false;DriverIK::V localOffset{},startMid{},startVector{};DriverIK::Q localRotation{1,0,0,0};InteractionBox startBox{};unsigned resizeAxis=0;float startSpan=0;
  void Release(){if(selected>=0)dirty=true;selected=owner=-1;two=false;}
- int Key(bool held){int result=0;if(held&&!keyDown){enabled=!enabled;Release();down[0]=down[1]=true;result=enabled?1:2;}keyDown=held;return result;}
+ int Toggle(){enabled=!enabled;Release();down[0]=down[1]=true;return enabled?1:2;}
+ int Key(bool held){int result=0;if(held&&!keyDown)result=Toggle();keyDown=held;return result;}
  void Anchor(unsigned side,const BoxGrabInput& in){owner=side;two=false;localOffset=DriverIK::Rotate(DriverIK::Inverse(in.rotation),DriverIK::Sub(boxes[selected].center,in.position));localRotation=DriverIK::Product(DriverIK::Inverse(in.rotation),boxes[selected].rotation);}
  void Step(const BoxGrabInput (&in)[2]){
   bool held[2]{},edge[2]{};for(unsigned i=0;i<2;++i){held[i]=in[i].valid && in[i].grip>(down[i]?.3f:.65f);edge[i]=held[i]&&!down[i];if(!in[i].valid)down[i]=true;else if(in[i].grip<.3f)down[i]=false;else if(held[i])down[i]=true;}

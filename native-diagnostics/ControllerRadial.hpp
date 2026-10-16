@@ -37,3 +37,7 @@ inline int ControllerRadialAction(unsigned side,int segment){
  if(side==1&&segment==1)return 6;
  return -1;
 }
+
+inline bool ControllerRadialSetupSelection(unsigned side,int segment){return side==0&&segment==3;}
+
+inline bool ControllerRadialRecenterSelection(unsigned side,int segment){return side==0&&segment==5;}
