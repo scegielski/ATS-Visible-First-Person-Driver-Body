@@ -1,0 +1,8 @@
+{
+  "feature": "Eight-segment controller radial menu",
+  "in_game_validation": "User confirmed both menus, click selection, and higher-resolution eight-segment graphics on 2026-10-15",
+  "feedback": "White flash and controller vibration on fresh thumbstick click",
+  "actions": "Visual selection prototype; no segment actions assigned",
+  "native_tests": "All six suites passed, including octant classification and click confirmation",
+  "installer": "0.39.6"
+}

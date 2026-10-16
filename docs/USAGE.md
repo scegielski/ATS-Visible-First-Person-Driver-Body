@@ -64,3 +64,6 @@ General tracking, timing, visibility, elbow and wrist settings are compiled into
 Double-press right controller A to toggle cabin setup mode (F9 remains available). Left X retains finger selection; right A is reserved for setup.
 
 Changing setup mode through double-press A or F9 speaks “Setup mode enabled” or “Setup mode disabled”.
+
+Radial-menu visual prototype (1024-pixel antialiased texture): tilt either thumbstick to show a eight-segment ring near that controller, with the dominant direction highlighted; center the stick to hide it. Segments have no new actions assigned yet.
+Click the thumbstick while highlighting a radial segment to confirm it. A brief white flash and vibration confirm selection. Holding does not repeat; no actions are assigned yet.
