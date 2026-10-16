@@ -140,3 +140,7 @@ Setup uses a dedicated left-controller radial menu with EXIT SETUP (lower-right)
 Setup also provides UNDO (upper-left) and REDO (upper-right) on the left radial menu. Up to one hundred completed edits are retained per vehicle for the current game session. History includes box moves, rotations, resizing, resting-hand adjustments, and complete box/hand resets. A new edit clears the redo branch. Undo and redo save the restored state to the active vehicle profile; empty stacks cannot be selected.
 
 The user confirmed the dedicated Setup radial menu and undo/redo behavior in VR. All seven native suites pass, covering full box/hand reset history, redo branching, vehicle separation, confirmation clicks/cancel/timeout, and hidden normal actions during setup.
+
+### Align the VR viewpoint to the driver
+
+In Setup, point both controllers into empty space away from setup boxes, release both grips, then hold both grips and move the controllers together. The interior camera follows that translation so you can align your viewpoint with the native driver head. Release either grip to save the camera offset in that vehicle pose file. Existing box grabbing and two-hand resizing retain priority when a box is selected. Body placement, resting-hand offsets and box placements are unchanged; camera alignment participates in per-vehicle Undo/Redo. New vehicle profiles keep the game camera until adjusted.

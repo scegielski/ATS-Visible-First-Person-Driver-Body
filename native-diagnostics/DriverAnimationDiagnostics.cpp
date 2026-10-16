@@ -718,6 +718,7 @@ void Update() {
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
  const bool menuMouse=core && core->gameworld && core->gameworld->GW_IsGamePaused && (core->gameworld->GW_IsGamePaused() || !cameraValid || !telemetryTick.load() || GetTickCount64()-telemetryTick.load()>250);
  PollControllers(!menuMouse && cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
+ if(!menuMouse&&cameraValid&&static_cast<int>(cameraType)==2&&core&&core->camera&&core->camera->Cam_SetInteriorSeatPos){DriverIK::V seat;if(ConsumeControllerCameraPosition(seat)){core->camera->Cam_SetInteriorSeatPos(seat[0],seat[1],seat[2]);SetControllerSceneCamera(seat[0],seat[1],seat[2]);}}
  PollControllerMenuMouse(menuMouse);
  RefreshBorrowedDriverPose();
  {static uint64_t report=0,previous=0;auto now=GetTickCount64();if(now-report>=2000){report=now;auto calls=mapWidgetCalls.load();char msg[180];std::snprintf(msg,sizeof(msg),"MENU_MAP_PROBE menu=%d calls=%llu delta=%llu recent=%d widget_vtable_rva=%llx",menuMouse?1:0,calls,calls-previous,mapWidgetTick.load() && now-mapWidgetTick.load()<250?1:0,mapWidgetVtable.load()?mapWidgetVtable.load()-reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)):0);previous=calls;Log(SPF_LOG_INFO,msg);}}
