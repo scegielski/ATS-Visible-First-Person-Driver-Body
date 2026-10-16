@@ -346,7 +346,6 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
  api->Policy_AddConfigurableSystem(h,"keybinds");
  api->Defaults_AddKeybind(h,"Gestures","LeftWindowBird","keyboard","KEY_F10","always");
  api->Defaults_AddKeybind(h,"Gestures","RightHandBird","keyboard","KEY_F11","always");
- api->Defaults_AddKeybind(h,"Setup","EditInteractionBoxes","keyboard","KEY_F9","always");
  DescribeIntegratedAdjustments(h,api);
 
 }
@@ -741,7 +740,6 @@ void Update() {
  bool held=false;
  const bool valid=ReadPlayerHorn(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,held);
  gameHornValid.store(valid);hornHeld.store(valid && held);hornTick.store(valid?GetTickCount64():0);
- if(gestureKeys){int setup=ControllerBoxSetupKey(core->keybinds->Kbind_GetActionValue(gestureKeys,"Setup.EditInteractionBoxes")>.5f);if(setup)Log(SPF_LOG_INFO,setup==1?"BOX_SETUP enabled: grip to move/rotate; both grips to scale.":"BOX_SETUP disabled: placements saved.");}
  if(gestureKeys){windowGestureHeld.store(core->keybinds->Kbind_GetActionValue(gestureKeys,"Gestures.LeftWindowBird")>.5f);windowGestureTick.store(GetTickCount64());rightGestureHeld.store(core->keybinds->Kbind_GetActionValue(gestureKeys,"Gestures.RightHandBird")>.5f);rightGestureTick.store(GetTickCount64());}
  static bool installed=false;
  if(!installed && core->hooks->Hook_IsInstalled(driverHook) && core->hooks->Hook_IsInstalled(advanceHook) && core->hooks->Hook_IsInstalled(boneHook) && core->hooks->Hook_IsInstalled(engineRequestHook)) {

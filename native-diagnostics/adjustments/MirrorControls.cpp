@@ -1,3 +1,4 @@
+#include "../RetiredKeybinds.hpp"
 #include <Windows.h>
 #include <algorithm>
 #include <bcrypt.h>
@@ -136,10 +137,7 @@ void UpdateVoiceCue(int slot) {
  else Log(SPF_LOG_WARN,"MIRRORS: voice cue could not play; check the sounds folder.");
 }
 void StopVoiceCue() { if(cuePlaying) { playCueSound(nullptr,nullptr,0); cuePlaying=false; } }
-const char* movementActions[]={"Move.left","Move.right","Move.up","Move.down","Move.reset"};
-void SetMovementBlocking(bool block) {
- if(core && core->keybinds && keys) for(const auto* action:movementActions) core->keybinds->Kbind_SetBlockState(keys,action,block);
-}
+void SetMovementBlocking(bool) {} // Controller-only adjustments do not own keyboard movement.
 void ExitCenter() {
  if(selectedSlot.exchange(-1)>=0) {
   Log(SPF_LOG_INFO,"MIRRORS: mode off.");
@@ -401,7 +399,7 @@ bool DefaultBindingNeeded(const nlohmann::json& saved,const char* group,const ch
  return !value.contains("bindings") || !value["bindings"].is_array();
 }
 #include "NativeSeat.inc"
-void OnLoad(const SPF_Load_API* api) { load=api; InitializeCuePaths(); if(api && api->config) { config=api->config->Cfg_GetContext(kName); holdSelectors.store(api->config->Cfg_GetBool(config,"settings.hold_selectors",false)); } if (api && api->logger) logger=api->logger->Log_GetContext(kName); }
+void OnLoad(const SPF_Load_API* api) { load=api; InitializeCuePaths(); if(api && api->config) { config=api->config->Cfg_GetContext(kName); holdSelectors.store(false);if(api->config->Cfg_RemoveKey)for(const char* key:{"settings.hold_selectors","settings.voice_cues","settings.servo_sound","settings.selection_clicks"})api->config->Cfg_RemoveKey(config,key); } if (api && api->logger) logger=api->logger->Log_GetContext(kName); }
 void OnActivated(const SPF_Core_API* api) {
     core=api;
     if(core && core->keybinds) {
@@ -412,23 +410,9 @@ void OnActivated(const SPF_Core_API* api) {
         core->config->Cfg_RemoveKey(config,"keybinds.SPF_MirrorControls.Select.menu");
         core->config->Cfg_RemoveKey(config,"keybinds.SPF_MirrorControls.Select.escape");
       }
-      // Declare bindable actions without assigning keys on a fresh installation.
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Select.left","Select left mirror","Toggle or hold to adjust the left mirror.",nullptr,nullptr);
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Select.right","Select right mirror","Toggle or hold to adjust the right mirror.",nullptr,nullptr);
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Select.center","Select center mirror","Toggle or hold to adjust the center mirror.",nullptr,nullptr);
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Select.seat","Select seat","Adjust native seat up/down and forward/back.",nullptr,nullptr);
-      core->keybinds->Kbind_Register(keys,"Select.seat",ToggleSeat);
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Select.steering_extension","Select steering wheel extension","Adjust native steering column extension.",nullptr,nullptr);
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Select.steering_tilt","Select steering wheel tilt","Adjust native steering wheel tilt.",nullptr,nullptr);
-      core->keybinds->Kbind_Register(keys,"Select.steering_extension",ToggleSteeringExtension);
-      core->keybinds->Kbind_Register(keys,"Select.steering_tilt",ToggleSteeringTilt);
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Select.cycle","Cycle adjustments","Cycle left, center, right, seat, extension, tilt, then off; hold mode wraps to left.",nullptr,nullptr);
-      core->keybinds->Kbind_RegisterActionMetadata(keys,"Move.reset","Reset selected mirror","Reset the mirror currently being adjusted.",nullptr,nullptr);
-      core->keybinds->Kbind_Register(keys,"Select.left",ToggleLeft);
-      core->keybinds->Kbind_Register(keys,"Select.right",ToggleRight);
-      core->keybinds->Kbind_Register(keys,"Select.center",ToggleCenter);
-      core->keybinds->Kbind_Register(keys,"Select.cycle",CycleMirror);
-      for(const auto* action:movementActions) core->keybinds->Kbind_Register(keys,action,NoAction);
+      if(core->keybinds->Kbind_RegisterActionMetadata&&core->keybinds->Kbind_UnregisterActionMetadata)RetireControllerKeybinds(
+       [&](const char* action){core->keybinds->Kbind_RegisterActionMetadata(keys,action,"Retired controller binding","",nullptr,nullptr);},
+       [&](const char* action){core->keybinds->Kbind_UnregisterActionMetadata(keys,action);});
     }
     if (!core || !core->hooks || !core->gameworld || !core->keybinds) { Log(SPF_LOG_ERROR,"DIAG: hooks API unavailable; observation disabled."); return; }
     char hash[65]{};
@@ -464,24 +448,21 @@ void OnUpdate() {
     const bool allowed=foregroundPid==GetCurrentProcessId() && core->gameworld && !core->gameworld->GW_IsGamePaused();
     movementAllowed.store(allowed && HooksReady());
     if (!allowed) ExitCenter();
-    const bool requestedHold=core->config && config && core->config->Cfg_GetBool(config,"settings.hold_selectors",false);
+    const bool requestedHold=false;
     if(requestedHold!=holdSelectors.load()) {
       ExitCenter(); previousHeld=0; heldCycleSlot=-1; lastCycleSlot=-1; holdSelectors.store(requestedHold);
       Log(SPF_LOG_INFO,requestedHold?"MIRRORS: hold selection enabled.":"MIRRORS: tap-to-toggle enabled.");
     }
-    if(holdSelectors.load() && movementAllowed.load() && allowed) PollHoldSelection();
-    const bool requestedVoice=core->config && config && core->config->Cfg_GetBool(config,"settings.voice_cues",false);
+    // Selection is owned by controller boxes; retired keyboard selectors are not polled.
+    const bool requestedVoice=false;
     if(!requestedVoice && voiceCuesEnabled) StopVoiceCue();
     voiceCuesEnabled=requestedVoice;
-    selectionClicksEnabled=!core->config || !config || core->config->Cfg_GetBool(config,"settings.selection_clicks",true);
+    selectionClicksEnabled=true;
     if(selectedSlot.load()>=6 && !SeatReady()) ExitCenter();
     UpdateVoiceCue(selectedSlot.load());
     unsigned char mask=0;
-    if(selectedSlot.load()>=0 && movementAllowed.load()) {
-      for(size_t i=0;i<5;++i) if(core->keybinds->Kbind_GetActionValue(keys,movementActions[i])>0.5f) mask|=static_cast<unsigned char>(1u<<i);
-    }
     inputMask.store(mask);
-    servoEnabled=!core->config || !config || core->config->Cfg_GetBool(config,"settings.servo_sound",true);
+    servoEnabled=true;
     int servoSlot=selectedSlot.load();unsigned char servoMask=mask;
     if(movementAllowed.load())controllerMirrorLease.Get(GetTickCount64(),servoSlot,servoMask);
     servo.SetMirror(servoSlot>=6?4:servoSlot);
@@ -541,23 +522,8 @@ void CloseIntegratedAdjustments(){OnUnload();}
 void DescribeIntegratedAdjustments(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api){
  const auto saved=ReadSavedSettings(PluginFolder()/"config"/"settings.json");
  api->Policy_AddConfigurableSystem(h,"settings");
-    api->Settings_SetJson(h,R"json({"hold_selectors":false,"voice_cues":false,"servo_sound":true,"selection_clicks":true})json");
-    api->Meta_AddCustomSetting(h,"settings.selection_clicks","Adjustment selection click","Play selection and exit clicks for adjustment mode.","checkbox",nullptr,false);
-    api->Meta_AddCustomSetting(h,"settings.servo_sound","Adjustment servo sound","Play a quiet motor sound while a mirror, seat or steering wheel is moving.","checkbox",nullptr,false);
-    api->Meta_AddCustomSetting(h,"settings.voice_cues","Adjustment voice cues","Announce the selected mirror, seat or steering wheel when adjustment starts or switches.","checkbox",nullptr,false);
-    api->Meta_AddCustomSetting(h,"settings.hold_selectors","Hold adjustment selector","Off: tap to toggle. On: hold selector while adjusting; release to exit.","checkbox",nullptr,false);
+    api->Settings_SetJson(h,"{}");
     api->Defaults_SetLogging(h,"info",true);
-    if(DefaultBindingNeeded(saved,"Move","left")) api->Defaults_AddKeybind(h,"Move","left","keyboard","KEY_A","manual");
-    if(DefaultBindingNeeded(saved,"Move","right")) api->Defaults_AddKeybind(h,"Move","right","keyboard","KEY_D","manual");
-    if(DefaultBindingNeeded(saved,"Move","up")) api->Defaults_AddKeybind(h,"Move","up","keyboard","KEY_W","manual");
-    if(DefaultBindingNeeded(saved,"Move","down")) api->Defaults_AddKeybind(h,"Move","down","keyboard","KEY_S","manual");
-    api->Meta_AddKeybind(h,"Select","steering_extension","Select steering wheel extension","A/D retract/extend using current movement assignments.");
-    api->Meta_AddKeybind(h,"Select","steering_tilt","Select steering wheel tilt","W/S increase/decrease tilt using current movement assignments.");
-    api->Meta_AddKeybind(h,"Select","seat","Select seat","Toggle or hold; W/S up/down, A/D forward/back using current movement assignments.");
-    api->Meta_AddKeybind(h,"Select","cycle","Cycle adjustments","Toggle: left, center, right, seat, extension, tilt, off. Hold: each press advances; release exits.");
-    api->Meta_AddKeybind(h,"Select","left","Toggle left mirror","Tap on/off, or switch from another mirror.");
-    api->Meta_AddKeybind(h,"Select","right","Toggle right mirror","Tap on/off, or switch from another mirror.");
-    api->Meta_AddKeybind(h,"Select","center","Toggle center mirror","Tap on/off, or switch from another mirror.");
 }
 
 void SetIntegratedDisplayObserver(void(*observer)(uintptr_t,int)){displayObserver.store(observer);}

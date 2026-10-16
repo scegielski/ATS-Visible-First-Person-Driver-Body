@@ -1,3 +1,4 @@
+#include <set>
 #include <algorithm>
 #include "MirrorControls.cpp"
 #include <iostream>
@@ -21,6 +22,8 @@ extern "C" int RunSeatUiStub(uintptr_t,unsigned char*);
 extern "C" void TestSeatUiPass();
 extern "C" void TestSeatUiBypass();
 int main(int argc,char** argv) {
+ std::set<std::string> bindingOwnership{"Gestures.LeftWindowBird","Move.left","Select.right","Setup.EditInteractionBoxes"};std::vector<std::string> removedBindings;RetireControllerKeybinds([&](const char* name){bindingOwnership.insert(name);},[&](const char* name){if(bindingOwnership.erase(name))removedBindings.push_back(name);});CHECK(removedBindings.size()==13&&bindingOwnership.size()==1&&!bindingOwnership.count("Move.left")&&bindingOwnership.count("Gestures.LeftWindowBird"));for(auto name:RetiredControllerKeybinds)CHECK(!bindingOwnership.count(name));
+
  if(argc>1) {
   std::ifstream clip(argv[1],std::ios::binary); ServoWaveHeader header{};
   CHECK(clip.read(reinterpret_cast<char*>(&header),sizeof(header)) && ValidServoHeader(header));

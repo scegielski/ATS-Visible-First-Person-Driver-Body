@@ -51,9 +51,9 @@ Outside setup, touch a box with an enabled hand or target it with a disabled han
 | Wipers | Fresh trigger press advances speed, wrapping from maximum to off |
 | Radio | Left/right stick nudges change station; up/down changes volume; trigger toggles playback |
 
-## F9 setup editor
+## Controller setup editor
 
-Press F9 to show the labeled boxes and suspend their actions. Grip near a box to move and rotate it. Grab with both hands to resize along the local axis closest to the hand separation. Release and re-grab along another direction to resize a different dimension. The L HAND and R HAND grab boxes follow the wrist bones. Edit their placement and nonuniform size like the other boxes; their saved positions and rotations are local to the wrists. Release to save; press F9 to return to normal play.
+Use the Setup radial item or double-press right A to show the labeled boxes and suspend their actions. Grip near a box to move and rotate it. Grab with both hands to resize along the local axis closest to the hand separation. Release and re-grab along another direction to resize a different dimension. The L HAND and R HAND grab boxes follow the wrist bones. Edit their placement and nonuniform size like the other boxes; their saved positions and rotations are local to the wrists. Release to save; select Exit Setup or double-press right A to return to normal play.
 
 ## Configuration files
 
@@ -63,15 +63,15 @@ Paths below are relative to the dedicated SPF plugin folder, `bin/win_x64/plugin
 | --- | --- |
 | `config/mustang_poses.ini` | Live finger, gesture, ignition and turn-signal poses |
 | `config/vehicles/<brand_model_hash>_poses.ini` | Live per-vehicle resting hand offsets and native head visibility/backshift |
-| `config/vehicles/<brand_model_hash>_boxes.ini` | Active vehicle box positions, rotations and sizes; selected from game brand/model IDs; F9 saves here |
+| `config/vehicles/<brand_model_hash>_boxes.ini` | Active vehicle box positions, rotations and sizes; selected from game brand/model IDs; Setup saves here |
 | `config/mustang_boxes.ini` | Preserved Mustang seed; copied into its vehicle profile on first use |
 | `config/settings.json` | SPF-owned preferences and keybindings |
 
 General tracking, timing, visibility, elbow and wrist settings are compiled into the DLL. There is no installed `driver_body.ini`. Pose edits reload in about half a second; invalid edits retain the last valid pose. The INI section names and formats must be preserved. Updates retain existing Mustang configurations.
 
-Double-press right controller A to toggle cabin setup mode (F9 remains available). Left X retains finger selection; right A is reserved for setup.
+Double-press right controller A to toggle cabin setup mode. Left X retains finger selection; right A is reserved for setup.
 
-Changing setup mode through double-press A or F9 speaks “Setup mode enabled” or “Setup mode disabled”.
+Changing setup mode through double-press A or the radial menu speaks “Setup mode enabled” or “Setup mode disabled”.
 
 Radial menus use eight segments with a 2048-pixel antialiased texture with smoothly rendered Segoe UI labels. Press and hold a controller thumbstick button to open its ring, tilt while holding to highlight an octant, then release the button to select that octant. Release at center to cancel. Tilting without holding does not show a menu. Selection gives vibration.
 
@@ -87,13 +87,13 @@ Right radial native actions: top Services and Adjustments; upper-right Activate;
 
 Activate uses SPF semantic virtual input registered during plugin OnLoad. It emits a short activate press/release through the game input system and does not depend on a primary keyboard binding. Startup must have the plugin enabled for device registration. The other radial actions retain their validated native binding hooks.
 
-Left radial lower-right: SETUP MODE ON/OFF. Select it to toggle box setup with the existing spoken cue and vibration. F9 and double-press right A remain available.
+Left radial lower-right: SETUP MODE ON/OFF. Select it to toggle box setup with the existing spoken cue and vibration. Double-press right A remains available.
 
 Left radial lower-left: VR RECENTER. Select while seated normally; it uses the existing native reset and speaks VR recenter after the reset applies. Double-press right B remains available outside Finger editing mode.
 
 Vehicle box profiles are created automatically when driving telemetry identifies a vehicle. A new non-Mustang vehicle starts with generic boxes: use setup mode to position them. Profiles include all cabin boxes and the two wrist-local grab boxes. Switching vehicles releases hand control and clears pending cabin interactions. Profile edits reload live; invalid files retain the last valid placement. This change covers boxes only: poses and body alignment still use the Mustang configuration. Profiles created at runtime are not overwritten by installer updates.
 
-Setup boxes now render through the controller bridge, independently of the driver-body accessory. The bridge and plugin must be updated together. New vehicles start with twelve labeled cabin boxes arranged in front of the seat for placement with F9 or the controller setup toggle. Box grabbing, rotation, nonuniform scaling and saving work without a body. The two wrist-attached boxes appear only when a real driver skeleton is available. Outside setup mode, controller lasers can operate the configured cabin boxes without a driver body.
+Setup boxes now render through the controller bridge, independently of the driver-body accessory. The bridge and plugin must be updated together. New vehicles start with twelve labeled cabin boxes arranged in front of the seat for placement with the controller setup toggle. Box grabbing, rotation, nonuniform scaling and saving work without a body. The two wrist-attached boxes appear only when a real driver skeleton is available. Outside setup mode, controller lasers can operate the configured cabin boxes without a driver body.
 
 The driver body reuses the game-owned native player model and draws it with the interior render context; no accessory is required. The active build does not create or release native body scene objects.
 
@@ -150,3 +150,11 @@ Setup adds HIDE/SHOW HEAD at the top of the left radial and HIDE/SHOW DRIVER at 
 A floating controls placard appears to your right when entering Setup. It stays anchored in the cabin while you look around and lists box grabbing/resizing, hand adjustment, camera alignment, and the radial selection gesture. It omits the radial item list and keyboard/button exit shortcuts. The lower-left Setup radial segment shows or hides HELP. It is hidden outside Setup and while a reset confirmation is open.
 
 The shortened help text omits radial item descriptions, F9/double-A references, and reset-dialog instructions. All seven native suites pass. The latest text revision is packaged but was not installed during the running VR session.
+
+The obsolete SPF keyboard actions for mirror reset, setup editing, mirror/seat/wheel selection, and adjustment cycling are removed. Existing saved entries are retired during activation. Setup uses its radial control or double-press right A; the former F9 action is removed. Controller box operation is unchanged.
+
+The old SPF adjustment movement bindings Down, Left, Right, and Up are also retired. Mirror, seat and steering-wheel adjustments use the targeted controller thumbstick exclusively; other game keyboard bindings are untouched.
+
+The retired General Settings options Hold Selectors, Voice Cues, Servo Sounds, and Selection Clicks are no longer exposed. Their fixed behavior disables old adjustment-selector hold mode and selection announcements while keeping servo audio and selection clicks enabled. Controller spoken cues and setup feedback remain active. Existing saved copies of those four settings are removed on load.
+
+The user confirmed the SPF keybind and General Settings cleanup in game. All seven native suites pass, including retirement of the thirteen obsolete actions while retaining unrelated gesture bindings and controller input leases.
