@@ -1,3 +1,4 @@
+#include "IndependentBoxRender.hpp"
 #include <Windows.h>
 #include "ControllerModelsD3D11.hpp"
 #include <cstdio>
@@ -35,5 +36,6 @@ int main(){D3D_FEATURE_LEVEL level{};Check(SUCCEEDED(D3D11CreateDevice(nullptr,D
  auto setupLeft=ReadCentroid(swaps[0]->texture.Get());setupViewShift=.05f;store.state.setupTick=GetTickCount64();Check(renderer.EndFrame(&frame,End)==XR_SUCCESS&&endCalls==5&&acquires==6,"late tracking transform updates without resubmitting box poses");Check(ReadCentroid(swaps[0]->texture.Get())<setupLeft-10,"head motion changes view while box tracking pose stays fixed");
  store.state.setupTick=GetTickCount64()-1000;store.state.tick=GetTickCount64();expectLayer=false;Check(renderer.EndFrame(&frame,End)==XR_SUCCESS&&endCalls==6&&acquires==6,"fresh controller input does not revive expired setup boxes");
  store.state.poses[64].visible=false;auto highlight=std::make_shared<ControllerMeshData>(*mesh);highlight->texture={20,240,20,64};highlight->revision=2;store.state.meshes[InteractionHoverMeshStart]=highlight;store.state.poses[InteractionHoverMeshStart]=store.state.poses[64];store.state.poses[InteractionHoverMeshStart].visible=true;store.state.setupTick=GetTickCount64();expectLayer=true;Check(renderer.EndFrame(&frame,End)==XR_SUCCESS&&endCalls==7&&acquires==8,"translucent hover draws in both eyes");Check(ReadCentroid(swaps[0]->texture.Get())>ReadCentroid(swaps[1]->texture.Get())+10,"hover has correct stereo parallax");ComPtr<ID3D11BlendState> restoredBlend;float blendFactors[4]{};UINT blendMask=0;context->OMGetBlendState(&restoredBlend,blendFactors,&blendMask);Check(!restoredBlend,"hover blend state does not leak into game context");
+ auto smooth=std::make_shared<ControllerMeshData>(InteractionHoverFillMesh({20,240,20},1.f));smooth->revision=3;store.state.meshes[InteractionHoverMeshStart]=smooth;store.state.poses[InteractionHoverMeshStart].matrix={.1f,0,0,0,0,.1f,0,0,0,0,.1f,-.5f};store.state.setupTick=GetTickCount64();Check(renderer.EndFrame(&frame,End)==XR_SUCCESS&&endCalls==8&&acquires==10,"half-float density volume uploads and draws in both eyes");Check(ReadCentroid(swaps[0]->texture.Get())>ReadCentroid(swaps[1]->texture.Get())+10,"smooth volume retains correct stereo parallax");
  std::puts("controller mesh stereo, texture, pass-through, frame forwarding and graphics restoration passed");
 }

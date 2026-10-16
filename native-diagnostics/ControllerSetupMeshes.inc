@@ -13,13 +13,15 @@ ControllerMeshData SetupLabelMesh(unsigned box){
  auto pixels=static_cast<unsigned char*>(bits);for(size_t i=0;i<mesh.texture.size();i+=4){mesh.texture[i]=mesh.texture[i+1]=mesh.texture[i+2]=255;mesh.texture[i+3]=std::max({pixels[i],pixels[i+1],pixels[i+2]});}
  if(oldFont)SelectObject(dc,oldFont);if(font)DeleteObject(font);SelectObject(dc,old);DeleteObject(bitmap);DeleteDC(dc);return mesh;
 }
+unsigned hoverMeshStyle=~0u;
+bool RefreshHoverMeshes(SetupMeshUpload upload){auto& prefs=highlightPreferences.settings;unsigned style=prefs.color+prefs.opacity*8;if(style==hoverMeshStyle)return true;for(unsigned side=0;side<2;++side){auto mesh=InteractionHoverFillMesh(prefs.Color(),prefs.Strength());if(upload(InteractionHoverMeshStart+side*2,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,mesh.format,1))return false;}hoverMeshStyle=style;return true;}
 bool EnsureSetupMeshes(){
- if(setupMeshesReady)return true;auto module=GetModuleHandleW(L"spf_controller_xr_layer.dll");auto upload=module?reinterpret_cast<SetupMeshUpload>(GetProcAddress(module,"SPF_SetControllerRenderModel")):nullptr;setupPoseSubmit=module?reinterpret_cast<SetupPoseSubmit>(GetProcAddress(module,"SPF_SetInteractionBoxTrackingPoses")):nullptr;if(!upload||!setupPoseSubmit)return false;
+auto module=GetModuleHandleW(L"spf_controller_xr_layer.dll");auto upload=module?reinterpret_cast<SetupMeshUpload>(GetProcAddress(module,"SPF_SetControllerRenderModel")):nullptr;setupPoseSubmit=module?reinterpret_cast<SetupPoseSubmit>(GetProcAddress(module,"SPF_SetInteractionBoxTrackingPoses")):nullptr;if(!upload||!setupPoseSubmit)return false;if(setupMeshesReady)return RefreshHoverMeshes(upload);
  const std::array<std::array<uint8_t,3>,18> colors{{{255,90,70},{90,255,120},{80,210,255},{80,210,255},{80,210,255},{255,220,90},{220,130,255},{220,130,255},{255,180,70},{255,255,180},{150,220,255},{255,160,220},{90,150,255},{90,150,255},{140,255,210},{140,255,210},{90,150,255},{90,150,255}}};
  for(unsigned i=0;i<InteractionBoxCount;++i){auto wire=SetupBoxWireMesh();for(unsigned c=0;c<3;++c)wire.texture[c]=colors[i][c];auto label=SetupLabelMesh(i);if(label.texture.empty())return false;
   for(unsigned part=0;part<2;++part){const auto& mesh=part?label:wire;if(upload(InteractionBoxMeshStart+i+part*InteractionBoxCount,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,0,1))return false;}
  }
- for(unsigned side=0;side<2;++side){auto mesh=InteractionHoverFillMesh();if(upload(InteractionHoverMeshStart+side*2,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,0,1))return false;}
+ if(!RefreshHoverMeshes(upload))return false;
  setupMeshesReady=true;return true;
 }
 void SubmitSetupBoxes(bool active,bool hover=false){

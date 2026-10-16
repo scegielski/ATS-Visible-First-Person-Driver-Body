@@ -1,3 +1,4 @@
+#include "HighlightPreferences.hpp"
 #include "DriverSettings.hpp"
 #include "VehicleBoxProfiles.hpp"
 #include "VehicleSteeringPose.hpp"
@@ -61,5 +62,6 @@ int main(){
  Put(gripFile,"broken edit");REQUIRE(!liveGrips.Poll(directory,other)&&liveGrips.settings.offset[0][2]==.03f);REQUIRE(liveGrips.Poll(directory,ford)&&liveGrips.settings.offset[0][2]==0);std::filesystem::remove(gripFile);std::filesystem::remove(VehiclePosePath(directory,ford));
  REQUIRE(ReadDriverSettingsFile(mustang,text)&&text==original);
  std::filesystem::remove(vehicleFile);std::filesystem::remove(VehicleBoxPath(directory,other));std::filesystem::remove(directory/"vehicles");std::filesystem::remove(mustang);
+ LiveHighlightPreferences highlights;REQUIRE(highlights.Poll(directory)&&highlights.settings.enabled&&highlights.settings.color==0&&highlights.settings.opacity==1);REQUIRE(highlights.Select(0,directory)&&!highlights.settings.enabled);REQUIRE(highlights.Select(2,directory)&&highlights.settings.color==1);REQUIRE(highlights.Select(4,directory)&&highlights.settings.opacity==2);LiveHighlightPreferences loadedHighlights;REQUIRE(loadedHighlights.Poll(directory)&&loadedHighlights.settings==highlights.settings);auto validHighlights=loadedHighlights.settings;Put(directory/"highlights.ini","[highlights]\nenabled 1\ncolor 99\nopacity 0\n");REQUIRE(!loadedHighlights.Poll(directory)&&loadedHighlights.settings==validHighlights&&!loadedHighlights.Select(2,directory));HighlightPreferences cycle;for(unsigned i=0;i<5;++i)REQUIRE(cycle.Select(2));REQUIRE(cycle.color==0);for(unsigned i=0;i<4;++i)REQUIRE(cycle.Select(4));REQUIRE(cycle.opacity==1&&!cycle.Select(3));std::filesystem::remove(directory/"highlights.ini");
  std::filesystem::remove(legacy);std::filesystem::remove(bundle);REQUIRE(std::filesystem::remove(directory));std::cout<<"Unified driver settings regression passed\n";
 }

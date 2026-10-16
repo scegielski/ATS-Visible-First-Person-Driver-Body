@@ -1002,3 +1002,7 @@ Added wrist-style LEFT FOOT and RIGHT FOOT setup boxes, with per-vehicle resting
 ### Soft pointer-target highlights
 
 Outside Setup, the nearest box hit by either cabin laser receives a soft cyan volume highlight. Three crossed stacks sample a feathered density field with fading boundaries; no outline or cube faces are shown. Duplicate targets draw once, unavailable joints and stale tracking hide highlights, and Setup and menus suppress them. The effect highlights the box volume rather than clipping to vehicle geometry. The renderer uses transparency without depth writes and preserves the game's graphics state. All seven native suites pass, including stereo hover output and density falloff. The user confirmed the installed soft highlight looks good in VR.
+
+### Setup highlight controls and smoother volumes
+
+Setup Help now starts hidden, Setup radial menus use a distinct purple palette, and the right Setup radial offers highlight visibility at the top, color cycling at the right, and opacity cycling at the bottom. Preferences save globally across vehicles and restarts in config/highlights.ini. Highlight volumes now use 33 layers per axis and 16-bit floating-point density textures; the renderer prefers floating-point swapchains when supported and retains the earlier fallback. All seven native suites pass, including preference persistence, malformed-edit recovery, radial visibility, density falloff, and stereo floating-point texture rendering. The user validated the installed changes in VR and requested commit and push.
