@@ -122,3 +122,7 @@ While targeting INFOTAINMENT, nudge either controller thumbstick up to cycle the
 In setup mode, hold grip while either touching a box or aiming the controller laser at it within two metres. Remote grabs retain the box offset instead of snapping it to the controller; move or rotate the controller, then release grip to save. Existing two-controller resizing remains available.
 
 The user confirmed laser-based setup grabbing works in VR after installation. All seven native regression suites pass, including remote-grab selection, retained offset, continued movement after leaving the ray target, and tracking-loss release.
+
+Finger editing and box setup are mutually exclusive. Enabling either turns the other off. Entering finger editing releases an active box grab so its placement can be saved; exiting a mode does not re-enable the other one.
+
+The user confirmed mutually exclusive Finger Editing and Setup mode switching in VR. All seven native suites pass, including mode transitions, active-grab release, and held-key suppression.
