@@ -31,4 +31,6 @@ Native hooks support the fingerprinted ATS executable only. A game update may re
 
 ## Project scope
 
+See the [future-work plan](docs/FUTURE_WORK.md) for controller Driving Mode, safe input transitions, vehicle profiles selected by game identity, essential controls, and a headset-only acceptance walkthrough.
+
 Future work includes additional vehicle calibrations and investigating parked-vehicle exit and walking. Those features are not implemented. Historical experimental DLLs remain under `releases/`; asset-building scripts and checkpoint JSON reports are grouped under `development/scripts/` and `development/evidence/`. These are development resources; use the current installer for installation.
