@@ -8,3 +8,5 @@ void PollIntegratedAdjustments();
 void ResetIntegratedAdjustments();
 void CloseIntegratedAdjustments();
 extern "C" int __cdecl SetIntegratedAdjustmentInput(int,float,float);
+
+void SetIntegratedDisplayObserver(void(*observer)(uintptr_t,int));

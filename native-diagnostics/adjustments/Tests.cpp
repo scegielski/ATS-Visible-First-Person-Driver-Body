@@ -12,6 +12,7 @@ int cueCalls=0; std::wstring lastCue; DWORD cueFlags=0;
 int clickCalls=0; int lastClickSlot=-1;
 void StubClick(int slot) { ++clickCalls; lastClickSlot=slot; }
 BOOL WINAPI StubCue(LPCWSTR path,HMODULE,DWORD flags) { ++cueCalls; lastCue=path?path:L""; cueFlags=flags; return TRUE; }
+int displayObserved=0,displayBefore=-1,displayCallCount=0;uintptr_t displayContext=0;
 int calls=0; void* passed=nullptr; float passedDt=0; uintptr_t scoped=0;unsigned scopedSlot=0;unsigned char scopedMask=0;
 void __fastcall StubUpdate(void* context,float dt) { ++calls; passed=context; passedDt=dt; scoped=gOverrideContext;scopedSlot=gOverrideSlot;scopedMask=gInputMask; }
 template<class T,size_t N> void Put(std::array<unsigned char,N>& bytes,size_t off,T value) { std::memcpy(bytes.data()+off,&value,sizeof(value)); }
@@ -197,6 +198,7 @@ int main(int argc,char** argv) {
  int audioSlot=-1;unsigned char audioMask=0;CHECK(controllerMirrorLease.Get(GetTickCount64(),audioSlot,audioMask) && audioSlot==2 && ServoMovement(audioSlot,audioMask,true,true) && ServoChannelVolume(audioSlot)==0x40000000);
  controllerMirrorLease.Put(0,0,0,GetTickCount64());CHECK(controllerMirrorLease.Get(GetTickCount64(),audioSlot,audioMask) && !ServoMovement(audioSlot,audioMask,true,true));
  controllerMirrorLease.Put(-1,0,0,GetTickCount64());DetourUpdate(context.data(),.016f);CHECK(calls==7 && scoped==0);
+ std::array<unsigned char,0x15f0> displayOwner{};Put(displayOwner,0x15d4,int{3});SetIntegratedDisplayObserver([](uintptr_t owner,int before){++displayObserved;displayBefore=before;displayContext=owner;displayCallCount=calls;});observing=false;movementAllowed=false;DetourUpdate(displayOwner.data(),.016f);CHECK(displayObserved==1&&displayBefore==3&&displayContext==reinterpret_cast<uintptr_t>(displayOwner.data())&&displayCallCount==8&&calls==8);SetIntegratedDisplayObserver(nullptr);DetourUpdate(displayOwner.data(),.016f);CHECK(displayObserved==1&&calls==9);
  int wheelSlot=-1;unsigned char wheelMask=0;controllerMirrorLease.Put(9,.8f,-.9f,100);CHECK(controllerMirrorLease.Get(101,wheelSlot,wheelMask) && wheelSlot==9 && wheelMask==10 && ServoMovement(wheelSlot,wheelMask,true,true));
  int leaseSlot=-1;unsigned char leaseMask=0;controllerMirrorLease.Put(4,-.8f,.9f,100);CHECK(controllerMirrorLease.Get(150,leaseSlot,leaseMask) && leaseSlot==4 && leaseMask==5);CHECK(!controllerMirrorLease.Get(251,leaseSlot,leaseMask));controllerMirrorLease.Put(-1,0,0,100);CHECK(!controllerMirrorLease.Get(101,leaseSlot,leaseMask));
  ExitCenter(); CHECK(selectedSlot.load()==-1); CHECK(!HooksReady()); ToggleCenter(); CHECK(selectedSlot.load()==-1);

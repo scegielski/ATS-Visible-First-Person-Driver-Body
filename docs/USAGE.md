@@ -110,3 +110,11 @@ Controller-to-body mapping uses the active vehicle's reported cabin and head ori
 ### Bronco VR validation
 
 The user confirmed accessory-free body visibility, normal shutdown, continuous hand updates, controller-to-hand tracking, sharp and stable independent boxes, and the corrected hand-box rotation and readable labels. Bronco resting hand offsets were tuned live to two centimetres up and five centimetres back and are saved in its vehicle pose profile. The final hand-box transform correction passed all seven native test suites and installer lifecycle tests.
+
+### Dashboard and infotainment boxes
+
+DASHBOARD and INFOTAINMENT each cycle the corresponding native game display mode once per trigger press while touched by an engaged hand or targeted by a controller laser. No keyboard binding is required. Place and resize them in setup mode; their placements save in the active vehicle box profile. Existing profiles keep their saved placements and gain two new ten-centimetre boxes in a fifth grid column: Dashboard to the right of Center Mirror and Infotainment to the right of Right Window.
+
+The controller infotainment cycle inserts the native Parking Cameras action when the ordinary mode sequence wraps. Selecting the infotainment box again while parking cameras are active requests the native camera toggle instead of advancing a camera subview. Native camera availability and driving restrictions remain controlled by ATS. This extension requires the verified native infotainment-state hook.
+
+While targeting INFOTAINMENT, nudge either controller thumbstick up to cycle the native navigation zoom mode. Return the stick to center between changes; setup mode and an open radial menu suppress this shortcut.

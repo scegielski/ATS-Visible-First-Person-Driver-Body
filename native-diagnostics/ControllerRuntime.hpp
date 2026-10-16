@@ -43,3 +43,5 @@ void PlayVRRecenterFeedback();
 void SetControllerVehicleIdentity(const char* brand,const char* model);
 
 VehicleSteeringPose SnapshotVehicleSteeringPose();
+
+bool ConsumeControllerDisplayRequest(unsigned action);

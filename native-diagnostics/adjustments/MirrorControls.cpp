@@ -54,6 +54,7 @@ constexpr char kExecutableHash[] = "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8
 using UpdateFn = void(__fastcall*)(void*, float);
 using SetRotationFn = void(__fastcall*)(void*, const float*);
 UpdateFn originalUpdate = nullptr;
+std::atomic<void(*)(uintptr_t,int)> displayObserver{nullptr};
 SetRotationFn originalSetRotation = nullptr;
 const SPF_Core_API* core = nullptr;
 const SPF_Load_API* load = nullptr;
@@ -317,7 +318,9 @@ void DetourUpdate(void* context,float dt) {
  if (enabled && std::isfinite(dt) && dt>=0 && dt<=0.1f)
   { gOverrideSlot=static_cast<unsigned int>(slot); gInputMask=directions; gOverrideContext=reinterpret_cast<uintptr_t>(context); }
  else gOverrideContext=0;
+ int beforeDisplay=-1;auto observer=displayObserver.load();if(observer)SafeRead(reinterpret_cast<uintptr_t>(context)+0x15d4,&beforeDisplay,sizeof(beforeDisplay));
  originalUpdate(context,dt); // Exactly one call; native getter, setter and camera refresh.
+ if(observer)observer(reinterpret_cast<uintptr_t>(context),beforeDisplay);
  gOverrideContext=0; gInputMask=0;
  if(slot>=6 && movementAllowed.load()){if(slot==9){MoveNativeSeat(dt,directions,7);MoveNativeSeat(dt,directions,8);}else MoveNativeSeat(dt,directions,slot);}
 }
@@ -556,3 +559,5 @@ void DescribeIntegratedAdjustments(SPF_Manifest_Builder_Handle* h,const SPF_Mani
     api->Meta_AddKeybind(h,"Select","right","Toggle right mirror","Tap on/off, or switch from another mirror.");
     api->Meta_AddKeybind(h,"Select","center","Toggle center mirror","Tap on/off, or switch from another mirror.");
 }
+
+void SetIntegratedDisplayObserver(void(*observer)(uintptr_t,int)){displayObserver.store(observer);}

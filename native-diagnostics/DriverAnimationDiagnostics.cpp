@@ -83,7 +83,8 @@ void AdvanceObserveStub();
 namespace {
 using NativeDialogActionFn=bool(__fastcall*)(uintptr_t,uintptr_t,unsigned,uintptr_t);NativeDialogActionFn originalRadialDialogAction=nullptr;
 bool __fastcall NativeRadialDialogAction(uintptr_t object,uintptr_t source,unsigned event,uintptr_t payload);
-SPF_VirtualDevice_Handle* activateDevice=nullptr;std::atomic<bool> activateDeviceReady{false};MenuKeyPulse activatePulse;
+SPF_VirtualDevice_Handle* activateDevice=nullptr;std::atomic<bool> activateDeviceReady{false};MenuKeyPulse activatePulse;MenuKeyPulse displayPulses[4];
+std::atomic<uint64_t> infotainmentCyclePending{0},parkingCameraRequest{0},infotainmentStateTick{0};std::atomic<bool> infotainmentCameraActive{false};void ObserveInfotainmentUpdate(uintptr_t,int);
 std::atomic<uint64_t> radialActionTicks[7]{};bool radialActionsReady=false;
 thread_local bool controllerIgnitionCycle=false;
 constexpr char kName[]="SPF_VisibleFirstPersonDriverBody";
@@ -352,8 +353,8 @@ void Manifest(SPF_Manifest_Builder_Handle* h,const SPF_Manifest_Builder_API* api
 void OnLoad(const SPF_Load_API* api) {
  LoadIntegratedAdjustments(api);
  load=api; if(api && api->logger) logger=api->logger->Log_GetContext(kName);
- activateDevice=nullptr;activateDeviceReady.store(false);activatePulse={};
- if(api&&api->input){auto input=api->input;if(input->Virt_CreateDevice&&input->Virt_AddButton&&input->Virt_Register&&input->Virt_PressButton&&input->Virt_ReleaseButton){activateDevice=input->Virt_CreateDevice(kName,"controller_actions","VR Controller Actions",SPF_INPUT_DEVICE_TYPE_SEMANTICAL);if(activateDevice){input->Virt_AddButton(activateDevice,"activate","Activate");activateDeviceReady.store(input->Virt_Register(activateDevice));}}}
+ activateDevice=nullptr;activateDeviceReady.store(false);activatePulse={};displayPulses[0]={};displayPulses[1]={};
+ if(api&&api->input){auto input=api->input;if(input->Virt_CreateDevice&&input->Virt_AddButton&&input->Virt_Register&&input->Virt_PressButton&&input->Virt_ReleaseButton){activateDevice=input->Virt_CreateDevice(kName,"controller_actions","VR Controller Actions",SPF_INPUT_DEVICE_TYPE_SEMANTICAL);if(activateDevice){input->Virt_AddButton(activateDevice,"activate","Activate");input->Virt_AddButton(activateDevice,"display","Dashboard display mode");input->Virt_AddButton(activateDevice,"infotainment","Infotainment display mode");input->Virt_AddButton(activateDevice,"parking_cams","Parking cameras");input->Virt_AddButton(activateDevice,"dashmapzoom","Navigation zoom mode");activateDeviceReady.store(input->Virt_Register(activateDevice));}}}
  Log(SPF_LOG_INFO,activateDeviceReady.load()?"RADIAL_ACTIVATE semantic input device registered.":"RADIAL_ACTIVATE semantic device unavailable; restart ATS with plugin enabled.");
 }
 extern "C" {void* gMapWidgetOriginal=nullptr;void MapWidgetObserveStub();}
@@ -426,6 +427,7 @@ bool __fastcall ControllerWindowControl(uintptr_t actor,uintptr_t state,float dt
  return ForwardControllerWindow(originalWindowControl,actor,state,dt,open,close,electricity,player,allowed,direction);
 }
 void Activated(const SPF_Core_API* api) {
+ SetIntegratedDisplayObserver(ObserveInfotainmentUpdate);
  ActivateIntegratedAdjustments(api);
  core=api;
  if(!core || !core->hooks) {Log(SPF_LOG_ERROR,"DIAG: hooks API unavailable.");return;}
@@ -686,7 +688,18 @@ void UpdateActivateSemanticInput(){
  if(!load||!load->input||!activateDevice||!activateDeviceReady.load())return;auto now=GetTickCount64();auto requested=radialActionTicks[6].exchange(0);DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);bool active=enabled.load()&&foreground==GetCurrentProcessId();int edge=activatePulse.Step(active,requested&&now>=requested&&now-requested<=500,now);
  if(edge>0){load->input->Virt_PressButton(activateDevice,"activate");Log(SPF_LOG_INFO,"RADIAL_ACTIVATE semantic activate pressed.");}else if(edge<0){load->input->Virt_ReleaseButton(activateDevice,"activate");Log(SPF_LOG_INFO,"RADIAL_ACTIVATE semantic activate released.");}
 }
+void ObserveInfotainmentUpdate(uintptr_t owner,int before){
+ int after=-1;SafeRead(owner+0x15d4,&after,sizeof(after));float timer=0;int left=-1,right=-1;bool valid=SafeRead(owner+0x15e4,&timer,sizeof(timer))&&SafeRead(owner+0x15d8,&left,sizeof(left))&&SafeRead(owner+0x15dc,&right,sizeof(right));auto now=GetTickCount64();infotainmentCameraActive.store(valid&&timer<0&&(left>=0||right>=0));infotainmentStateTick.store(now);
+ auto pending=infotainmentCyclePending.load();if(pending&&now>=pending){if(now-pending>500)infotainmentCyclePending.store(0);else if(before!=after){char text[128];std::snprintf(text,sizeof(text),"INFOTAINMENT_CYCLE mode before=%d after=%d camera=%d",before,after,infotainmentCameraActive.load()?1:0);Log(SPF_LOG_INFO,text);infotainmentCyclePending.store(0);if(before>=0&&after>=0&&after<before){parkingCameraRequest.store(now);Log(SPF_LOG_INFO,"INFOTAINMENT_CYCLE native mode wrapped; parking camera queued as extra step.");}}}
+}
+void UpdateDisplaySemanticInput(){
+ if(!load||!load->input||!activateDevice||!activateDeviceReady.load())return;DWORD foreground=0;GetWindowThreadProcessId(GetForegroundWindow(),&foreground);bool active=enabled.load()&&foreground==GetCurrentProcessId();auto now=GetTickCount64();bool requests[4]{ConsumeControllerDisplayRequest(0),false,false,ConsumeControllerDisplayRequest(2)};bool infotainment=ConsumeControllerDisplayRequest(1);auto parking=parkingCameraRequest.exchange(0);requests[2]=parking&&now>=parking&&now-parking<=500;
+ if(infotainment){auto state=infotainmentStateTick.load();if(state&&now>=state&&now-state<250&&infotainmentCameraActive.load())requests[2]=true;else{requests[1]=true;infotainmentCyclePending.store(now);}}
+ const char* names[]{"display","infotainment","parking_cams","dashmapzoom"};for(unsigned i=0;i<4;++i){int edge=displayPulses[i].Step(active,requests[i],now);if(edge>0){load->input->Virt_PressButton(activateDevice,names[i]);Log(SPF_LOG_INFO,i==0?"DISPLAY_BOX dashboard pressed.":i==1?"DISPLAY_BOX infotainment pressed.":i==2?"DISPLAY_BOX parking cameras pressed.":"DISPLAY_BOX navigation zoom pressed.");}else if(edge<0)load->input->Virt_ReleaseButton(activateDevice,names[i]);}
+}
+
 void Update() {
+ UpdateDisplaySemanticInput();
  UpdateActivateSemanticInput();
  PollIntegratedAdjustments();
  if(!enabled.load()) {
@@ -801,7 +814,7 @@ void Update() {
   Log(SPF_LOG_INFO,text);
  }
 }
-void Unload() { if(activateDevice&&activateDeviceReady.load()&&load&&load->input&&activatePulse.down)load->input->Virt_ReleaseButton(activateDevice,"activate");activatePulse={};activateDeviceReady.store(false);activateDevice=nullptr;radialActionTicks[6].store(0);CloseIntegratedAdjustments(); earlyMenuStopped.store(true); nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
+void Unload() { SetIntegratedDisplayObserver(nullptr); if(activateDevice&&activateDeviceReady.load()&&load&&load->input)for(unsigned i=0;i<4;++i){if(displayPulses[i].down)load->input->Virt_ReleaseButton(activateDevice,i==0?"display":i==1?"infotainment":i==2?"parking_cams":"dashmapzoom");displayPulses[i]={};} if(activateDevice&&activateDeviceReady.load()&&load&&load->input&&activatePulse.down)load->input->Virt_ReleaseButton(activateDevice,"activate");activatePulse={};activateDeviceReady.store(false);activateDevice=nullptr;radialActionTicks[6].store(0);CloseIntegratedAdjustments(); earlyMenuStopped.store(true); nativeCursorEmit=nullptr; enabled.store(false); PollControllerMenuMouse(false); Reset(); CloseControllers(); }
 }
 // Blend only requested private arm rotations before the original hierarchy assembly.
 // The current steering pose is freshly computed by the engine on every call.
