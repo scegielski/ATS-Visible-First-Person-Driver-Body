@@ -1,6 +1,6 @@
 {
   "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.2.exe",
-  "sha256": "2a35d3c7fca2c014f5e43f70e8b212cc77c055af679d0abb32cdc17b767cfafb",
+  "sha256": "399835d44e41260e8b6560223ea283806fe03b9313b2bc06cc595b3faffc7a26",
   "payload": {
     "version": "0.39.2",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
@@ -9,7 +9,7 @@
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "182052a655ae399c6e14c4566bfe7dd1a410b75ef6b9625be5096681f1c999cf",
+        "sha256": "7ce57fab028b3c09392d07e5a8181b5438dd720752c0deb24eb1f958b4790241",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -49,7 +49,7 @@
         "source": "plugin/config/mustang_boxes.ini",
         "destination": "plugin",
         "target": "config/mustang_boxes.ini",
-        "sha256": "7ae657ee6fde61a02d68919a80a8f4650000162ce5cca92e6d4c79ee3a2d8803",
+        "sha256": "4566103cc9d2fa8408b769c6cc4f9200effd511924006982b4d515b1018a0895",
         "mutable": true,
         "onlyIfMissing": false
       },
@@ -233,7 +233,7 @@
         "source": "mod/ATS-VisibleDriverBody-Mustang-0.1.0.scs",
         "destination": "mod",
         "target": "ATS-VisibleDriverBody-Mustang-0.1.0.scs",
-        "sha256": "9d7132a49ee8be723f3f697658b636accf72849dadca261e7633aac1cdeea868",
+        "sha256": "86f7848d236e4cc9a8efd80f7e6850e8d3ec34f7897211e8bc09bb5bff4906ab",
         "mutable": false,
         "onlyIfMissing": false
       },

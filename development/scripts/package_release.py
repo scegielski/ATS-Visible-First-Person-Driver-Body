@@ -3,6 +3,7 @@
 Uses the validated marker/animation archive as input; does not rebuild geometry.
 """
 from pathlib import Path
+import argparse
 import hashlib
 import json
 import re
@@ -42,7 +43,9 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 def main():
-    with ZipFile(SOURCE) as source:
+    parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,default=SOURCE);args=parser.parse_args()
+    if args.source.resolve()==TARGET.resolve():raise ValueError('Source and output archives must differ')
+    with ZipFile(args.source) as source:
         assert KEEP <= set(source.namelist())
         content = {name: source.read(name) for name in KEEP}
         removed = sorted(set(source.namelist()) - KEEP)

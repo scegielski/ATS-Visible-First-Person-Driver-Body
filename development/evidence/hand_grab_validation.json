@@ -1,0 +1,6 @@
+{
+  "in_game_validation": "User confirmed works great on 2026-10-15",
+  "feature": "Wrist-attached hand grab boxes",
+  "installer_tests": "Lifecycle tests passed",
+  "native_tests": "All six suites passed"
+}

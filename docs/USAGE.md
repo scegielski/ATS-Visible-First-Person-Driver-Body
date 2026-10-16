@@ -4,7 +4,9 @@ See the [README](../README.md) for installation and supported scope.
 
 ## Calibration and hand tracking
 
-Sit normally and use ATS's assigned head-reset control to establish neutral head and torso tracking. Hold each controller at that hand's wheel grip, then click its thumbstick to calibrate and enable hand IK. Later clicks toggle that hand; holding the click recalibrates. Each hand operates independently. Engage/disengage produces a tone and vibration.
+Sit normally and use ATS's assigned head-reset control to establish neutral head and torso tracking. Point the left controller at the left hand, or the right controller at the right hand, and press trigger once to engage it. Touching the corresponding grab box also works. Calibration captures that controller's current pose and the hand's current position; subsequent movement is relative to that grab.
+
+Double-click that controller's trigger to release the engaged hand without targeting a box. The activation click is excluded from the release gesture. Thumbstick clicks no longer engage, release or recalibrate hands. Each hand operates independently; engagement and release retain their sound and vibration feedback.
 
 Controller models and white laser pointers appear in the cabin while that hand's IK is disabled. Enabled hands use contact targeting. Targets outside arm reach can remain beyond the wrist even though the controller continues moving.
 
@@ -45,7 +47,7 @@ Outside setup, touch a box with an enabled hand or target it with a disabled han
 
 ## F9 setup editor
 
-Press F9 to show the labeled boxes and suspend their actions. Grip near a box to move and rotate it. Grab with both hands to resize along the local axis closest to the hand separation. Release and re-grab along another direction to resize a different dimension. Release to save; press F9 to return to normal play.
+Press F9 to show the labeled boxes and suspend their actions. Grip near a box to move and rotate it. Grab with both hands to resize along the local axis closest to the hand separation. Release and re-grab along another direction to resize a different dimension. The L HAND and R HAND grab boxes follow the wrist bones. Edit their placement and nonuniform size like the other boxes; their saved positions and rotations are local to the wrists. Release to save; press F9 to return to normal play.
 
 ## Configuration files
 

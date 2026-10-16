@@ -1,14 +1,14 @@
 """Build solid controller axes as a separate private animated accessory."""
 from pathlib import Path
-import struct,zipfile,json,re
+import struct,zipfile,json,re,argparse
 root=Path(__file__).resolve().parents[2]
-source=Path('C:/Users/scegi/OneDrive/Documents/American Truck Simulator/mod/ATS-VisibleDriverBody-Mustang-0.1.0.scs')
-destination=root/'releases/ATS-VisibleDriverBody-Mustang-0.18.0-radio-interaction-box-test.scs'
+parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,default=root/'releases/ATS-VisibleDriverBody-Mustang.scs');parser.add_argument('--output',type=Path,default=root/'work/hand-grab-marker-assets.scs');args=parser.parse_args();source=args.source;destination=args.output
+if source.resolve()==destination.resolve():raise ValueError('Source and output archives must differ')
 chars='\x000123456789abcdefghijklmnopqrstuvwxyz_'
 def token(s):return sum(chars.index(c)*38**i for i,c in enumerate(s))
 with zipfile.ZipFile(source) as z:
  mesh=bytearray(z.read('model/spf_stock_driver/driver.pmg'));descriptor=z.read('model/spf_stock_driver/driver.pmd')
- for bone in (7,28,44,45,48,49,50,51,52,53,54,55,56,57,58,59,60,46):struct.pack_into('<16f',mesh,112+bone*200+72,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)
+ for bone in (7,8,28,29,44,45,48,49,50,51,52,53,54,55,56,57,58,59,60,46):struct.pack_into('<16f',mesh,112+bone*200+72,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)
  for axis in range(3):
   o=12384+axis*100;ic,vc=struct.unpack_from('<2I',mesh,o);vo=struct.unpack_from('<I',mesh,o+64)[0];io=struct.unpack_from('<I',mesh,o+96)[0];assert vc>=16 and ic>=72
   mesh[io:io+ic*2]=bytes(ic*2)
@@ -22,7 +22,7 @@ with zipfile.ZipFile(source) as z:
   struct.pack_into('<72H',mesh,io,*indices)
  # Visible ignition and right-hand collision wireframes use private marker bones.
  usedVertices={};usedIndices={}
- for piece,bone,half in [(0,44,(.04,.04,.04)),(1,49,(.06,.05,.05)),(2,48,(.04,.035,.055)),(2,45,(.04,.035,.055)),(0,50,(.07,.07,.05)),(1,51,(.07,.05,.05)),(2,52,(.07,.07,.05)),(1,55,(.06,.06,.06)),(0,56,(.06,.06,.06)),(2,57,(.06,.06,.06)),(1,58,(.06,.06,.06)),(0,59,(.04,.04,.04)),(1,60,(.04,.04,.04)),(1,46,(.07,.04,.04))]:
+ for piece,bone,half in [(0,44,(.04,.04,.04)),(1,49,(.06,.05,.05)),(2,48,(.04,.035,.055)),(2,45,(.04,.035,.055)),(0,50,(.07,.07,.05)),(1,51,(.07,.05,.05)),(2,52,(.07,.07,.05)),(1,55,(.06,.06,.06)),(0,56,(.06,.06,.06)),(2,57,(.06,.06,.06)),(1,58,(.06,.06,.06)),(0,59,(.04,.04,.04)),(1,60,(.04,.04,.04)),(1,46,(.07,.04,.04)),(2,8,(.04,.035,.055)),(0,29,(.04,.035,.055))]:
   o=12384+piece*100;ic,vc=struct.unpack_from('<2I',mesh,o);vo=struct.unpack_from('<I',mesh,o+64)[0];io=struct.unpack_from('<I',mesh,o+96)[0];vertices=[];faces=[];vertexStart=usedVertices.get(piece,16);indexStart=usedIndices.get(piece,72)
   for axis in range(3):
    others=[d for d in range(3) if d!=axis]
@@ -64,7 +64,7 @@ with zipfile.ZipFile(source) as z:
  'M':['10001','11011','10101','10101','10001','10001','10001'],
  ' ':['00000']*7,
  'T':['11111','00100','00100','00100','00100','00100','00100']}
- for piece,bone,word,halfY,halfZ in [(0,44,'IGNITION',.04,.04),(1,49,'HORN',.05,.05),(0,50,'LEFT',.07,.05),(1,51,'CENTER',.05,.05),(2,52,'RIGHT',.07,.05),(1,55,'SEAT',.06,.06),(0,56,'L WIN',.06,.06),(2,57,'R WIN',.06,.06),(1,58,'WHEEL',.06,.06),(0,59,'LIGHTS',.04,.04),(1,60,'WIPERS',.04,.04),(1,46,'RADIO',.04,.04)]:
+ for piece,bone,word,halfY,halfZ in [(0,44,'IGNITION',.04,.04),(1,49,'HORN',.05,.05),(0,50,'LEFT',.07,.05),(1,51,'CENTER',.05,.05),(2,52,'RIGHT',.07,.05),(1,55,'SEAT',.06,.06),(0,56,'L WIN',.06,.06),(2,57,'R WIN',.06,.06),(1,58,'WHEEL',.06,.06),(0,59,'LIGHTS',.04,.04),(1,60,'WIPERS',.04,.04),(1,46,'RADIO',.04,.04),(2,8,'L HAND',.035,.055),(0,29,'R HAND',.035,.055)]:
   o=12384+piece*100;ic,vc=struct.unpack_from('<2I',mesh,o);vo=struct.unpack_from('<I',mesh,o+64)[0];io=struct.unpack_from('<I',mesh,o+96)[0];vertexStart=usedVertices[piece];indexStart=usedIndices[piece];vertices=[];faces=[];pixel=.0035
   for letter,char in enumerate(word):
    glyph=font[char];taken=set()

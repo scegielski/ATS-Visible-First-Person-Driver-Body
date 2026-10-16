@@ -1,3 +1,4 @@
+#include "HandGrab.hpp"
 #include "MenuKeyPulse.hpp"
 #include "MenuDoublePress.hpp"
 #include "MenuButtonRoute.hpp"
@@ -177,6 +178,10 @@ int main() {
  Check(rightDrag.Step(true,true,0,0,0,0,.01f).button==-1 && leftDrag.down,"grip release preserves held left button");
  Check(leftDrag.Step(false,false,0,0,1,0,.01f).button==-1,"tracking loss releases captured left button");
  rightDrag.Step(true,true,0,0,0,0,.01f);rightDrag.Step(true,true,0,0,1,0,.01f);Check(rightDrag.Step(false,false,0,0,1,0,.01f).button==-1,"tracking loss releases captured right button");
+ HandGrabGesture grabGesture;Check(!grabGesture.Step(false,0,true,false,false,1),"grab waits for target and fresh press");Check(!grabGesture.Step(false,1,true,false,false,2),"off-target trigger cannot grab");Check(!grabGesture.Step(false,1,true,false,true,3),"entering hand target with held trigger cannot grab");grabGesture.Step(false,0,true,false,true,4);Check(grabGesture.Step(false,1,true,false,true,5)==1,"fresh targeted trigger engages hand");Check(!grabGesture.Step(true,1,true,false,true,6),"activation press does not release hand");grabGesture.Step(true,0,true,false,false,7);Check(!grabGesture.Step(true,1,true,false,false,10),"first release click starts double press");grabGesture.Step(true,0,true,false,false,20);Check(grabGesture.Step(true,1,true,false,false,100)==-1,"double trigger releases without targeting");grabGesture.Step(false,0,true,true,true,110);Check(!grabGesture.Step(false,1,true,true,true,120),"setup mode suppresses hand engagement");
+ InteractionBox localGrab{{.1f,.02f,-.03f},{.04f,.035f,.055f},{1,0,0,0},1.4f,{1,2,3}};auto wristTurn=DriverIK::Q{.70710678f,0,.70710678f,0};auto attachedGrab=AttachHandBox(localGrab,{1,2,3},wristTurn);auto detachedGrab=DetachHandBox(attachedGrab,{1,2,3},wristTurn);Check(DriverIK::Length(DriverIK::Sub(detachedGrab.center,localGrab.center))<1e-5f&&detachedGrab.stretch==localGrab.stretch&&detachedGrab.scale==localGrab.scale,"wrist-local grab box transforms round trip including nonuniform size");
+ InteractionBoxEditor handBoxEditor;handBoxEditor.boxes[12]=localGrab;HandBoxAttachments attachments;attachments.Load(handBoxEditor);attachments.valid=true;attachments.wrist[0]={1,2,3};attachments.rotation[0]=wristTurn;handBoxEditor.boxes[12]=attachedGrab;attachments.CaptureEdit(handBoxEditor);auto savedHands=SerializeInteractionBoxes(attachments.Saved(handBoxEditor));InteractionBoxEditor loadedHands;Check(ParseInteractionBoxes(savedHands,loadedHands)&&DriverIK::Length(DriverIK::Sub(loadedHands.boxes[12].center,localGrab.center))<1e-5f,"fourteen-box format saves local hand offsets");
+ std::string oldBoxes=SerializeInteractionBoxes(InteractionBoxEditor{});oldBoxes.replace(oldBoxes.find("BOXES 10"),8,"BOXES 9");auto oldEnd=oldBoxes.find("hand_left ");oldBoxes.erase(oldEnd);loadedHands.boxes[12].center={99,99,99};Check(ParseInteractionBoxes(oldBoxes,loadedHands)&&loadedHands.boxes[12].center[0]==.14f,"legacy twelve-box files initialize hand-local defaults instead of retaining world coordinates");
  MenuKeyPulse keyPulse;Check(keyPulse.Step(true,true,100)==1,"shortcut key emits key down");Check(keyPulse.Step(true,false,101)==0&&keyPulse.down,"key remains held across frames");Check(keyPulse.Step(true,false,179)==0&&keyPulse.down,"key does not release before 80ms");Check(keyPulse.Step(true,false,180)==-1&&!keyPulse.down,"key emits delayed key up");keyPulse.Step(true,true,200);Check(keyPulse.Step(false,false,201)==-1,"focus loss immediately releases shortcut key");
  MenuDoublePress doubleX,doubleY;doubleX.Step(true,false,90);doubleY.Step(true,false,90);
  Check(!doubleX.Step(true,true,100)&&!doubleX.Step(true,true,110),"single press and holding do not invoke menu key");
@@ -464,6 +469,8 @@ int main() {
   }
   for(bool right:{false,true}){
    auto candidate=pose;auto before=DriverIK::FK(pose,positions);unsigned wrist=right?28:7;ControllerHand hand;hand.enabled=hand.calibrate=true;
+   ControllerHand grabbedAtClick;grabbedAtClick.enabled=true;CalibrateControllerHand(grabbedAtClick,pose,positions,right,{1,2,3},{1,0,0,0},{1,0,0,0});Check(grabbedAtClick.origin==DriverIK::V{1,2,3}&&DriverIK::Length(DriverIK::Sub(grabbedAtClick.anchor,before.p[wrist]))<1e-6f&&!grabbedAtClick.calibrate,"grab captures exact controller position and current wrist before later updates");
+
    {
     auto rigidPose=pose;auto beforeRigid=DriverIK::FK(rigidPose,positions);unsigned wrist=right?28:7;ControllerHand rigidHand;rigidHand.enabled=true;rigidHand.calibrate=true;auto controller=DriverIK::Add(beforeRigid.p[wrist],DriverIK::V{0,.025f,0});
     Check(ApplyControllerHand(rigidPose,positions,right,rigidHand,controller,{1,0,0,0},{1,0,0,0},1,1.f/90.f,{0,0,0},.5f,true),"rigid controller calibration retains wheel grip");

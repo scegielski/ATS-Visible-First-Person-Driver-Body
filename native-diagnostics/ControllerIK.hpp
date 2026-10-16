@@ -43,6 +43,11 @@ inline bool ShareControllerWristTwist(DriverIK::Pose& pose,const DriverIK::Posit
  float amount=angle*share;Q turn{std::cos(amount/2),axis[0]*std::sin(amount/2),axis[1]*std::sin(amount/2),axis[2]*std::sin(amount/2)};
  pose[lower]=Product(pose[lower],turn);pose[wrist]=Product(Inverse(turn),pose[wrist]);hand.previousTwist=angle;hand.haveTwist=true;return true;
 }
+inline void CalibrateControllerHand(ControllerHand& hand,const DriverIK::Pose& pose,const DriverIK::Positions& positions,bool right,DriverIK::V point,DriverIK::Q rotation,DriverIK::Q headRotation){
+ using namespace DriverIK;auto world=FK(pose,positions);unsigned wrist=right?28:7;
+  float yaw=std::atan2(2*(headRotation[0]*headRotation[2]+headRotation[1]*headRotation[3]),1-2*(headRotation[2]*headRotation[2]+headRotation[1]*headRotation[1]));
+  hand.basis={std::cos(yaw/2),0,-std::sin(yaw/2),0};hand.origin=point;hand.originRotation=rotation;hand.anchor=world.p[wrist];hand.anchorRotation=world.q[wrist];hand.bodyOrientation=world.q[3];hand.haveBend=false;hand.neutralWrist=pose[wrist];hand.haveTwist=false;hand.calibrate=false;
+}
 inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& positions,bool right,ControllerHand& hand,DriverIK::V point,DriverIK::Q rotation,DriverIK::Q headRotation,float blend,float seconds=1.f/90.f,DriverIK::V bodyGuide={0,0,0},float twistShare=.5f,bool rigidControllerOffset=false){
  using namespace DriverIK;
  if(!hand.enabled || !std::isfinite(blend) || !std::isfinite(seconds) || seconds<0 || !std::isfinite(twistShare) || twistShare<0 || twistShare>1)return false;
@@ -50,10 +55,7 @@ inline bool ApplyControllerHand(DriverIK::Pose& pose,const DriverIK::Positions& 
  for(float x:point)if(!std::isfinite(x))return false;
  for(auto q:{rotation,headRotation}){float n=0;for(float x:q){if(!std::isfinite(x))return false;n+=x*x;}if(n<.98f || n>1.02f)return false;}
  unsigned upper=right?26:5,lower=upper+1,wrist=upper+2;auto world=FK(pose,positions);
- if(hand.calibrate){
-  float yaw=std::atan2(2*(headRotation[0]*headRotation[2]+headRotation[1]*headRotation[3]),1-2*(headRotation[2]*headRotation[2]+headRotation[1]*headRotation[1]));
-  hand.basis={std::cos(yaw/2),0,-std::sin(yaw/2),0};hand.origin=point;hand.originRotation=rotation;hand.anchor=world.p[wrist];hand.anchorRotation=world.q[wrist];hand.bodyOrientation=world.q[3];hand.haveBend=false;hand.neutralWrist=pose[wrist];hand.haveTwist=false;hand.calibrate=false;
- }
+ if(hand.calibrate)CalibrateControllerHand(hand,pose,positions,right,point,rotation,headRotation);
  V target=Add(hand.anchor,Rotate(hand.basis,Sub(point,hand.origin)));
  Q change=Product(Product(hand.basis,Product(rotation,Inverse(hand.originRotation))),Inverse(hand.basis));
  Q orientation=Product(change,hand.anchorRotation);
