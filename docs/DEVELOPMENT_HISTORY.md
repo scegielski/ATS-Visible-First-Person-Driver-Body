@@ -1041,3 +1041,6 @@ Foot engagement and double-trigger release now use the same queued sound and con
 ### Explicit Setup camera adjustment mode
 
 Added Adjust Camera in the left Setup radial's upper-left segment, with spoken enabled/disabled cues. The mode starts off and clears when Setup closes or the active vehicle changes. With it off, grip box movement and two-grip resizing work normally; with it on, both grips adjust the camera and box/limb edits are suspended. Camera positions still save per vehicle and support Undo/Redo. All seven native suites pass, and the user confirmed the installed toggle, audio, and restored resizing in VR.
+### Setup foot orientation and unrestricted offsets
+
+Trigger dragging a foot in Setup now adjusts both its resting position and orientation relative to the controller pose at the grab, without an initial snap. Rotations save per vehicle, preserve older position-only profiles, and participate in Undo/Redo. Removed the unrelated half-metre hand-offset cap from foot dragging and foot-file validation; anatomical IK reach remains enforced. All seven native suites pass, including rotation-only edits, release retention, native skeleton orientation, and saving foot offsets beyond the old cap. The user confirmed the installed behavior in VR.
