@@ -17,9 +17,9 @@ inline DriverIK::Q HandBoxUnitRotation(DriverIK::Q q){float n=0;for(float v:q)n+
 inline InteractionBox AttachHandBox(const InteractionBox& local,DriverIK::V wrist,DriverIK::Q rotation){rotation=HandBoxUnitRotation(rotation);auto box=local;box.center=DriverIK::Add(wrist,DriverIK::Rotate(rotation,local.center));box.rotation=HandBoxUnitRotation(DriverIK::Product(rotation,HandBoxUnitRotation(local.rotation)));return box;}
 inline InteractionBox DetachHandBox(const InteractionBox& world,DriverIK::V wrist,DriverIK::Q rotation){rotation=HandBoxUnitRotation(rotation);auto box=world;box.center=DriverIK::Rotate(DriverIK::Inverse(rotation),DriverIK::Sub(world.center,wrist));box.rotation=HandBoxUnitRotation(DriverIK::Product(DriverIK::Inverse(rotation),HandBoxUnitRotation(world.rotation)));return box;}
 struct HandBoxAttachments {
- InteractionBox local[2]{{{.07f,0,0},{.04f,.035f,.055f},{1,0,0,0},1,{1.25f,1.428571429f,.909090909f}},{{-.07f,-.02f,0},{.04f,.035f,.055f},{1,0,0,0},1,{1.25f,1.428571429f,.909090909f}}};
- DriverIK::V wrist[2]{};DriverIK::Q rotation[2]{{1,0,0,0},{1,0,0,0}};bool valid=false;
- void Load(InteractionBoxEditor& editor){for(unsigned i=0;i<2;++i){local[i]=editor.boxes[12+i];if(valid)editor.boxes[12+i]=AttachHandBox(local[i],wrist[i],rotation[i]);}}
- void CaptureEdit(const InteractionBoxEditor& editor){if(valid&&editor.selected>=12&&editor.selected<14){unsigned i=unsigned(editor.selected-12);local[i]=DetachHandBox(editor.boxes[12+i],wrist[i],rotation[i]);}}
- InteractionBoxEditor Saved(const InteractionBoxEditor& editor)const{auto saved=editor;for(unsigned i=0;i<2;++i)saved.boxes[12+i]=local[i];return saved;}
+ InteractionBox local[4]{{{.07f,0,0},{.04f,.035f,.055f},{1,0,0,0},1,{1.25f,1.428571429f,.909090909f}},{{-.07f,-.02f,0},{.04f,.035f,.055f},{1,0,0,0},1,{1.25f,1.428571429f,.909090909f}},{{0,0,0},{.05f,.05f,.05f}},{{0,0,0},{.05f,.05f,.05f}}};
+ DriverIK::V wrist[4]{};DriverIK::Q rotation[4]{{1,0,0,0},{1,0,0,0},{1,0,0,0},{1,0,0,0}};bool valid=false;
+ void Load(InteractionBoxEditor& editor){for(unsigned i=0;i<4;++i){unsigned box=i<2?12+i:14+i;local[i]=editor.boxes[box];if(valid)editor.boxes[box]=AttachHandBox(local[i],wrist[i],rotation[i]);}}
+ void CaptureEdit(const InteractionBoxEditor& editor){if(valid&&((editor.selected>=12&&editor.selected<14)||editor.selected>=16)){unsigned i=unsigned(editor.selected-(editor.selected<14?12:14));local[i]=DetachHandBox(editor.boxes[editor.selected],wrist[i],rotation[i]);}}
+ InteractionBoxEditor Saved(const InteractionBoxEditor& editor)const{auto saved=editor;for(unsigned i=0;i<4;++i)saved.boxes[i<2?12+i:14+i]=local[i];return saved;}
 };

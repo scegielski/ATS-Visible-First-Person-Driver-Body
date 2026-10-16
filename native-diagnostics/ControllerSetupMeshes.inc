@@ -4,7 +4,7 @@ using SetupMeshUpload=int(__cdecl*)(unsigned,const ControllerMeshVertex*,uint32_
 SetupPoseSubmit setupPoseSubmit=nullptr;bool setupMeshesReady=false;
 ControllerMeshData SetupLabelMesh(unsigned box){
  ControllerMeshData mesh;mesh.vertices={{{-1,-1,0},{0,0,1},{0,1}},{{1,-1,0},{0,0,1},{1,1}},{{-1,1,0},{0,0,1},{0,0}},{{1,1,0},{0,0,1},{1,0}}};mesh.indices={0,1,2,1,3,2};mesh.width=1024;mesh.height=128;mesh.mips=1;mesh.texture.resize(mesh.width*mesh.height*4);
- const wchar_t* names[]{L"IGNITION",L"HORN",L"LEFT MIRROR",L"CENTER MIRROR",L"RIGHT MIRROR",L"SEAT",L"LEFT WINDOW",L"RIGHT WINDOW",L"STEERING WHEEL ADJUSTMENTS",L"LIGHTS",L"WIPERS",L"RADIO",L"LEFT HAND",L"RIGHT HAND",L"DASHBOARD",L"INFOTAINMENT"};
+ const wchar_t* names[]{L"IGNITION",L"HORN",L"LEFT MIRROR",L"CENTER MIRROR",L"RIGHT MIRROR",L"SEAT",L"LEFT WINDOW",L"RIGHT WINDOW",L"STEERING WHEEL ADJUSTMENTS",L"LIGHTS",L"WIPERS",L"RADIO",L"LEFT HAND",L"RIGHT HAND",L"DASHBOARD",L"INFOTAINMENT",L"LEFT FOOT",L"RIGHT FOOT"};
  BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=mesh.width;info.bmiHeader.biHeight=-static_cast<LONG>(mesh.height);info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
  auto dc=CreateCompatibleDC(nullptr);void* bits=nullptr;auto bitmap=dc?CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0):nullptr;
  if(!bitmap){if(dc)DeleteDC(dc);mesh.texture.clear();return mesh;}
@@ -14,7 +14,7 @@ ControllerMeshData SetupLabelMesh(unsigned box){
 }
 bool EnsureSetupMeshes(){
  if(setupMeshesReady)return true;auto module=GetModuleHandleW(L"spf_controller_xr_layer.dll");auto upload=module?reinterpret_cast<SetupMeshUpload>(GetProcAddress(module,"SPF_SetControllerRenderModel")):nullptr;setupPoseSubmit=module?reinterpret_cast<SetupPoseSubmit>(GetProcAddress(module,"SPF_SetInteractionBoxTrackingPoses")):nullptr;if(!upload||!setupPoseSubmit)return false;
- const std::array<std::array<uint8_t,3>,16> colors{{{255,90,70},{90,255,120},{80,210,255},{80,210,255},{80,210,255},{255,220,90},{220,130,255},{220,130,255},{255,180,70},{255,255,180},{150,220,255},{255,160,220},{90,150,255},{90,150,255},{140,255,210},{140,255,210}}};
+ const std::array<std::array<uint8_t,3>,18> colors{{{255,90,70},{90,255,120},{80,210,255},{80,210,255},{80,210,255},{255,220,90},{220,130,255},{220,130,255},{255,180,70},{255,255,180},{150,220,255},{255,160,220},{90,150,255},{90,150,255},{140,255,210},{140,255,210},{90,150,255},{90,150,255}}};
  for(unsigned i=0;i<InteractionBoxCount;++i){auto wire=SetupBoxWireMesh();for(unsigned c=0;c<3;++c)wire.texture[c]=colors[i][c];auto label=SetupLabelMesh(i);if(label.texture.empty())return false;
   for(unsigned part=0;part<2;++part){const auto& mesh=part?label:wire;if(upload(InteractionBoxMeshStart+i+part*InteractionBoxCount,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,0,1))return false;}
  }
@@ -22,7 +22,7 @@ bool EnsureSetupMeshes(){
 }
 void SubmitSetupBoxes(bool active){
  std::array<ControllerMeshPose,InteractionBoxMeshCount> poses{};
- if(active&&EnsureSetupMeshes())for(unsigned i=0;i<InteractionBoxCount;++i){if((i==12||i==13)&&!handBoxes.valid)continue;for(unsigned part=0;part<2;++part){auto pose=SetupBoxTrackingPose(boxEditor.boxes[i],actualSceneFrame,part!=0);for(float v:pose.matrix)if(!std::isfinite(v)||std::abs(v)>10)pose.visible=false;poses[i+part*InteractionBoxCount]=pose;}}
+ if(active&&EnsureSetupMeshes())for(unsigned i=0;i<InteractionBoxCount;++i){if((i==12||i==13||i>=16)&&!handBoxes.valid)continue;for(unsigned part=0;part<2;++part){auto pose=SetupBoxTrackingPose(boxEditor.boxes[i],actualSceneFrame,part!=0);for(float v:pose.matrix)if(!std::isfinite(v)||std::abs(v)>10)pose.visible=false;poses[i+part*InteractionBoxCount]=pose;}}
  if(setupPoseSubmit)setupPoseSubmit(poses.data(),static_cast<uint32_t>(poses.size()));
- static int prior=-1;int state=active?(setupMeshesReady?1:2):0;if(state!=prior){prior=state;ReportControllerSetupGraphics(state,handBoxes.valid?16:14);}
+ static int prior=-1;int state=active?(setupMeshesReady?1:2):0;if(state!=prior){prior=state;ReportControllerSetupGraphics(state,handBoxes.valid?18:14);}
 }

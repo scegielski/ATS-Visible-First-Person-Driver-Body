@@ -994,3 +994,7 @@ Final checkpoint: the user confirmed the 0.9.2 direct-return version works great
 ### Native driver pedal restoration
 
 Restored accelerator, staged brake transfer, and independent clutch animation after the accessory-free body transition. Pedal rotation deltas are extracted from the previously validated clip and applied only to the native driver's leg bones, retaining the active vehicle's resting pose. No accessory is required. All seven native suites pass, including neutral-pose preservation, independent gas/clutch movement, brake transfer, and isolation from other bones. The user confirmed the installed restoration works in VR.
+
+### Foot setup and live controller control
+
+Added wrist-style LEFT FOOT and RIGHT FOOT setup boxes, with per-vehicle resting offsets, backward-compatible box profiles, and Undo/Redo. Outside Setup, a targeted trigger press engages the corresponding foot with relative controller position and rotation; double-trigger releases it. Release blends back to the saved resting position and current pedal pose over 0.35 seconds. Tracking loss, Setup entry, and vehicle changes clear live foot ownership. All seven native suites pass, covering migration, persistence, leg-only IK, calibration, rotation, and the return transition. The user confirmed the installed controls and smooth return work in VR.

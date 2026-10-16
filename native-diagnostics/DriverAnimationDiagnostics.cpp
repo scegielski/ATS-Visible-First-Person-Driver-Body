@@ -892,7 +892,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
    ApplyNativePedals(rotations,nativePedals,nativeClutch);
    lastThrottle.store(gas);lastBrake.store(brake);lastClutch.store(clutch);lastClutchPress.store(nativeClutch);lastTransfer.store(nativePedals.transfer);lastAnklePress.store(nativePedals.press);
   }
-  unsigned gripMask=0;DriverIK::Positions gripPositions{};if(SafeRead(pointers[3],gripPositions.data(),sizeof(gripPositions)))gripMask=ApplyVehicleSteeringGrips(rotations,gripPositions,SnapshotVehicleSteeringPose());
+  unsigned gripMask=0,footMask=0;DriverIK::Positions gripPositions{};if(SafeRead(pointers[3],gripPositions.data(),sizeof(gripPositions))){auto vehiclePose=SnapshotVehicleSteeringPose();gripMask=ApplyVehicleSteeringGrips(rotations,gripPositions,vehiclePose);footMask=ApplyVehicleFootOffsets(rotations,gripPositions,vehiclePose);}
   BlendHornPose(rotations,gestures.horn);
   BlendLiveWindowGesture(rotations,gestures.window);
   if(signal.reach>0)BlendLiveSignal(rotations,signal);
@@ -966,6 +966,8 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
   }
   __try {
    if(nativePedalApplied){for(unsigned bone:NativePedalBones)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);throttleOverrides.fetch_add(1);brakeOverrides.fetch_add(1);clutchOverrides.fetch_add(1);}
+   if((footMask&1)||(controllerMask&4))for(unsigned bone:{48u,49u,51u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
+   if((footMask&2)||(controllerMask&8))for(unsigned bone:{54u,55u,57u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(gripMask&1)for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(gripMask&2)for(unsigned bone:{26u,27u,28u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);
    if(controllerMask&1){for(unsigned bone:{5u,6u,7u})std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);for(unsigned bone=8;bone<=22;++bone)std::memcpy(reinterpret_cast<void*>(pointers[2]+bone*16),rotations[bone].data(),16);}
