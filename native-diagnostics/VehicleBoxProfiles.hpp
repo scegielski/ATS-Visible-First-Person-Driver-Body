@@ -30,6 +30,7 @@ inline bool WriteVehicleBoxes(const std::filesystem::path& path,const VehicleBox
  return MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
 }
 inline InteractionBoxEditor GenericVehicleBoxes(){InteractionBoxEditor editor;for(unsigned i=0;i<12;++i){editor.boxes[i].center={-.7f+.2f*static_cast<float>(i%4),1.6f-.24f*static_cast<float>(i/4),-.40f};editor.boxes[i].rotation={1,0,0,0};editor.boxes[i].scale=1;for(unsigned axis=0;axis<3;++axis)editor.boxes[i].stretch[axis]=.05f/editor.boxes[i].half[axis];}return editor;}
+inline void ResetVehicleBoxLayout(InteractionBoxEditor& editor){auto defaults=GenericVehicleBoxes();defaults.enabled=editor.enabled;for(auto& authored:defaults.authored)authored=true;defaults.dirty=true;editor=defaults;}
 // First-use seed only. Never modify the legacy Mustang file or another vehicle.
 inline bool InitializeVehicleBoxes(const std::filesystem::path& config,const VehicleBoxIdentity& id,InteractionBoxEditor& editor,std::string& placement,bool& migrated){
  migrated=false;auto path=VehicleBoxPath(config,id);if(path.empty())return false;std::error_code ec;

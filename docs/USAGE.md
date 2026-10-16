@@ -130,3 +130,13 @@ The user confirmed mutually exclusive Finger Editing and Setup mode switching in
 ### Adjust resting hand placement in VR
 
 In Setup mode, touch or point at a hand grab box and hold trigger. Move the controller to adjust that hand relative to the steering wheel; the initial press preserves its current offset. Release trigger to save the adjustment in the active vehicle pose file. Grip still moves the box itself. Leaving setup, losing tracking, or switching vehicles releases the hand adjustment. Saved head settings, the other hand, and other vehicle profiles are preserved.
+
+In Setup mode, the left radial menu offers RESET BOXES in the left segment and RESET HANDS in the bottom segment. Reset Boxes restores the default grid, sizes, rotations, and wrist-local grab boxes for the current vehicle. Reset Hands clears both resting-hand offsets to their native vehicle positions while preserving head visibility and head offset. Each reset saves only the active vehicle; these commands are hidden and inactive outside Setup.
+
+Both radial reset commands first open a VR confirmation panel. Point at RESET or CANCEL and make a fresh trigger press; an already held trigger cannot confirm. Tracking loss, leaving setup, opening a game menu, switching vehicles, or waiting thirty seconds cancels the pending request without resetting anything.
+
+Setup uses a dedicated left-controller radial menu with EXIT SETUP (lower-right), RESET BOXES (left), RESET HANDS (bottom), UNDO (upper-left), and REDO (upper-right). Map, Recenter, and Finger Editing are hidden and cannot be selected there. The right radial menu is hidden during Setup; both normal menus return after exiting.
+
+Setup also provides UNDO (upper-left) and REDO (upper-right) on the left radial menu. Up to one hundred completed edits are retained per vehicle for the current game session. History includes box moves, rotations, resizing, resting-hand adjustments, and complete box/hand resets. A new edit clears the redo branch. Undo and redo save the restored state to the active vehicle profile; empty stacks cannot be selected.
+
+The user confirmed the dedicated Setup radial menu and undo/redo behavior in VR. All seven native suites pass, covering full box/hand reset history, redo branching, vehicle separation, confirmation clicks/cancel/timeout, and hidden normal actions during setup.
