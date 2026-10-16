@@ -230,7 +230,7 @@ unsigned ApplyControllers(DriverIK::Pose& pose,const DriverIK::Positions& positi
   if(fingerTrigger[side]<.2f)suppressGrabTrigger[side]=false;
   auto& footBox=boxEditor.boxes[16+side];DriverIK::V footHalf{};for(unsigned axis=0;axis<3;++axis)footHalf[axis]=footBox.half[axis]*footBox.scale*footBox.stretch[axis];bool footContact=IgnitionBoxesOverlap(footBox.center,footHalf,raw,rawQ,{.025f,.025f,.04f},footBox.rotation);
   bool wasFoot=footControls[side].enabled;int footAction=footGrabGestures[side].Step(wasFoot,fingerTrigger[side],permitted&&!controls[side].enabled,boxEditor.enabled,footContact||hit.box==static_cast<int>(16+side),grabNow);
-  if(footAction){if(footAction<0)footControls[side].Release();suppressGrabTrigger[side]=true;ControllerToggleFeedback(side);if(footAction>0){controls[side].enabled=false;weights[side]=0;footControls[side].Calibrate(pose,positions,side!=0,raw,rawQ);}}
+  if(footAction){if(footAction<0)footControls[side].Release();suppressGrabTrigger[side]=true;handFeedback[side]=footAction;if(footAction>0){controls[side].enabled=false;weights[side]=0;footControls[side].Calibrate(pose,positions,side!=0,raw,rawQ);}}
   int action=handGrabGestures[side].Step(controls[side].enabled,fingerTrigger[side],permitted&&!wasFoot&&!footControls[side].enabled&&!footAction,boxEditor.enabled,contact||hit.box==static_cast<int>(12+side),grabNow);
   if(action){controls[side].enabled=action>0;controls[side].calibrate=false;handFeedback[side]=action;suppressGrabTrigger[side]=true;
    if(action>0){CalibrateControllerHand(controls[side],pose,positions,side!=0,raw,rawQ,{1,0,0,0});++calibrations[side];}

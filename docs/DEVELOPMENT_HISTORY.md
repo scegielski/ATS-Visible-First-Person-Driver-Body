@@ -1034,3 +1034,7 @@ In Setup, left-thumbstick nudges left and right invoke Undo and Redo without a s
 ### Cardinal left radial layouts
 
 The normal left radial now has Map at top, Setup at right, Finger Editing at left, and VR Recenter at bottom. The left Setup radial has Help at top, Exit Setup at right, Reset Hands at bottom, and Reset Boxes at left. Undo/Redo radial items and their dispatch routes are removed; the left-stick nudge shortcuts remain, and the Help placard explicitly says no stick click is required. Right radial controls remain unchanged. All seven native suites pass, and the user confirmed the installed layouts in VR.
+
+### Matching foot grab feedback
+
+Foot engagement and double-trigger release now use the same queued sound and controller vibration path as hand engagement and release. No additional audio assets are needed. All seven native suites pass, and the user confirmed the installed feedback works in VR.
