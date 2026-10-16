@@ -34,7 +34,7 @@ not be restored without overwriting later edits remain available beside the reco
 On a new profile, enable the body archive in ATS Mod Manager and select its body
 accessory in the Mustang. Calibrate head tracking using the game's recenter action
 then point at or touch a hand grab box and press trigger to engage that hand.
-Double-press trigger to release. F9 edits the wrist-attached grab boxes. The desktop shortcut uses the
+Double-press trigger to release. Setup mode edits the wrist-attached grab boxes. The desktop shortcut uses the
 normal Steam game launch. SteamVR and the headset must be ready.
 
 The installer is unsigned. Automated native and isolated installer tests pass;

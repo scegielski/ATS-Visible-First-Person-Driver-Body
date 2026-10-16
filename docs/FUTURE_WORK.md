@@ -42,7 +42,7 @@ Each vehicle profile should own its vehicle-specific data:
 
 Keep the Mustang's validated defaults as its own profile. Preserve the existing distinction between pose data and box placements; the exact per-vehicle filename or directory convention can be chosen during implementation. Maintain a stable mapping from game identity to profile files so two vehicles with similar names cannot overwrite each other's settings.
 
-F9 setup edits must save to the active vehicle's files. Switching vehicles or loading a different save must switch profiles and clear transient calibration and interaction state. Do not write one vehicle's placements into another profile. For an unknown vehicle, clearly report the missing profile and provide a calibration/setup path rather than silently applying Mustang positions.
+Setup edits must save to the active vehicle's files. Switching vehicles or loading a different save must switch profiles and clear transient calibration and interaction state. Do not write one vehicle's placements into another profile. For an unknown vehicle, clearly report the missing profile and provide a calibration/setup path rather than silently applying Mustang positions.
 
 Separate distributed defaults from user-edited placements, preserve edits during installer updates, and support adding a vehicle profile without rebuilding the DLL. Validate at least one additional vehicle, then switch repeatedly between it and the Mustang and confirm persistence after restarting ATS.
 

@@ -9,10 +9,6 @@ extern "C" void TestSelectReturn();
 extern "C" void RunInputStubs(uintptr_t,void*);
 extern "C" void TestSlotReturn();
 namespace {
-int cueCalls=0; std::wstring lastCue; DWORD cueFlags=0;
-int clickCalls=0; int lastClickSlot=-1;
-void StubClick(int slot) { ++clickCalls; lastClickSlot=slot; }
-BOOL WINAPI StubCue(LPCWSTR path,HMODULE,DWORD flags) { ++cueCalls; lastCue=path?path:L""; cueFlags=flags; return TRUE; }
 int displayObserved=0,displayBefore=-1,displayCallCount=0;uintptr_t displayContext=0;
 int calls=0; void* passed=nullptr; float passedDt=0; uintptr_t scoped=0;unsigned scopedSlot=0;unsigned char scopedMask=0;
 void __fastcall StubUpdate(void* context,float dt) { ++calls; passed=context; passedDt=dt; scoped=gOverrideContext;scopedSlot=gOverrideSlot;scopedMask=gInputMask; }
@@ -22,7 +18,7 @@ extern "C" int RunSeatUiStub(uintptr_t,unsigned char*);
 extern "C" void TestSeatUiPass();
 extern "C" void TestSeatUiBypass();
 int main(int argc,char** argv) {
- std::set<std::string> bindingOwnership{"Gestures.LeftWindowBird","Move.left","Select.right","Setup.EditInteractionBoxes"};std::vector<std::string> removedBindings;RetireControllerKeybinds([&](const char* name){bindingOwnership.insert(name);},[&](const char* name){if(bindingOwnership.erase(name))removedBindings.push_back(name);});CHECK(removedBindings.size()==13&&bindingOwnership.size()==1&&!bindingOwnership.count("Move.left")&&bindingOwnership.count("Gestures.LeftWindowBird"));for(auto name:RetiredControllerKeybinds)CHECK(!bindingOwnership.count(name));
+ std::set<std::string> bindingOwnership{"Gestures.LeftWindowBird","Move.left","Select.right","Setup.EditInteractionBoxes"};std::vector<std::string> removedBindings;RetireControllerKeybinds([&](const char* name){bindingOwnership.insert(name);},[&](const char* name){if(bindingOwnership.erase(name))removedBindings.push_back(name);});CHECK(removedBindings.size()==std::size(RetiredControllerKeybinds)&&bindingOwnership.size()==1&&!bindingOwnership.count("Move.left")&&bindingOwnership.count("Gestures.LeftWindowBird"));for(auto name:RetiredControllerKeybinds)CHECK(!bindingOwnership.count(name));
 
  if(argc>1) {
   std::ifstream clip(argv[1],std::ios::binary); ServoWaveHeader header{};
@@ -84,54 +80,12 @@ int main(int argc,char** argv) {
  CHECK(PrepareSeatValues(seat,seatCurrent,0.1f,4,8)); CHECK(std::abs(SeatFloat(seat,0x3d8)-0.725f)<0.00001f);
  CHECK(PrepareSeatValues(seat,seatCurrent,0.1f,16,7)); CHECK(SeatFloat(seat,0x3e8)==0.5f && SeatFloat(seat,0x3d8)==0.7f);
  seatCurrent[5]=0.5f; CHECK(PrepareSeatValues(seat,seatCurrent,0.1f,2,7)); CHECK(SeatFloat(seat,0x3e8)==1.f);
- CHECK(ResolveHeldSelection(-1,16,0)==7); CHECK(ResolveHeldSelection(7,0,16)==-1);
- CHECK(ResolveHeldSelection(-1,32,0)==8); CHECK(ResolveHeldSelection(8,0,32)==-1);
  gSeatUiOriginal=reinterpret_cast<void*>(TestSeatUiPass); gSeatApplyReturn=reinterpret_cast<void*>(TestSeatUiBypass);
  unsigned char carry=0; gSyntheticSeatContext=123;
  CHECK(RunSeatUiStub(123,&carry)==22 && carry==1);
  CHECK(RunSeatUiStub(124,&carry)==11 && carry==1);
  gSyntheticSeatContext=0; CHECK(RunSeatUiStub(0,&carry)==11 && carry==1);
 
- voiceCuesEnabled=true; playCueSound=StubCue; cuePaths={L"left.wav",L"center.wav",L"right.wav",L"seat.wav",L"off.wav",L"steering_extension.wav",L"steering_tilt.wav"};
- playSelectionClick=StubClick;
- CHECK(CueIndex(0)==0 && CueIndex(4)==1 && CueIndex(2)==2 && CueIndex(-1)==-1);
- UpdateVoiceCue(0); CHECK(cueCalls==1 && lastCue==L"left.wav" && (cueFlags&SND_ASYNC));
- UpdateVoiceCue(0); CHECK(cueCalls==1);
- UpdateVoiceCue(4); CHECK(cueCalls==2 && lastCue==L"center.wav");
- UpdateVoiceCue(2); CHECK(cueCalls==3 && lastCue==L"right.wav");
- UpdateVoiceCue(-1); CHECK(cueCalls==4 && lastCue==L"off.wav" && lastClickSlot==-1);
- const int afterExitClicks=clickCalls; UpdateVoiceCue(-1); CHECK(cueCalls==4 && clickCalls==afterExitClicks);
- voiceCuesEnabled=false; UpdateVoiceCue(0); CHECK(cueCalls==4);
- UpdateVoiceCue(-1); CHECK(cueCalls==4 && clickCalls==afterExitClicks+2 && lastClickSlot==-1);
- StopVoiceCue(); CHECK(cueCalls==5 && lastCue.empty());
- voiceCuesEnabled=true; UpdateVoiceCue(0); CHECK(cueCalls==6 && lastCue==L"left.wav");
- const int beforeRepeat=clickCalls; UpdateVoiceCue(0); CHECK(clickCalls==beforeRepeat);
- UpdateVoiceCue(4); CHECK(clickCalls==beforeRepeat+1 && lastClickSlot==4);
- UpdateVoiceCue(2); CHECK(clickCalls==beforeRepeat+2 && lastClickSlot==2);
- UpdateVoiceCue(-1); CHECK(clickCalls==beforeRepeat+3 && lastClickSlot==-1 && lastCue==L"off.wav");
- selectionClicksEnabled=false; const int mutedClicks=clickCalls;
- UpdateVoiceCue(0); UpdateVoiceCue(-1); CHECK(clickCalls==mutedClicks && lastCue==L"off.wav");
- selectionClicksEnabled=true;
- UpdateVoiceCue(6); CHECK(lastCue==L"seat.wav" && lastClickSlot==6);
- UpdateVoiceCue(-1); CHECK(lastCue==L"off.wav" && lastClickSlot==-1);
- // Exit feedback is emitted synchronously even without another OnUpdate tick.
- UpdateVoiceCue(7); CHECK(lastCue==L"steering_extension.wav" && lastClickSlot==7);
- UpdateVoiceCue(8); CHECK(lastCue==L"steering_tilt.wav" && lastClickSlot==8);
- UpdateVoiceCue(6); selectedSlot=6; const int beforeExit=cueCalls;
- ExitCenter(); CHECK(selectedSlot==-1 && cueCalls==beforeExit+1 && lastCue==L"off.wav" && lastClickSlot==-1);
- ExitCenter(); UpdateVoiceCue(-1); CHECK(cueCalls==beforeExit+1);
- CHECK(ResolveHeldSelection(-1,8,0)==6); CHECK(ResolveHeldSelection(6,0,8)==-1);
- const auto saved=nlohmann::json::parse(R"json({"keybinds":{"SPF_VisibleFirstPersonDriverBody.Select":{"left":{"bindings":[]},"cycle":{"bindings":[{"key":"KEY_1","type":"keyboard"}]}}}})json");
- CHECK(!DefaultBindingNeeded(saved,"Select","left"));
- CHECK(!DefaultBindingNeeded(saved,"Select","cycle"));
- CHECK(DefaultBindingNeeded(saved,"Select","right"));
- CHECK(DefaultBindingNeeded(nlohmann::json::object(),"Select","left"));
- const auto malformed=nlohmann::json::parse(R"json({"keybinds":{"SPF_VisibleFirstPersonDriverBody.Select":{"left":{"bindings":null}}}})json");
- CHECK(DefaultBindingNeeded(malformed,"Select","left"));
- const auto fixture=std::filesystem::temp_directory_path()/"spf-mirror-persistence-regression.json";
- { std::ofstream file(fixture); file<<saved.dump(); }
- for(int run=0;run<2;++run) { const auto reloaded=ReadSavedSettings(fixture); CHECK(!DefaultBindingNeeded(reloaded,"Select","left")); CHECK(!DefaultBindingNeeded(reloaded,"Select","cycle")); }
- std::filesystem::remove(fixture);
  CHECK(ServoChannelVolume(0)==0x00004000); CHECK(ServoChannelVolume(4)==0x40004000); CHECK(ServoChannelVolume(2)==0x40000000); CHECK(ServoChannelVolume(-1)==0);
  CHECK(NextServoVolume(0x40004000,-1)==0x40004000); CHECK(NextServoVolume(0x40000000,-1)==0x40000000); CHECK(NextServoVolume(0x40004000,0)==0x00004000);
  CHECK(ServoMovement(0,1,true,true)); CHECK(ServoMovement(4,4,true,true));
@@ -161,26 +115,7 @@ int main(int argc,char** argv) {
  }
  gOverrideContext=0; gInputMask=0; RunInputStubs(0x1234,out); for(int i=0;i<5;++i) CHECK(out[i]==1);
  gOverrideContext=0x1234; RunInputStubs(0x5678,out); for(int i=0;i<5;++i) CHECK(out[i]==1);
- for(int current:{-1,0,2,4}) for(int requested:{0,2,4}) CHECK(NextSelection(current,requested)==(current==requested?-1:requested));
  gOverrideContext=0;
- CHECK(ResolveHeldSelection(-1,1,0)==0);
- CHECK(ResolveHeldSelection(0,1,1)==0);
- CHECK(ResolveHeldSelection(0,0,1)==-1);
- CHECK(ResolveHeldSelection(0,3,1)==2);
- CHECK(ResolveHeldSelection(2,1,3)==0);
- CHECK(ResolveHeldSelection(2,7,3)==4);
- CHECK(ResolveHeldSelection(4,3,7)==2);
- CHECK(ResolveHeldSelection(-1,4,0)==4);
- CHECK(ResolveHeldSelection(-1,7,0)==4);
- CHECK(ResolveHeldSelection(4,0,4)==-1);
- CHECK(NextCycleSlot(-1,false)==0); CHECK(NextCycleSlot(0,false)==4); CHECK(NextCycleSlot(4,false)==2); CHECK(NextCycleSlot(2,false)==6); CHECK(NextCycleSlot(6,false)==7); CHECK(NextCycleSlot(7,false)==8); CHECK(NextCycleSlot(8,false)==-1);
- CHECK(NextCycleSlot(-1,true)==0); CHECK(NextCycleSlot(0,true)==4); CHECK(NextCycleSlot(4,true)==2); CHECK(NextCycleSlot(2,true)==6); CHECK(NextCycleSlot(6,true)==7); CHECK(NextCycleSlot(7,true)==8); CHECK(NextCycleSlot(8,true)==0);
- CHECK(ResolveHeldWithCycle(4,0,0,true,4)==4);
- CHECK(ResolveHeldWithCycle(4,0,0,false,4)==-1);
- CHECK(ResolveHeldWithCycle(4,1,0,true,4)==0);
- CHECK(ResolveHeldWithCycle(4,1,1,false,4)==0);
- holdSelectors=true; selectedSlot=-1; ToggleLeft(); ToggleRight(); ToggleCenter(); CHECK(selectedSlot==-1);
- holdSelectors=false;
  std::array<float,36> entries{}; for(int i=0;i<9;++i) entries[i*4+3]=1;
  const auto beforeEntries=entries;
  std::array<unsigned char,0x130> context{}; std::array<unsigned char,0x210> actor{},mirrors{};
@@ -188,22 +123,21 @@ int main(int argc,char** argv) {
  Put(mirrors,0x1d0,reinterpret_cast<uintptr_t>(entries.data())); Put(mirrors,0x1d8,uint64_t{9});
  const auto beforeContext=context; const auto beforeActor=actor; const auto beforeMirrors=mirrors;
  observing=true; originalUpdate=StubUpdate;
- selectedSlot=-1; movementAllowed=true; DetourUpdate(context.data(),0.016f);
+ controllerMirrorLease.Put(-1,0,0,GetTickCount64()); movementAllowed=true; DetourUpdate(context.data(),0.016f);
  CHECK(calls==1 && passed==context.data() && passedDt==0.016f && scoped==0 && gOverrideContext==0);
- selectedSlot=4; DetourUpdate(context.data(),0.016f);
+ controllerMirrorLease.Put(4,0,0,GetTickCount64()); DetourUpdate(context.data(),0.016f);
  CHECK(calls==2 && scoped==reinterpret_cast<uintptr_t>(context.data()) && gOverrideContext==0);
  movementAllowed=false; DetourUpdate(context.data(),0.016f); CHECK(calls==3 && scoped==0);
  movementAllowed=true; DetourUpdate(context.data(),0.5f); CHECK(calls==4 && scoped==0);
  Put(mirrors,0x1d8,uint64_t{3}); DetourUpdate(context.data(),0.016f); CHECK(calls==5 && scoped==0);
  Put(mirrors,0x1d8,uint64_t{9});
  CHECK(context==beforeContext && actor==beforeActor && mirrors==beforeMirrors && entries==beforeEntries);
- selectedSlot=-1;controllerMirrorLease.Put(2,.8f,-.9f,GetTickCount64());DetourUpdate(context.data(),.016f);CHECK(calls==6 && scoped==reinterpret_cast<uintptr_t>(context.data()) && scopedSlot==2 && scopedMask==10 && gOverrideContext==0 && gInputMask==0);
+ controllerMirrorLease.Put(2,.8f,-.9f,GetTickCount64());DetourUpdate(context.data(),.016f);CHECK(calls==6 && scoped==reinterpret_cast<uintptr_t>(context.data()) && scopedSlot==2 && scopedMask==10 && gOverrideContext==0 && gInputMask==0);
  int audioSlot=-1;unsigned char audioMask=0;CHECK(controllerMirrorLease.Get(GetTickCount64(),audioSlot,audioMask) && audioSlot==2 && ServoMovement(audioSlot,audioMask,true,true) && ServoChannelVolume(audioSlot)==0x40000000);
  controllerMirrorLease.Put(0,0,0,GetTickCount64());CHECK(controllerMirrorLease.Get(GetTickCount64(),audioSlot,audioMask) && !ServoMovement(audioSlot,audioMask,true,true));
  controllerMirrorLease.Put(-1,0,0,GetTickCount64());DetourUpdate(context.data(),.016f);CHECK(calls==7 && scoped==0);
  std::array<unsigned char,0x15f0> displayOwner{};Put(displayOwner,0x15d4,int{3});SetIntegratedDisplayObserver([](uintptr_t owner,int before){++displayObserved;displayBefore=before;displayContext=owner;displayCallCount=calls;});observing=false;movementAllowed=false;DetourUpdate(displayOwner.data(),.016f);CHECK(displayObserved==1&&displayBefore==3&&displayContext==reinterpret_cast<uintptr_t>(displayOwner.data())&&displayCallCount==8&&calls==8);SetIntegratedDisplayObserver(nullptr);DetourUpdate(displayOwner.data(),.016f);CHECK(displayObserved==1&&calls==9);
  int wheelSlot=-1;unsigned char wheelMask=0;controllerMirrorLease.Put(9,.8f,-.9f,100);CHECK(controllerMirrorLease.Get(101,wheelSlot,wheelMask) && wheelSlot==9 && wheelMask==10 && ServoMovement(wheelSlot,wheelMask,true,true));
  int leaseSlot=-1;unsigned char leaseMask=0;controllerMirrorLease.Put(4,-.8f,.9f,100);CHECK(controllerMirrorLease.Get(150,leaseSlot,leaseMask) && leaseSlot==4 && leaseMask==5);CHECK(!controllerMirrorLease.Get(251,leaseSlot,leaseMask));controllerMirrorLease.Put(-1,0,0,100);CHECK(!controllerMirrorLease.Get(101,leaseSlot,leaseMask));
- ExitCenter(); CHECK(selectedSlot.load()==-1); CHECK(!HooksReady()); ToggleCenter(); CHECK(selectedSlot.load()==-1);
- std::cout<<"PASS: real assembly stubs select all mirror slots only for matching scoped context; flags preserved; side/default pass-through; one native call with unchanged arguments; override cleared; input override masks, toggle/switch and hold/release/overlap and cycle transitions, voice cue mapping and no-repeat/mute/asynchronous playback, persisted assigned/cleared bindings across reloads, servo movement/mute/cancel guards and WAV validation and left/center/right channel mapping, disallowed/large-dt/short-array guards; host metadata and rotations untouched by wrapper.\n";
+ std::cout<<"PASS: native adjustment stubs, register preservation, controller leases, pause guards, seat bounds, servo audio, retired binding migration, and shared display observer.\n";
 }

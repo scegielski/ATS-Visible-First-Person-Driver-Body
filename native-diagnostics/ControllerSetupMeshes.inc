@@ -4,11 +4,11 @@ using SetupMeshUpload=int(__cdecl*)(unsigned,const ControllerMeshVertex*,uint32_
 SetupPoseSubmit setupPoseSubmit=nullptr;bool setupMeshesReady=false;
 ControllerMeshData SetupLabelMesh(unsigned box){
  ControllerMeshData mesh;mesh.vertices={{{-1,-1,0},{0,0,1},{0,1}},{{1,-1,0},{0,0,1},{1,1}},{{-1,1,0},{0,0,1},{0,0}},{{1,1,0},{0,0,1},{1,0}}};mesh.indices={0,1,2,1,3,2};mesh.width=1024;mesh.height=128;mesh.mips=1;mesh.texture.resize(mesh.width*mesh.height*4);
- const wchar_t* names[]{L"IGNITION",L"HORN",L"LEFT MIRROR",L"CENTER MIRROR",L"RIGHT MIRROR",L"SEAT",L"LEFT WINDOW",L"RIGHT WINDOW",L"STEERING WHEEL",L"LIGHTS",L"WIPERS",L"RADIO",L"LEFT HAND",L"RIGHT HAND",L"DASHBOARD",L"INFOTAINMENT"};
+ const wchar_t* names[]{L"IGNITION",L"HORN",L"LEFT MIRROR",L"CENTER MIRROR",L"RIGHT MIRROR",L"SEAT",L"LEFT WINDOW",L"RIGHT WINDOW",L"STEERING WHEEL ADJUSTMENTS",L"LIGHTS",L"WIPERS",L"RADIO",L"LEFT HAND",L"RIGHT HAND",L"DASHBOARD",L"INFOTAINMENT"};
  BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=mesh.width;info.bmiHeader.biHeight=-static_cast<LONG>(mesh.height);info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
  auto dc=CreateCompatibleDC(nullptr);void* bits=nullptr;auto bitmap=dc?CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0):nullptr;
  if(!bitmap){if(dc)DeleteDC(dc);mesh.texture.clear();return mesh;}
- auto old=SelectObject(dc,bitmap);memset(bits,0,mesh.texture.size());auto font=CreateFontW(-78,0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,L"Segoe UI");auto oldFont=font?SelectObject(dc,font):nullptr;SetBkMode(dc,TRANSPARENT);SetTextColor(dc,RGB(255,255,255));RECT rect{0,0,1024,128};DrawTextW(dc,names[box],-1,&rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX);
+ auto old=SelectObject(dc,bitmap);memset(bits,0,mesh.texture.size());auto font=CreateFontW(box==8?-54:-78,0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,DEFAULT_PITCH,L"Segoe UI");auto oldFont=font?SelectObject(dc,font):nullptr;SetBkMode(dc,TRANSPARENT);SetTextColor(dc,RGB(255,255,255));RECT rect{0,0,1024,128};DrawTextW(dc,names[box],-1,&rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX);
  auto pixels=static_cast<unsigned char*>(bits);for(size_t i=0;i<mesh.texture.size();i+=4){mesh.texture[i]=mesh.texture[i+1]=mesh.texture[i+2]=255;mesh.texture[i+3]=std::max({pixels[i],pixels[i+1],pixels[i+2]});}
  if(oldFont)SelectObject(dc,oldFont);if(font)DeleteObject(font);SelectObject(dc,old);DeleteObject(bitmap);DeleteDC(dc);return mesh;
 }

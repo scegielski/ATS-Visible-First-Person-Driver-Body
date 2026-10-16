@@ -54,7 +54,7 @@ not detect, back up, disable, remove, or migrate that separate plugin.
 
 ## Live settings and preservation
 
-Setup migrates existing vehicle sections from the retired main INI before removing it. Existing Mustang files take precedence and remain mutable across updates and uninstall. General values come from the compiled defaults. The native reader retains the last structurally valid live pose document, with per-pose validation. F9 saves box placement atomically and rejects concurrent external edits.
+Setup migrates existing vehicle sections from the retired main INI before removing it. Existing Mustang files take precedence and remain mutable across updates and uninstall. General values come from the compiled defaults. The native reader retains the last structurally valid live pose document, with per-pose validation. Setup saves box placement atomically and rejects concurrent external edits.
 
 ## Build and validation
 

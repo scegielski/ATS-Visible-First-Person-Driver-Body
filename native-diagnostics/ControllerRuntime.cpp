@@ -301,7 +301,6 @@ bool ConsumeControllerIgnitionRequest(){std::lock_guard lock(guard);auto event=i
 void SetHornInteractionTarget(DriverIK::V point){for(float v:point)if(!std::isfinite(v))return;std::lock_guard lock(guard);hornTarget=DriverIK::Add(point,hornBoxOffset);hornTargetTick=GetTickCount64();}
 bool ControllerHornBoxHeld(){std::lock_guard lock(guard);return hornBoxHeld && hornBoxTick && GetTickCount64()-hornBoxTick<250;}
 
-int ControllerBoxSetupKey(bool held){std::lock_guard lock(guard);if(!vehicleBoxesReady)return 0;auto result=KeyExclusiveBoxSetup(boxEditor,fingerSetup,held);if(result)PlaySetupFeedback(boxEditor.enabled);return result;}
 
 float ControllerWindowDirection(unsigned side){std::lock_guard lock(guard);return side<2 && windowRequestTick && GetTickCount64()-windowRequestTick<150 && !boxEditor.enabled?windowRequests[side]:0;}
 
