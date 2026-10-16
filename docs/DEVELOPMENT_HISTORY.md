@@ -1006,3 +1006,7 @@ Outside Setup, the nearest box hit by either cabin laser receives a soft cyan vo
 ### Setup highlight controls and smoother volumes
 
 Setup Help now starts hidden, Setup radial menus use a distinct purple palette, and the right Setup radial offers highlight visibility at the top, color cycling at the right, and opacity cycling at the bottom. Preferences save globally across vehicles and restarts in config/highlights.ini. Highlight volumes now use 33 layers per axis and 16-bit floating-point density textures; the renderer prefers floating-point swapchains when supported and retains the earlier fallback. All seven native suites pass, including preference persistence, malformed-edit recovery, radial visibility, density falloff, and stereo floating-point texture rendering. The user validated the installed changes in VR and requested commit and push.
+
+### Exact setup grip boundaries
+
+Removed the remaining eight-centimeter contact-grab margin from cabin setup boxes. All eighteen boxes now use their visible rotated, scaled boundaries for controller-origin contact selection, while laser grabbing remains available. The empty-space camera adjustment uses the same boundary check. All seven native suites pass, including just-inside and just-outside acquisition checks for every box with rotation and nonuniform scale. The user confirmed the installed behavior in VR.
