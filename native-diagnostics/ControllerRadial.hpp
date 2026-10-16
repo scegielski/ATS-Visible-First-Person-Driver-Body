@@ -22,7 +22,7 @@ struct ControllerRadialConfirm {
 };
 struct ControllerFingerSetupMode {
  bool enabled=false;
- bool Select(unsigned side,int segment){if(side!=0||segment!=2)return false;enabled=!enabled;return true;}
+ bool Select(unsigned side,int segment){if(side!=0||segment!=6)return false;enabled=!enabled;return true;}
 };
 struct ControllerRadialNote {
  int previous=-1;
@@ -39,13 +39,13 @@ inline int ControllerRadialAction(unsigned side,int segment){
  return -1;
 }
 
-inline bool ControllerRadialSetupSelection(unsigned side,int segment){return side==0&&segment==3;}
+inline bool ControllerRadialSetupSelection(unsigned side,int segment){return side==0&&segment==2;}
 
-inline bool ControllerRadialRecenterSelection(unsigned side,int segment){return side==0&&segment==5;}
+inline bool ControllerRadialRecenterSelection(unsigned side,int segment){return side==0&&segment==4;}
 
 inline int ControllerRadialResetSelection(unsigned side,int segment,bool setup){if(!setup||side!=0)return -1;return segment==6?0:segment==4?1:-1;}
 
-inline bool ControllerRadialSegmentVisible(unsigned side,int segment,bool setup){if(segment<0||segment>7||side>1)return false;return !setup||(side==0?(segment!=0&&segment!=2):(segment==0||segment==1||segment==2||segment==4||segment==7));}
+inline bool ControllerRadialSegmentVisible(unsigned side,int segment,bool setup){if(segment<0||segment>7||side>1)return false;return !setup||(side==0?(segment==0||segment==2||segment==4||segment==6):(segment==0||segment==1||segment==2||segment==4||segment==7));}
 
 inline std::array<unsigned char,3> ControllerRadialTint(bool setup,bool selected,bool flash,bool fingerEnabled=false){if(selected&&flash)return {255,255,255};if(setup)return selected?std::array<unsigned char,3>{185,90,245}:std::array<unsigned char,3>{150,80,190};return selected?std::array<unsigned char,3>{70,220,255}:fingerEnabled?std::array<unsigned char,3>{70,210,255}:std::array<unsigned char,3>{210,210,255};}
 

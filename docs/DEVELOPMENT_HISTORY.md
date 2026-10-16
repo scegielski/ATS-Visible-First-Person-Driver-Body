@@ -1030,3 +1030,7 @@ Moved head visibility to upper-left and driver visibility to upper-right on the 
 ### Setup history thumbstick nudges
 
 In Setup, left-thumbstick nudges left and right invoke Undo and Redo without a stick click. Each action requires returning to center. The shortcut is inactive during box or limb grabs, camera adjustment, reset dialogs, and radial-menu use. Successful history operations, from either nudges or radial items, play distinct spoken Undo/Redo cues. All seven native suites pass, including held-stick suppression, diagonal rejection, and rearming after invalid input. The user repeatedly verified both actions and audio in VR and requested a commit.
+
+### Cardinal left radial layouts
+
+The normal left radial now has Map at top, Setup at right, Finger Editing at left, and VR Recenter at bottom. The left Setup radial has Help at top, Exit Setup at right, Reset Hands at bottom, and Reset Boxes at left. Undo/Redo radial items and their dispatch routes are removed; the left-stick nudge shortcuts remain, and the Help placard explicitly says no stick click is required. Right radial controls remain unchanged. All seven native suites pass, and the user confirmed the installed layouts in VR.

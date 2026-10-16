@@ -75,7 +75,7 @@ Changing setup mode through double-press A or the radial menu speaks “Setup mo
 
 Radial menus use eight segments with a 2048-pixel antialiased texture with smoothly rendered Segoe UI labels. Press and hold a controller thumbstick button to open its ring, tilt while holding to highlight an octant, then release the button to select that octant. Release at center to cancel. Tilting without holding does not show a menu. Selection gives vibration.
 
-The left ring right segment toggles Finger editing mode, which defaults off and announces enabled or disabled. While editing, X/A select fingers and Y/B toggle the corresponding trigger assignment, speaking Enabled or Disabled with vibration. Exiting editing retains assignments. Y/B thumb closure, double-B recenter, double-A setup and X/Y keyboard shortcuts are suspended while editing to prevent conflicts; normal controls return when editing is off.
+The normal left ring left segment toggles Finger editing mode, which defaults off and announces enabled or disabled. While editing, X/A select fingers and Y/B toggle the corresponding trigger assignment, speaking Enabled or Disabled with vibration. Exiting editing retains assignments. Y/B thumb closure, double-B recenter, double-A setup and X/Y keyboard shortcuts are suspended while editing to prevent conflicts; normal controls return when editing is off.
 
 While a radial menu is held open, newly highlighted octants play a short note. Left uses C major; right uses C natural minor. Both ascend clockwise from tonic at top to the upper octave. Holding one octant does not repeat; center is silent.
 
@@ -87,9 +87,9 @@ Right radial native actions: top Services and Adjustments; upper-right Activate;
 
 Activate uses SPF semantic virtual input registered during plugin OnLoad. It emits a short activate press/release through the game input system and does not depend on a primary keyboard binding. Startup must have the plugin enabled for device registration. The other radial actions retain their validated native binding hooks.
 
-Left radial lower-right: SETUP MODE ON/OFF. Select it to toggle box setup with the existing spoken cue and vibration. Double-press right A remains available.
+Normal left radial right: SETUP MODE ON/OFF. Select it to toggle box setup with the existing spoken cue and vibration. Double-press right A remains available.
 
-Left radial lower-left: VR RECENTER. Select while seated normally; it uses the existing native reset and speaks VR recenter after the reset applies. Double-press right B remains available outside Finger editing mode.
+Normal left radial bottom: VR RECENTER. Select while seated normally; it uses the existing native reset and speaks VR recenter after the reset applies. Double-press right B remains available outside Finger editing mode.
 
 Vehicle box profiles are created automatically when driving telemetry identifies a vehicle. A new non-Mustang vehicle starts with generic boxes: use setup mode to position them. Profiles include all cabin boxes and the two wrist-local grab boxes. Switching vehicles releases hand control and clears pending cabin interactions. Profile edits reload live; invalid files retain the last valid placement. This change covers boxes only: poses and body alignment still use the Mustang configuration. Profiles created at runtime are not overwritten by installer updates.
 
@@ -135,7 +135,7 @@ In Setup mode, the left radial menu offers RESET BOXES in the left segment and R
 
 Both radial reset commands first open a VR confirmation panel. Point at RESET or CANCEL and make a fresh trigger press; an already held trigger cannot confirm. Tracking loss, leaving setup, opening a game menu, switching vehicles, or waiting thirty seconds cancels the pending request without resetting anything.
 
-Setup uses a dedicated left-controller radial menu with EXIT SETUP (lower-right), RESET BOXES (left), RESET HANDS (bottom), UNDO (upper-left), and REDO (upper-right). Map, Recenter, and Finger Editing are hidden and cannot be selected there. The right radial menu is hidden during Setup; both normal menus return after exiting.
+Setup uses a dedicated left-controller radial menu with HELP (top), EXIT SETUP (right), RESET BOXES (left), and RESET HANDS (bottom). Undo and Redo use the left thumbstick nudges and are absent from the radial menu. Map, Recenter, and Finger Editing are hidden and cannot be selected there. The right Setup radial has highlight preferences and head/driver visibility controls; normal menus return after exiting.
 
 Setup also provides UNDO (upper-left) and REDO (upper-right) on the left radial menu. Up to one hundred completed edits are retained per vehicle for the current game session. History includes box moves, rotations, resizing, resting-hand adjustments, and complete box/hand resets. A new edit clears the redo branch. Undo and redo save the restored state to the active vehicle profile; empty stacks cannot be selected.
 
@@ -147,7 +147,7 @@ In Setup, release both grips, then hold both grips and move the controllers toge
 
 Setup places HIDE/SHOW HEAD in the upper-left segment of the right radial and HIDE/SHOW DRIVER in its upper-right segment. Neither appears on the left Setup radial. Head visibility affects the cabin head; hiding the driver hides the whole native driver while keeping controller tracking and setup boxes available. Both toggles save per vehicle and participate in Undo/Redo. Hidden normal Map and Finger Editing actions do not fire from these Setup segments.
 
-A floating controls placard appears to your right when entering Setup. It stays anchored in the cabin while you look around and lists box grabbing/resizing, hand adjustment, camera alignment, and the radial selection gesture. It omits the radial item list and keyboard/button exit shortcuts. The lower-left Setup radial segment shows or hides HELP. It is hidden outside Setup and while a reset confirmation is open.
+An optional floating controls placard is available to your right in Setup and starts hidden. It stays anchored in the cabin while you look around and lists box grabbing, hand adjustment, camera alignment, Undo/Redo nudges, and the radial selection gesture. It omits the radial item list and keyboard/button exit shortcuts. The top Setup radial segment shows or hides HELP. It is hidden outside Setup and while a reset confirmation is open.
 
 The shortened help text omits radial item descriptions, F9/double-A references, and reset-dialog instructions. All seven native suites pass. The latest text revision is packaged but was not installed during the running VR session.
 
@@ -159,4 +159,4 @@ The retired General Settings options Hold Selectors, Voice Cues, Servo Sounds, a
 
 The user confirmed the SPF keybind and General Settings cleanup in game. All seven native suites pass, including retirement of the thirteen obsolete actions while retaining unrelated gesture bindings and controller input leases.
 
-In Setup, nudge the left thumbstick left for Undo or right for Redo without clicking it. Return to center between actions. Nudges are inactive while grabbing, adjusting the camera, or using a radial menu. Successful history actions, including the radial Undo/Redo items, speak Undo or Redo.
+In Setup, nudge the left thumbstick left for Undo or right for Redo without clicking it. Return to center between actions. Nudges are inactive while grabbing, adjusting the camera, or using a radial menu. Successful history actions speak Undo or Redo.
