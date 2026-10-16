@@ -43,6 +43,11 @@ inline std::string DefaultVehicleSteeringPose(const VehicleBoxIdentity& id){
 }
 struct LiveVehicleSteeringPose {
  VehicleBoxIdentity identity;VehicleSteeringPose settings;std::string prior;
+ bool Save(const std::filesystem::path& config){
+  auto path=VehiclePosePath(config,identity);std::string before;DriverSettingSections sections;if(path.empty()||!ReadDriverSettingsFile(path,before)||before!=prior||!ParseDriverSettings(before,sections)||!identity.MatchesMetadata(sections["vehicle"]))return false;
+  std::ostringstream grips;grips<<std::setprecision(9);for(unsigned side=0;side<2;++side){grips<<(side?"right_offset":"left_offset");for(float v:settings.offset[side])grips<<' '<<v;grips<<'\n';}sections["steering_grips"]=grips.str();auto text=SerializeDriverSettings(sections);VehicleSteeringPose checked;if(!ParseVehicleSteeringPose(text,identity,checked))return false;
+  auto temporary=path;temporary+=L".pose.tmp";{std::ofstream file(temporary,std::ios::binary|std::ios::trunc);if(!file)return false;file<<text;file.flush();if(!file.good())return false;}std::string latest;std::error_code ec;if(!ReadDriverSettingsFile(path,latest)||latest!=before){std::filesystem::remove(temporary,ec);return false;}if(!MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH))return false;prior=text;return true;
+ }
  bool Poll(const std::filesystem::path& config,const VehicleBoxIdentity& id){
   if(id!=identity){identity=id;settings={};prior.clear();}
   auto path=VehiclePosePath(config,id);if(path.empty())return false;

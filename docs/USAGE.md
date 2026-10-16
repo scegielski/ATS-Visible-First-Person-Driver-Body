@@ -126,3 +126,7 @@ The user confirmed laser-based setup grabbing works in VR after installation. Al
 Finger editing and box setup are mutually exclusive. Enabling either turns the other off. Entering finger editing releases an active box grab so its placement can be saved; exiting a mode does not re-enable the other one.
 
 The user confirmed mutually exclusive Finger Editing and Setup mode switching in VR. All seven native suites pass, including mode transitions, active-grab release, and held-key suppression.
+
+### Adjust resting hand placement in VR
+
+In Setup mode, touch or point at a hand grab box and hold trigger. Move the controller to adjust that hand relative to the steering wheel; the initial press preserves its current offset. Release trigger to save the adjustment in the active vehicle pose file. Grip still moves the box itself. Leaving setup, losing tracking, or switching vehicles releases the hand adjustment. Saved head settings, the other hand, and other vehicle profiles are preserved.
