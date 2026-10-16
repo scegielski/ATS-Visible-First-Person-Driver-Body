@@ -1026,3 +1026,7 @@ Double-grip camera adjustment reverses all three controller movement axes. It ta
 ### Visibility controls moved to the right Setup radial
 
 Moved head visibility to upper-left and driver visibility to upper-right on the right Setup radial. Both controls and their hit routes are removed from the left Setup radial. Existing highlight controls remain in place, and the visibility labels and spoken cues reflect the saved state. All seven native suites pass. The user verified both toggles and their audio in VR and requested a commit.
+
+### Setup history thumbstick nudges
+
+In Setup, left-thumbstick nudges left and right invoke Undo and Redo without a stick click. Each action requires returning to center. The shortcut is inactive during box or limb grabs, camera adjustment, reset dialogs, and radial-menu use. Successful history operations, from either nudges or radial items, play distinct spoken Undo/Redo cues. All seven native suites pass, including held-stick suppression, diagonal rejection, and rearming after invalid input. The user repeatedly verified both actions and audio in VR and requested a commit.

@@ -158,3 +158,5 @@ The old SPF adjustment movement bindings Down, Left, Right, and Up are also reti
 The retired General Settings options Hold Selectors, Voice Cues, Servo Sounds, and Selection Clicks are no longer exposed. Their fixed behavior disables old adjustment-selector hold mode and selection announcements while keeping servo audio and selection clicks enabled. Controller spoken cues and setup feedback remain active. Existing saved copies of those four settings are removed on load.
 
 The user confirmed the SPF keybind and General Settings cleanup in game. All seven native suites pass, including retirement of the thirteen obsolete actions while retaining unrelated gesture bindings and controller input leases.
+
+In Setup, nudge the left thumbstick left for Undo or right for Redo without clicking it. Return to center between actions. Nudges are inactive while grabbing, adjusting the camera, or using a radial menu. Successful history actions, including the radial Undo/Redo items, speak Undo or Redo.

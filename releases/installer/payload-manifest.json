@@ -1,15 +1,15 @@
 {
-  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.61.exe",
-  "sha256": "07e97642a8c8cc60fa38587b85d90c645c427e0062b3092e9a5102ab4dd4b90c",
+  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.62.exe",
+  "sha256": "b8b641ef0caf0bac16c39016621eedafad9c1f8f19609b083d5696a3f89b4fca",
   "payload": {
-    "version": "0.39.61",
+    "version": "0.39.62",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
     "files": [
       {
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "548b0726d26da358c10a09a96272e7bdf519d5512cdb5b3740c13b444a6c2f7f",
+        "sha256": "4f1b0c9271cfd937b148c2d7d9871b5ce8e9642522a3f840c6f8770ba75cf0f9",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -378,6 +378,22 @@
         "destination": "plugin",
         "target": "sounds/controller_setup_enabled.wav",
         "sha256": "07cb50d9232802a25212774e42d9e92a6595b4c1db9af63451451a8ff925b17d",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_setup_redo.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_setup_redo.wav",
+        "sha256": "988519135ac35c7a5fd6848588c2b471175da87a6820f9a49d43961f93250d7d",
+        "mutable": false,
+        "onlyIfMissing": false
+      },
+      {
+        "source": "plugin/sounds/controller_setup_undo.wav",
+        "destination": "plugin",
+        "target": "sounds/controller_setup_undo.wav",
+        "sha256": "1c2fc02f60ac13a4f3187b95be93eb281c97f3f4ff87496b5c8172a3530e30de",
         "mutable": false,
         "onlyIfMissing": false
       },
