@@ -53,7 +53,7 @@ Outside setup, touch a box with an enabled hand or target it with a disabled han
 
 ## Controller setup editor
 
-Use the Setup radial item or double-press right A to show the labeled boxes and suspend their actions. Grip near a box to move and rotate it. Grab with both hands to resize along the local axis closest to the hand separation. Release and re-grab along another direction to resize a different dimension. The L HAND and R HAND grab boxes follow the wrist bones. Edit their placement and nonuniform size like the other boxes; their saved positions and rotations are local to the wrists. Release to save; select Exit Setup or double-press right A to return to normal play.
+Use the Setup radial item or double-press right A to show the labeled boxes and suspend their actions. Grip inside a box or point its laser at it to move and rotate it. Both grips take priority for camera adjustment, even during a box grab. The L HAND and R HAND grab boxes follow the wrist bones. Edit their placement like the other boxes; their saved positions and rotations are local to the wrists. Release to save; select Exit Setup or double-press right A to return to normal play.
 
 ## Configuration files
 
@@ -143,7 +143,7 @@ The user confirmed the dedicated Setup radial menu and undo/redo behavior in VR.
 
 ### Align the VR viewpoint to the driver
 
-In Setup, point both controllers into empty space away from setup boxes, release both grips, then hold both grips and move the controllers together. The interior camera follows that translation so you can align your viewpoint with the native driver head. Release either grip to save the camera offset in that vehicle pose file. Existing box grabbing and two-hand resizing retain priority when a box is selected. Body placement, resting-hand offsets and box placements are unchanged; camera alignment participates in per-vehicle Undo/Redo. New vehicle profiles keep the game camera until adjusted.
+In Setup, release both grips, then hold both grips and move the controllers together. All three camera movement axes are reversed relative to controller movement. Both grips take priority over box grabbing, even when pointing at a box or already holding one; the interrupted box edit is saved first. Release either grip to save the camera offset in that vehicle's pose file. Release both grips before grabbing another box. Camera alignment participates in per-vehicle Undo/Redo.
 
 Setup adds HIDE/SHOW HEAD at the top of the left radial and HIDE/SHOW DRIVER at the right. Head visibility affects the cabin head; hiding the driver hides the whole native driver while keeping controller tracking and setup boxes available. Both toggles save per vehicle and participate in Undo/Redo. Hidden normal Map and Finger Editing actions do not fire from these Setup segments.
 

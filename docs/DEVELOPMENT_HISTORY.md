@@ -1018,3 +1018,7 @@ Added distinct Hide driver, Show driver, Hide head, and Show head spoken cues af
 ### Editable elbow and knee bend targets
 
 Added four labeled, grip-editable Setup targets for left/right elbows and knees. Their vehicle-relative placements save in the active vehicle's box profile, participate in Undo/Redo, and initialize from the native rig without replacing older placements. Bend edits preserve palm and foot endpoints, apply to resting and controller-driven limbs, and are excluded from normal-mode laser targeting. The profile format now supports twenty-two boxes. All seven native suites pass, including migration, target persistence, unrelated-bone preservation, and IK endpoint checks. The user checked the installed change in VR and requested a commit.
+
+### Camera gesture direction and priority
+
+Double-grip camera adjustment reverses all three controller movement axes. It takes priority over contact or laser box grabbing, saving an interrupted box edit before anchoring the camera. Both grips must be released before box grabbing resumes. The former two-grip resize gesture no longer fires, and the help text reflects camera priority. All seven native suites pass, including axis direction, grab takeover, release blocking, and unchanged position anchoring. The user confirmed the installed behavior in VR and requested this checkpoint commit.
