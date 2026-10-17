@@ -277,6 +277,7 @@ void VehicleConstants(const SPF_TruckConstants* data,void*){if(!data)return;std:
  bool valid=SetControllerVehicleCamera({data->cabin_position.x,data->cabin_position.y,data->cabin_position.z},{data->head_position.x,data->head_position.y,data->head_position.z});
  static std::string prior;static DriverIK::V priorHead{};DriverIK::V position{data->head_position.x,data->head_position.y,data->head_position.z};if(prior!=model||position!=priorHead){prior=model;priorHead=position;char text[256];std::snprintf(text,sizeof(text),"VEHICLE_CAMERA valid=%d cabin=%.4f,%.4f,%.4f head=%.4f,%.4f,%.4f",valid?1:0,data->cabin_position.x,data->cabin_position.y,data->cabin_position.z,position[0],position[1],position[2]);Log(SPF_LOG_INFO,text);}
 }
+extern "C" void ReportGearHud(const char* text) noexcept{Log(SPF_LOG_INFO,text);}
 extern "C" void ReportControllerVehiclePose(const char* path,int status) noexcept{char text[1024];std::snprintf(text,sizeof(text),"VEHICLE_POSE file=%s status=%d (1=live -1=invalid edit retained prior settings)",path,status);Log(status<0?SPF_LOG_WARN:SPF_LOG_INFO,text);}
 extern "C" void ReportControllerSetupGraphics(int state,unsigned boxes) noexcept{char text[160];std::snprintf(text,sizeof(text),"SETUP_GRAPHICS state=%d boxes=%u (0=hidden 1=independent stereo 2=bridge update needed)",state,boxes);Log(state==2?SPF_LOG_WARN:SPF_LOG_INFO,text);}
 extern "C" void ReportControllerVehicleBoxes(const char* model,const char* file,int status) noexcept{char text[1024];std::snprintf(text,sizeof(text),"VEHICLE_BOXES model=%s file=%s status=%d (1=loaded 2=Mustang migrated -1=load failed -2=old save blocked)",model,file,status);Log(status<0?SPF_LOG_WARN:SPF_LOG_INFO,text);}
@@ -290,7 +291,7 @@ void Controls(const SPF_Controls* data,void*) {
  telemetryTick.store(GetTickCount64(),std::memory_order_relaxed);
 }
 void TruckSignals(const SPF_TruckData* data,void*) {
- if(!data)return;
+ if(!data)return;SetControllerGear(data->gear);
  selectedLeft.store(data->lblinker);selectedRight.store(data->rblinker);signalTick.store(GetTickCount64());
  int direction=signalSelection.Sample(data->lblinker,data->rblinker,data->hazard_warning);
  const int replayed=skipSignalDirection.load();
@@ -725,6 +726,7 @@ void Update() {
  bodyCameraValid.store(cameraValid);bodyCameraType.store(cameraValid?static_cast<int>(cameraType):-1);hideBody.store(bodyVisibilityMode.load()==0 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));hideStockDriver.store(!nativeDriverRenderReady && bodyVisibilityMode.load()==1 && HideInteriorBody(cameraValid,static_cast<int>(cameraType)));
  uintptr_t playerController=0,playerModel=0;ReadPlayerExteriorDriver(reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)),SafeRead,playerController,playerModel);expectedPlayerDriverController.store(playerController);expectedPlayerDriverModel.store(playerModel);
  const bool menuMouse=core && core->gameworld && core->gameworld->GW_IsGamePaused && (core->gameworld->GW_IsGamePaused() || !cameraValid || !telemetryTick.load() || GetTickCount64()-telemetryTick.load()>250);
+ if(!menuMouse&&core&&core->telemetry&&vehicleTelemetry&&core->telemetry->Tel_GetTruckData){SPF_TruckData truck{};core->telemetry->Tel_GetTruckData(vehicleTelemetry,&truck,sizeof(truck));SetControllerGear(truck.gear);}
  PollControllers(!menuMouse && cameraValid && telemetryTick.load() && GetTickCount64()-telemetryTick.load()<=250,worldGeneration.load());
  if(!menuMouse&&cameraValid&&static_cast<int>(cameraType)==2&&core&&core->camera&&core->camera->Cam_SetInteriorSeatPos){DriverIK::V seat;if(ConsumeControllerCameraPosition(seat)){core->camera->Cam_SetInteriorSeatPos(seat[0],seat[1],seat[2]);SetControllerSceneCamera(seat[0],seat[1],seat[2]);}}
  PollControllerMenuMouse(menuMouse);

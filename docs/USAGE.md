@@ -162,3 +162,5 @@ The user confirmed the SPF keybind and General Settings cleanup in game. All sev
 In Setup, nudge the left thumbstick left for Undo or right for Redo without clicking it. Return to center between actions. Nudges are inactive while grabbing, adjusting the camera, or using a radial menu. Successful history actions speak Undo or Redo.
 
 Camera rotation: in Setup with Adjust Camera enabled, hold either trigger and rotate the controller to adjust yaw and pitch relative to the grab angle. Release to save per vehicle. The right Setup ring's left segment opens Reset Camera confirmation, resetting camera position and rotation. Undo/Redo includes rotation edits and camera resets.
+
+Gear panel: displays the current gear as a signed number (0 neutral, positive forward, negative reverse). In Setup with Adjust Camera off, point at or touch the panel and hold grip to move or rotate it; hold both grips to resize it as a square. Release to save placement per vehicle. The right Setup ring's lower-right Gear Panel item toggles visibility without losing placement.

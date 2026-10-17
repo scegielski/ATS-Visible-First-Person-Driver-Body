@@ -45,10 +45,12 @@ inline bool ControllerRadialRecenterSelection(unsigned side,int segment){return 
 
 inline int ControllerRadialResetSelection(unsigned side,int segment,bool setup){if(!setup)return -1;if(side==1)return segment==6?2:-1;if(side!=0)return -1;return segment==6?0:segment==4?1:-1;}
 
-inline bool ControllerRadialSegmentVisible(unsigned side,int segment,bool setup){if(segment<0||segment>7||side>1)return false;return !setup||(side==0?(segment==0||segment==2||segment==4||segment==6||segment==7):(segment==0||segment==1||segment==2||segment==4||segment==6||segment==7));}
+inline bool ControllerRadialSegmentVisible(unsigned side,int segment,bool setup){if(segment<0||segment>7||side>1)return false;return !setup||(side==0?(segment==0||segment==2||segment==4||segment==6||segment==7):(segment==0||segment==1||segment==2||segment==3||segment==4||segment==6||segment==7));}
 
 inline std::array<unsigned char,3> ControllerRadialTint(bool setup,bool selected,bool flash,bool fingerEnabled=false){if(selected&&flash)return {255,255,255};if(setup)return selected?std::array<unsigned char,3>{185,90,245}:std::array<unsigned char,3>{150,80,190};return selected?std::array<unsigned char,3>{70,220,255}:fingerEnabled?std::array<unsigned char,3>{70,210,255}:std::array<unsigned char,3>{210,210,255};}
 
 inline int ControllerRadialVisibilitySelection(unsigned side,int segment,bool setup){if(!setup||side!=1)return -1;return segment==7?0:segment==1?1:-1;}
 
 inline bool ControllerRadialCameraSelection(unsigned side,int segment,bool setup){return setup&&side==0&&segment==7;}
+
+inline bool ControllerRadialGearHudSelection(unsigned side,int segment,bool setup){return setup&&side==1&&segment==3;}

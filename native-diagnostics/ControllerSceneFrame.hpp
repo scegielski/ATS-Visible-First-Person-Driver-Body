@@ -22,5 +22,7 @@ struct ControllerSceneFrame {
   auto space=DriverIK::Product(xrHeadQ,DriverIK::Inverse(steamHeadQ));auto local=DriverIK::Add(xrHead,DriverIK::Rotate(space,DriverIK::Sub(controller,steamHead)));
   return DriverIK::Add(HeadInCabin(),DriverIK::Rotate(TrackingToCabin(),DriverIK::Sub(local,xrHead)));
  }
+ DriverIK::V TrackingPointToSteam(DriverIK::V point,DriverIK::V steamHead,DriverIK::Q steamHeadQ)const{return DriverIK::Add(steamHead,DriverIK::Rotate(DriverIK::Product(steamHeadQ,DriverIK::Inverse(xrHeadQ)),DriverIK::Sub(point,xrHead)));}
+ DriverIK::Q TrackingOrientationToSteam(DriverIK::Q rotation,DriverIK::Q steamHeadQ)const{return DriverIK::Product(DriverIK::Product(steamHeadQ,DriverIK::Inverse(xrHeadQ)),rotation);}
  DriverIK::Q Orientation(DriverIK::Q controller,DriverIK::Q steamHeadQ) const {return DriverIK::Product(TrackingToCabin(),DriverIK::Product(xrHeadQ,DriverIK::Product(DriverIK::Inverse(steamHeadQ),controller)));}
 };
