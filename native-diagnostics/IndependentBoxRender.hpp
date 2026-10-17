@@ -36,3 +36,9 @@ inline ControllerMeshData InteractionHoverFillMesh(std::array<uint8_t,3> color={
 inline std::array<ControllerMeshPose,4> InteractionHoverPoses(const InteractionBoxEditor& editor,const ControllerSceneFrame& frame,const int (&targets)[2],bool active,bool jointsAvailable){
  std::array<ControllerMeshPose,4> poses{};if(!active||editor.enabled)return poses;for(unsigned side=0;side<2;++side){int box=targets[side];if(box<0||box>=static_cast<int>(InteractionBoxCount)||(side&&box==targets[0])||(!jointsAvailable&&(box==12||box==13||box>=16)))continue;auto pose=SetupBoxTrackingPose(editor.boxes[box],frame);for(float v:pose.matrix)if(!std::isfinite(v)||std::abs(v)>10)pose.visible=false;poses[side*2]=pose;}return poses;
 }
+
+inline ControllerMeshData JointAxesMesh(){
+ ControllerMeshData mesh;mesh.width=3;mesh.height=mesh.mips=1;mesh.texture={255,40,40,255,40,255,40,255,40,100,255,255};constexpr unsigned faces[]{0,2,1,1,2,3,4,5,6,5,7,6,0,1,4,1,5,4,2,6,3,3,6,7,0,4,2,2,4,6,1,3,5,3,7,5};for(unsigned axis=0;axis<3;++axis){unsigned base=static_cast<unsigned>(mesh.vertices.size());for(unsigned corner=0;corner<8;++corner){ControllerMeshVertex v{};v.normal[2]=1;for(unsigned d=0;d<3;++d)v.position[d]=d==axis?((corner&(1u<<d))?.07f:0.f):((corner&(1u<<d))?.0015f:-.0015f);v.uv[0]=(axis+.5f)/3;v.uv[1]=.5f;mesh.vertices.push_back(v);}for(unsigned index:faces)mesh.indices.push_back(static_cast<uint16_t>(base+index));}return mesh;
+}
+
+inline ControllerMeshData JointBoneMesh(){auto mesh=JointAxesMesh();mesh.vertices.resize(8);mesh.indices.resize(36);mesh.width=mesh.height=1;mesh.texture={235,235,235,255};for(unsigned corner=0;corner<8;++corner){auto& v=mesh.vertices[corner];v.position[0]=(corner&1)?1.f:0.f;v.position[1]=(corner&2)?.001f:-.001f;v.position[2]=(corner&4)?.001f:-.001f;v.uv[0]=v.uv[1]=.5f;}return mesh;}

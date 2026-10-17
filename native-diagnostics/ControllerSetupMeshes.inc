@@ -21,12 +21,14 @@ auto module=GetModuleHandleW(L"spf_controller_xr_layer.dll");auto upload=module?
  for(unsigned i=0;i<InteractionBoxCount;++i){auto wire=SetupBoxWireMesh();for(unsigned c=0;c<3;++c)wire.texture[c]=colors[i][c];auto label=SetupLabelMesh(i);if(label.texture.empty())return false;
   for(unsigned part=0;part<2;++part){const auto& mesh=part?label:wire;if(upload(InteractionBoxMeshStart+i+part*InteractionBoxCount,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,0,1))return false;}
  }
+ for(unsigned j=0;j<144;++j){auto mesh=j<72?JointAxesMesh():JointBoneMesh();if(upload(DriverJointAxesMeshStart+j,mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size()),mesh.texture.data(),mesh.width,mesh.height,0,1))return false;}
  if(!RefreshHoverMeshes(upload))return false;
  setupMeshesReady=true;return true;
 }
-void SubmitSetupBoxes(bool active,bool hover=false){
+void SubmitSetupBoxes(bool active,bool hover=false,bool skeletonActive=false){
  std::array<ControllerMeshPose,InteractionBoxMeshCount> poses{};
  if(active&&EnsureSetupMeshes())for(unsigned i=0;i<InteractionBoxCount;++i){if((i==12||i==13||i>=16)&&!handBoxes.valid)continue;for(unsigned part=0;part<2;++part){auto pose=SetupBoxTrackingPose(boxEditor.boxes[i],actualSceneFrame,part!=0);for(float v:pose.matrix)if(!std::isfinite(v)||std::abs(v)>10)pose.visible=false;poses[i+part*InteractionBoxCount]=pose;}}
+ if(skeletonActive&&skeletonVisible&&EnsureSetupMeshes()&&jointAxesTick&&GetTickCount64()-jointAxesTick<250){auto basis=actualSceneFrame.CabinToTracking();for(unsigned j=0;j<144;++j){ControllerMeshPose pose;pose.visible=true;for(unsigned col=0;col<3;++col){auto v=DriverIK::Rotate(basis,{driverJointAxes[j][col],driverJointAxes[j][4+col],driverJointAxes[j][8+col]});for(unsigned row=0;row<3;++row)pose.matrix[row*4+col]=v[row];}auto p=actualSceneFrame.CabinPointToTracking({driverJointAxes[j][3],driverJointAxes[j][7],driverJointAxes[j][11]});for(unsigned row=0;row<3;++row)pose.matrix[row*4+3]=p[row];poses[DriverJointAxesMeshStart-InteractionBoxMeshStart+j]=pose;}}
  if(hover&&EnsureSetupMeshes()){auto now=GetTickCount64();auto highlight=InteractionHoverPoses(boxEditor,actualSceneFrame,cabinHoverTargets,cabinHoverTick&&now>=cabinHoverTick&&now-cabinHoverTick<150,handBoxes.valid);std::copy(highlight.begin(),highlight.end(),poses.begin()+InteractionHoverMeshStart-InteractionBoxMeshStart);}
  if(setupPoseSubmit)setupPoseSubmit(poses.data(),static_cast<uint32_t>(poses.size()));
  static int prior=-1;int state=active?(setupMeshesReady?1:2):0;if(state!=prior){prior=state;ReportControllerSetupGraphics(state,handBoxes.valid?22:14);}

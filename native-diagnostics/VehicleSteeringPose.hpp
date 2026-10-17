@@ -2,8 +2,10 @@
 #include "VehicleBoxProfiles.hpp"
 #include "RuntimeArmIK.hpp"
 #include <set>
+#include "LiveJointPoseEdits.hpp"
 
 struct VehicleSteeringPose {
+ JointPoseEditBank jointPoseEdits;
  DriverIK::V offset[4]{};
  DriverIK::Q footRotation[2]{{1,0,0,0},{1,0,0,0}};
  DriverIK::V cameraAngles{};bool cameraAnglesConfigured=false;
@@ -12,6 +14,7 @@ struct VehicleSteeringPose {
  bool driverVisible=true;
  bool headVisible=true;
  float headBackshift=0;
+ float thumbSpreadDegrees=20.f,thumbCurlStrength=.60f,thumbBaseXDegrees=0.f,thumbBaseYDegrees=0.f,thumbBaseZDegrees=0.f,thumbActivationYDegrees=55.f,restingFingerCurl=-1.f;
 };
 inline std::filesystem::path VehiclePosePath(const std::filesystem::path& config,const VehicleBoxIdentity& id){
  if(!id.Valid())return {};auto name=id.Filename();name.replace(name.size()-10,10,"_poses.ini");return config/"vehicles"/name;
@@ -19,7 +22,7 @@ inline std::filesystem::path VehiclePosePath(const std::filesystem::path& config
 inline bool ParseVehicleSteeringPose(const std::string& text,const VehicleBoxIdentity& id,VehicleSteeringPose& output){
  DriverSettingSections sections;if(!id.Valid()||!ParseDriverSettings(text,sections)||!id.MatchesMetadata(sections["vehicle"]))return false;
  auto found=sections.find("steering_grips");if(found==sections.end())return false;
- VehicleSteeringPose candidate;if(id.brand=="westernstar"&&id.model=="vehicle.westernstar.5700xe"){candidate.cameraDefaultSeat={0,.2f,-.1f};candidate.cameraSeat=candidate.cameraDefaultSeat;candidate.cameraConfigured=true;}std::set<std::string> seen;
+ VehicleSteeringPose candidate;if(id.brand=="westernstar"&&id.model=="vehicle.westernstar.5700xe"){candidate.cameraDefaultSeat={0,.2f,-.1f};candidate.cameraSeat=candidate.cameraDefaultSeat;candidate.cameraConfigured=true;candidate.thumbBaseXDegrees=30;candidate.thumbBaseYDegrees=-10;candidate.restingFingerCurl=.35f;ParseJointPoseEdits(kWesternStarJointPoseDefaults,candidate.jointPoseEdits);}std::set<std::string> seen;
  std::istringstream input(found->second);std::string line;
  while(std::getline(input,line)){
   auto first=line.find_first_not_of(" \t\r");if(first==std::string::npos||line[first]=='#'||line[first]==';')continue;
@@ -48,6 +51,9 @@ inline bool ParseVehicleSteeringPose(const std::string& text,const VehicleBoxIde
  }
  found=sections.find("camera");if(found!=sections.end()){seen.clear();std::istringstream camera(found->second);while(std::getline(camera,line)){auto first=line.find_first_not_of(" \t\r");if(first==std::string::npos||line[first]=='#'||line[first]==';')continue;std::istringstream row(line);std::string key,extra;row>>key;if(!seen.insert(key).second)return false;if(key=="enabled"){int value;if(!(row>>value)||(value!=0&&value!=1))return false;candidate.cameraConfigured=value!=0;}else if(key=="seat_offset"){for(float& v:candidate.cameraSeat)if(!(row>>v)||!std::isfinite(v))return false;if(DriverIK::Length(candidate.cameraSeat)>2.00001f)return false;}else return false;if(row>>extra)return false;}if(seen.size()!=2)return false;}
  found=sections.find("camera_default");if(found!=sections.end()){std::istringstream row(found->second);std::string key,extra;if(!(row>>key>>candidate.cameraDefaultSeat[0]>>candidate.cameraDefaultSeat[1]>>candidate.cameraDefaultSeat[2])||key!="seat_offset"||(row>>extra))return false;for(float v:candidate.cameraDefaultSeat)if(!std::isfinite(v))return false;if(DriverIK::Length(candidate.cameraDefaultSeat)>2.00001f)return false;}
+ found=sections.find("truck_thumbs");if(found!=sections.end()){seen.clear();std::istringstream rows(found->second);while(std::getline(rows,line)){auto first=line.find_first_not_of(" \t\r");if(first==std::string::npos||line[first]=='#')continue;std::istringstream row(line);std::string key,extra;float value;if(!(row>>key>>value)||!std::isfinite(value)||(row>>extra)||!seen.insert(key).second)return false;if(key=="spread_degrees"){if(value<0||value>60)return false;candidate.thumbSpreadDegrees=value;}else if(key=="base_x_degrees"){if(std::abs(value)>180)return false;candidate.thumbBaseXDegrees=value;}else if(key=="base_y_degrees"){if(std::abs(value)>180)return false;candidate.thumbBaseYDegrees=value;}else if(key=="base_z_degrees"){if(std::abs(value)>180)return false;candidate.thumbBaseZDegrees=value;}else if(key=="activation_y_degrees"){if(std::abs(value)>180)return false;candidate.thumbActivationYDegrees=value;}else if(key=="curl_strength"){if(value<0||value>1.5f)return false;candidate.thumbCurlStrength=value;}else return false;}if(!seen.count("spread_degrees")||!seen.count("curl_strength"))return false;}
+ found=sections.find("truck_fingers");if(found!=sections.end()){std::istringstream row(found->second);std::string key,extra;if(!(row>>key>>candidate.restingFingerCurl)||key!="resting_curl"||(row>>extra)||!std::isfinite(candidate.restingFingerCurl)||candidate.restingFingerCurl< -1||candidate.restingFingerCurl>1)return false;}
+ found=sections.find("joint_pose_edits");if(found!=sections.end()&&!ParseJointPoseEdits(found->second,candidate.jointPoseEdits))return false;
  found=sections.find("body");if(found!=sections.end()){std::istringstream body(found->second);std::string key,extra;int visible;if(!(body>>key>>visible)||key!="visible"||(visible!=0&&visible!=1)||(body>>extra))return false;candidate.driverVisible=visible!=0;}
  output=candidate;return true;
 }

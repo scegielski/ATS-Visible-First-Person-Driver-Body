@@ -1056,3 +1056,9 @@ Added a square gear-number panel with a GEAR caption, rounded corners, and cyan 
 Added the verified 72-bone truck rig adapter, reflected/scaled skeleton handling, cabin placement, corrected limb sides, and camera-relative first-use cabin boxes. Joint targets initialize from actual joints. Per-vehicle camera reset defaults and hand-box defaults preserve the Western Star camera calibration (20 cm up, 10 cm forward) and captured hand-box placements. Other vehicle profiles remain separate.
 
 All seven native suites pass; user confirmed the installed setup changes in VR and requested this checkpoint.
+
+## Live joint poses and complete truck skeleton display
+
+Added per-vehicle live XYZ offsets for every native joint across supported pose families, weighted after retargeting and IK. Invalid edits retain previous settings; other setup saves preserve the joint-edit section. Truck fingers now use native rest poses, independent Y/B thumb control, native-Y activation, and live spread/curl/XYZ controls. Captured the current Western Star calibration, including 20 degrees less closed curl at the four left finger bases.
+
+Right Setup radial lower-left toggles all 72 truck joints with uniform RGB axes and parent/child lines. Visibility remains enabled outside Setup with freshness guards; wheel helper bones are included. The user reviewed the display and requested this checkpoint after live finger tuning; further pose tuning may still be needed. Seven native suites and installer validation accompany this release.

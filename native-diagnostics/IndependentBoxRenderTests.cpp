@@ -3,7 +3,7 @@
 #include <cstdlib>
 #define CHECK(x) do{if(!(x)){std::cerr<<"FAIL "<<__LINE__<<" "<<#x;std::exit(1);}}while(false)
 bool Near(float a,float b){return std::abs(a-b)<.0001f;}
-int main(){auto mesh=SetupBoxWireMesh();CHECK(mesh.vertices.size()==96&&mesh.indices.size()==432);CHECK(ValidControllerMesh(mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size())));
+int main(){auto bone=JointBoneMesh();CHECK(bone.vertices.size()==8&&bone.indices.size()==36&&bone.vertices[0].position[0]==0&&bone.vertices[1].position[0]==1);auto axes=JointAxesMesh();CHECK(axes.vertices.size()==24&&axes.indices.size()==108&&axes.texture.size()==12);CHECK(axes.vertices[1].position[0]==.07f&&axes.vertices[8+2].position[1]==.07f&&axes.vertices[16+4].position[2]==.07f);auto mesh=SetupBoxWireMesh();CHECK(mesh.vertices.size()==96&&mesh.indices.size()==432);CHECK(ValidControllerMesh(mesh.vertices.data(),static_cast<uint32_t>(mesh.vertices.size()),mesh.indices.data(),static_cast<uint32_t>(mesh.indices.size())));
  ControllerSceneFrame frame;frame.camera={-.4f,1.2f,.1f};frame.neutral={.1f,0,0};frame.xrHead={.2f,.1f,0};
  InteractionBox box;box.center={-.3f,1.3f,-.4f};box.half={.05f,.06f,.07f};box.scale=2;box.stretch={1,2,3};auto pose=SetupBoxTrackingPose(box,frame);
  CHECK(Near(pose.matrix[3],.2f)&&Near(pose.matrix[7],.1f)&&Near(pose.matrix[11],-.5f));CHECK(Near(pose.matrix[0],.1f)&&Near(pose.matrix[5],.24f)&&Near(pose.matrix[10],.42f));

@@ -52,3 +52,10 @@ bool GetControllerCameraAngles(DriverIK::V& angles);
 void SetControllerAppliedCameraAngles(DriverIK::V before,DriverIK::V after);
 
 void SetControllerGear(int gear);
+
+unsigned ControllerFingerControlMask();
+
+using DriverJointAxes=std::array<std::array<float,12>,144>;
+void PublishControllerJointAxes(const DriverJointAxes& axes);
+
+JointPoseWeights SnapshotControllerJointPoseWeights();
