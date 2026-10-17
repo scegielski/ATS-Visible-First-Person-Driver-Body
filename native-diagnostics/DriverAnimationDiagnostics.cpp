@@ -32,6 +32,7 @@
 #include "SignalReplayGuard.hpp"
 #include "SignalTiming.hpp"
 #include "HeadTracking.hpp"
+#include "TruckDriverRig.hpp"
 #include "HeadTorso.hpp"
 #include "GestureHeadFollow.hpp"
 #include "ControllerRuntime.hpp"
@@ -229,7 +230,7 @@ bool ReadModelPath(uintptr_t model,char (&path)[192]) noexcept {
  return false;
 }
 bool IsBorrowedPlayerBody(uintptr_t model,const char* path) {
- return nativeDriverRenderReady && model && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd");
+ return nativeDriverRenderReady && model && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && IsSupportedNativeDriverPath(path);
 }
 bool UseAnimatedBody(uintptr_t model,const char* path) {
  if(IsBorrowedPlayerBody(model,path))return true;
@@ -839,6 +840,7 @@ void UpdateIgnitionInteractionTarget(const DriverIK::Pose& rotations,uintptr_t p
   }
 }
 extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,uintptr_t bones,uint32_t count) noexcept {
+ if(enabled.load()&&count==72&&bounds>=0x1e0){const uintptr_t model=bounds-0x1e0;char path[192]{};uintptr_t expected=0,pointers[4]{};if(!ReadModelPath(model,path)||std::strcmp(path,"/vehicle/driver/man/driver.pmd")||!IsBorrowedPlayerBody(model,path)||!SafeRead(model+0x1c0,&expected,8)||output!=expected||!SafeRead(arrays,pointers,sizeof(pointers)))return;TruckPose native{};TruckPositions positions{},scales{};if(!SafeRead(pointers[2],native.data(),sizeof(native))||!SafeRead(pointers[3],positions.data(),sizeof(positions))||!SafeRead(pointers[1],scales.data(),sizeof(scales)))return;for(auto v:scales){for(float x:v)if(!std::isfinite(x)||x<.01f||x>10)return;if(std::abs(v[0]-v[1])>.001f||std::abs(v[0]-v[2])>.001f)return;}DriverIK::Pose canonical{};DriverIK::Positions points{},unit{};for(auto& s:unit)s={1,1,1};if(!ProjectTruckRig(native,positions,canonical,points,&scales))return;DriverIK::V modelPosition{};DriverIK::Q modelRotation{};if(!SafeRead(model+0x30,modelPosition.data(),12)||!SafeRead(model+0x40,modelRotation.data(),16))return;float norm=0;for(float v:modelRotation){if(!std::isfinite(v))return;norm+=v*v;}for(float v:modelPosition)if(!std::isfinite(v))return;if(std::abs(norm-1)>.02f)return;TruckPoseToCabin(canonical,points,modelPosition,modelRotation);uintptr_t projected[4]{pointers[0],reinterpret_cast<uintptr_t>(unit.data()),reinterpret_cast<uintptr_t>(canonical.data()),reinterpret_cast<uintptr_t>(points.data())};CaptureBone(output,bounds,reinterpret_cast<uintptr_t>(projected),bones,61);TruckPoseFromCabin(canonical,points,modelPosition,modelRotation);ApplyCanonicalTruckRig(canonical,points,native);__try{std::memcpy(reinterpret_cast<void*>(pointers[2]),native.data(),sizeof(native));}__except(EXCEPTION_EXECUTE_HANDLER){hornFaults.fetch_add(1);}return;}
  if(!enabled.load() || count!=61 || bounds<0x1e0)return;
  const uintptr_t model=bounds-0x1e0;char path[192]{};
  if(!ReadModelPath(model,path) || !UseAnimatedBody(model,path))return;
@@ -1009,6 +1011,7 @@ extern "C" void CaptureBone(uintptr_t output,uintptr_t bounds,uintptr_t arrays,u
  }
 }
 extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexcept {
+ if(enabled.load()&&!visibilityFaults.load()&&count==72&&bounds>=0x1e0){auto model=bounds-0x1e0;char path[192]{};uintptr_t expected=0;if(!ReadModelPath(model,path)||std::strcmp(path,"/vehicle/driver/man/driver.pmd")||!IsBorrowedPlayerBody(model,path)||!SafeRead(model+0x1c0,&expected,8)||output!=expected)return;auto settings=SnapshotVehicleSteeringPose();bool hide=hideBody.load()||!settings.driverVisible;bool head=!settings.headVisible&&(!bodyCameraValid.load()||bodyCameraType.load()==2);if(!hide&&!head)return;std::array<std::array<float,16>,72> palette{};if(!SafeRead(output,palette.data(),sizeof(palette)))return;for(unsigned i=0;i<72;++i)if(hide||i==22||i==25){for(unsigned row=0;row<3;++row)for(unsigned col=0;col<3;++col)palette[i][row*4+col]=0;}__try{std::memcpy(reinterpret_cast<void*>(output),palette.data(),sizeof(palette));}__except(EXCEPTION_EXECUTE_HANDLER){visibilityFaults.fetch_add(1);}return;}
  if(!enabled.load() || visibilityFaults.load() || count!=61 || bounds<0x1e0)return;
  const uintptr_t model=bounds-0x1e0;char path[192]{};uintptr_t expected=0;
  if(!ReadModelPath(model,path) || !SafeRead(model+0x1c0,&expected,8) || output!=expected)return;
@@ -1024,7 +1027,7 @@ extern "C" void PostBone(uintptr_t output,uintptr_t bounds,uint32_t count) noexc
  const bool privateBody=(hideBody.load() && (privateModel||borrowed)) || duplicateAccessory || (borrowed&&!SnapshotVehicleSteeringPose().driverVisible);
  const bool privateHead=(privateModel||borrowed) && !privateBody && (!bodyCameraValid.load() || bodyCameraType.load()==2);
  const auto now=GetTickCount64(),tick=playerDriverTick.load();
- const bool playerStock=hideStockDriver.load() && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && tick && now-tick<=750 && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd");
+ const bool playerStock=hideStockDriver.load() && model==expectedPlayerDriverModel.load() && model==confirmedPlayerDriverModel.load() && tick && now-tick<=750 && IsSupportedNativeDriverPath(path);
  if(!privateBody && !playerStock && !privateHead)return;
  DriverPalette palette{};if(!SafeRead(output,palette.data(),sizeof(palette)))return;
  const auto headBefore=palette[47];
@@ -1161,7 +1164,7 @@ extern "C" void CaptureDriver(uintptr_t controller) noexcept {
  if(ValidSample(sample)) {
   currentDriver=sample;
   if(IsConfirmedPlayerDriver(controller,sample.model,expectedPlayerDriverController.load(),expectedPlayerDriverModel.load())){
-   char path[192]{};if(ReadModelPath(sample.model,path) && !std::strcmp(path,"/asset/character/human/driver/man/driver.pmd")){confirmedPlayerDriverModel.store(sample.model);playerDriverTick.store(GetTickCount64());playerDriverMatches.fetch_add(1);}
+   char path[192]{};if(ReadModelPath(sample.model,path) && IsSupportedNativeDriverPath(path)){confirmedPlayerDriverModel.store(sample.model);playerDriverTick.store(GetTickCount64());playerDriverMatches.fetch_add(1);}
   }
  }
 }

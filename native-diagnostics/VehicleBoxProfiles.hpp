@@ -1,4 +1,6 @@
 #pragma once
+#include <optional>
+#include "TruckVehicleDefaults.hpp"
 #include "DriverSettings.hpp"
 #include "InteractionBoxEditor.hpp"
 
@@ -30,21 +32,27 @@ inline bool WriteVehicleBoxes(const std::filesystem::path& path,const VehicleBox
  return MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
 }
 inline InteractionBoxEditor GenericVehicleBoxes(){InteractionBoxEditor editor;for(unsigned i=0;i<12;++i){editor.boxes[i].center={-.7f+.2f*static_cast<float>(i%4),1.6f-.24f*static_cast<float>(i/4),-.40f};editor.boxes[i].rotation={1,0,0,0};editor.boxes[i].scale=1;for(unsigned axis=0;axis<3;++axis)editor.boxes[i].stretch[axis]=.05f/editor.boxes[i].half[axis];}return editor;}
-inline void ResetVehicleBoxLayout(InteractionBoxEditor& editor){auto defaults=GenericVehicleBoxes();defaults.enabled=editor.enabled;for(unsigned i=0;i<InteractionBoxCount;++i)defaults.authored[i]=i<18;defaults.dirty=true;editor=defaults;}
+inline InteractionBoxEditor GenericVehicleBoxesAtCamera(DriverIK::V camera){auto editor=GenericVehicleBoxes();for(unsigned i=0;i<12;++i)editor.boxes[i].center=DriverIK::Add(camera,{-.30f+.20f*static_cast<float>(i%4),.30f-.24f*static_cast<float>(i/4),-.55f});editor.boxes[14].center=DriverIK::Add(camera,{.50f,.30f,-.55f});editor.boxes[15].center=DriverIK::Add(camera,{.50f,.06f,-.55f});return editor;}
+inline void ResetVehicleBoxLayout(InteractionBoxEditor& editor,std::optional<DriverIK::V> camera=std::nullopt){auto defaults=camera?GenericVehicleBoxesAtCamera(*camera):GenericVehicleBoxes();defaults.enabled=editor.enabled;for(unsigned i=0;i<InteractionBoxCount;++i)defaults.authored[i]=i<18;defaults.dirty=true;editor=defaults;}
+inline void ApplyVehicleHandBoxDefaults(const std::filesystem::path& config,const VehicleBoxIdentity& id,InteractionBoxEditor& editor){
+ if(id.brand=="westernstar"&&id.model=="vehicle.westernstar.5700xe"){InteractionBoxEditor preset;if(ParseInteractionBoxes(kWesternStarHandBoxDefaults,preset))for(unsigned i:{12u,13u})editor.boxes[i]=preset.boxes[i];}
+ std::string text;DriverSettingSections sections;InteractionBoxEditor saved;if(!ReadDriverSettingsFile(VehicleBoxPath(config,id),text)||!ParseDriverSettings(text,sections)||!id.MatchesMetadata(sections["vehicle"]))return;auto found=sections.find("hand_box_defaults");if(found==sections.end()||!ParseInteractionBoxes(found->second,saved))return;for(unsigned i:{12u,13u})editor.boxes[i]=saved.boxes[i];
+}
 // First-use seed only. Never modify the legacy Mustang file or another vehicle.
-inline bool InitializeVehicleBoxes(const std::filesystem::path& config,const VehicleBoxIdentity& id,InteractionBoxEditor& editor,std::string& placement,bool& migrated){
+inline bool InitializeVehicleBoxes(const std::filesystem::path& config,const VehicleBoxIdentity& id,InteractionBoxEditor& editor,std::string& placement,bool& migrated,std::optional<DriverIK::V> camera=std::nullopt){
  migrated=false;auto path=VehicleBoxPath(config,id);if(path.empty())return false;std::error_code ec;
  if(std::filesystem::exists(path,ec)){
   if(!ReadVehicleBoxes(path,id,editor,placement))return false;
   // Upgrade only the untouched generic seed emitted before independent rendering.
   if(!id.Mustang()&&SerializeInteractionBoxes(editor)==SerializeInteractionBoxes(InteractionBoxEditor{})){auto defaults=GenericVehicleBoxes();placement=SerializeInteractionBoxes(defaults);if(!WriteVehicleBoxes(path,id,placement))return false;return ReadVehicleBoxes(path,id,editor,placement);}
+  if(camera&&!id.Mustang()&&SerializeInteractionBoxes(editor)==SerializeInteractionBoxes(GenericVehicleBoxes())){placement=SerializeInteractionBoxes(GenericVehicleBoxesAtCamera(*camera));if(!WriteVehicleBoxes(path,id,placement))return false;return ReadVehicleBoxes(path,id,editor,placement);}
   return true;
  }if(ec)return false;
- InteractionBoxEditor initial=GenericVehicleBoxes();
+ InteractionBoxEditor initial=camera?GenericVehicleBoxesAtCamera(*camera):GenericVehicleBoxes();
  if(id.Mustang()){
   auto legacy=config/"mustang_boxes.ini";if(std::filesystem::exists(legacy,ec)){
    std::string text;DriverSettingSections sections;if(!ReadDriverSettingsFile(legacy,text)||!ParseDriverSettings(text,sections)||!ParseInteractionBoxes(sections["interaction_boxes"],initial))return false;migrated=true;
   }if(ec)return false;
  }
- placement=SerializeInteractionBoxes(initial);if(!WriteVehicleBoxes(path,id,placement))return false;return ReadVehicleBoxes(path,id,editor,placement);
+ ApplyVehicleHandBoxDefaults(config,id,initial);placement=SerializeInteractionBoxes(initial);if(!WriteVehicleBoxes(path,id,placement))return false;return ReadVehicleBoxes(path,id,editor,placement);
 }

@@ -1050,3 +1050,9 @@ In Setup with Adjust Camera enabled, holding either trigger captures its control
 ### Movable gear HUD panel
 
 Added a square gear-number panel with a GEAR caption, rounded corners, and cyan outline. Live truck telemetry supplies signed gear numbers: zero for neutral, positive forward gears, and negative reverse gears. In Setup with Camera Adjustment off, contact or laser grip grabbing moves/rotates the panel; two grips resize it while retaining a square shape. Placement and visibility save per vehicle in a separate gear HUD profile. The right Setup radial's lower-right segment toggles the panel without discarding placement. The renderer converts cabin/OpenXR coordinates to OpenVR overlay space and keeps that alignment fixed between recenters to avoid head-motion jitter. The panel hides in menus and when telemetry is unavailable. All seven native suites pass, including gear formatting, profile migration, hidden-state persistence, tracking-origin alignment, and anchor stability. The user confirmed visibility, dragging/resizing, stability, and the final toggle/label in VR.
+
+## Western Star truck support and calibrated defaults
+
+Added the verified 72-bone truck rig adapter, reflected/scaled skeleton handling, cabin placement, corrected limb sides, and camera-relative first-use cabin boxes. Joint targets initialize from actual joints. Per-vehicle camera reset defaults and hand-box defaults preserve the Western Star camera calibration (20 cm up, 10 cm forward) and captured hand-box placements. Other vehicle profiles remain separate.
+
+All seven native suites pass; user confirmed the installed setup changes in VR and requested this checkpoint.

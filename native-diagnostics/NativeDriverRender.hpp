@@ -18,3 +18,5 @@ struct NativeBodyViewLedger {
   return false;
  }
 };
+
+inline bool IsSupportedNativeDriverPath(const char* path){return path&&(!std::strcmp(path,"/asset/character/human/driver/man/driver.pmd")||!std::strcmp(path,"/vehicle/driver/man/driver.pmd"));}

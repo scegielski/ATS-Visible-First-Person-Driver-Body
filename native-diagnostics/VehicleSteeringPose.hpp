@@ -8,6 +8,7 @@ struct VehicleSteeringPose {
  DriverIK::Q footRotation[2]{{1,0,0,0},{1,0,0,0}};
  DriverIK::V cameraAngles{};bool cameraAnglesConfigured=false;
  bool cameraConfigured=false;DriverIK::V cameraSeat{};
+ DriverIK::V cameraDefaultSeat{};
  bool driverVisible=true;
  bool headVisible=true;
  float headBackshift=0;
@@ -18,7 +19,7 @@ inline std::filesystem::path VehiclePosePath(const std::filesystem::path& config
 inline bool ParseVehicleSteeringPose(const std::string& text,const VehicleBoxIdentity& id,VehicleSteeringPose& output){
  DriverSettingSections sections;if(!id.Valid()||!ParseDriverSettings(text,sections)||!id.MatchesMetadata(sections["vehicle"]))return false;
  auto found=sections.find("steering_grips");if(found==sections.end())return false;
- VehicleSteeringPose candidate;std::set<std::string> seen;
+ VehicleSteeringPose candidate;if(id.brand=="westernstar"&&id.model=="vehicle.westernstar.5700xe"){candidate.cameraDefaultSeat={0,.2f,-.1f};candidate.cameraSeat=candidate.cameraDefaultSeat;candidate.cameraConfigured=true;}std::set<std::string> seen;
  std::istringstream input(found->second);std::string line;
  while(std::getline(input,line)){
   auto first=line.find_first_not_of(" \t\r");if(first==std::string::npos||line[first]=='#'||line[first]==';')continue;
@@ -46,6 +47,7 @@ inline bool ParseVehicleSteeringPose(const std::string& text,const VehicleBoxIde
   if(seen.size()!=2)return false;
  }
  found=sections.find("camera");if(found!=sections.end()){seen.clear();std::istringstream camera(found->second);while(std::getline(camera,line)){auto first=line.find_first_not_of(" \t\r");if(first==std::string::npos||line[first]=='#'||line[first]==';')continue;std::istringstream row(line);std::string key,extra;row>>key;if(!seen.insert(key).second)return false;if(key=="enabled"){int value;if(!(row>>value)||(value!=0&&value!=1))return false;candidate.cameraConfigured=value!=0;}else if(key=="seat_offset"){for(float& v:candidate.cameraSeat)if(!(row>>v)||!std::isfinite(v))return false;if(DriverIK::Length(candidate.cameraSeat)>2.00001f)return false;}else return false;if(row>>extra)return false;}if(seen.size()!=2)return false;}
+ found=sections.find("camera_default");if(found!=sections.end()){std::istringstream row(found->second);std::string key,extra;if(!(row>>key>>candidate.cameraDefaultSeat[0]>>candidate.cameraDefaultSeat[1]>>candidate.cameraDefaultSeat[2])||key!="seat_offset"||(row>>extra))return false;for(float v:candidate.cameraDefaultSeat)if(!std::isfinite(v))return false;if(DriverIK::Length(candidate.cameraDefaultSeat)>2.00001f)return false;}
  found=sections.find("body");if(found!=sections.end()){std::istringstream body(found->second);std::string key,extra;int visible;if(!(body>>key>>visible)||key!="visible"||(visible!=0&&visible!=1)||(body>>extra))return false;candidate.driverVisible=visible!=0;}
  output=candidate;return true;
 }
