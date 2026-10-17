@@ -5,6 +5,6 @@ inline ResetDialogHit HitResetDialog(DriverIK::V center,DriverIK::Q rotation,Dri
 struct ResetConfirmation {
  int action=-1;uint64_t deadline=0;IgnitionTriggerGate triggers[2];
  void Cancel(){action=-1;deadline=0;triggers[0]=triggers[1]={};}
- void Open(unsigned request,uint64_t now){Cancel();if(request<2){action=request;deadline=now+30000;}}
+ void Open(unsigned request,uint64_t now){Cancel();if(request<3){action=request;deadline=now+30000;}}
  int Step(bool valid,const float (&values)[2],const bool (&tracked)[2],const int (&buttons)[2],uint64_t now){if(action<0)return -1;if(!valid||now>=deadline){Cancel();return -1;}for(unsigned side=0;side<2;++side)if(triggers[side].Step(values[side],tracked[side],buttons[side]>=0)){int selected=action;bool confirm=buttons[side]==0;Cancel();return confirm?selected:-1;}return -1;}
 };

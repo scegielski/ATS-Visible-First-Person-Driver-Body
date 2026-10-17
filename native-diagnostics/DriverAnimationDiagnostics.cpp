@@ -108,6 +108,8 @@ std::atomic<uint64_t> playerDriverTick{0},playerDriverMatches{0},hiddenStockFram
 using NativeDriverRenderFn=void(__fastcall*)(uintptr_t,uintptr_t);
 NativeDriverRenderFn originalCabinModelRender=nullptr;
 bool nativeDriverRenderReady=false;
+using InteriorOrientationFn=void(__fastcall*)(uintptr_t);InteriorOrientationFn originalInteriorOrientation=nullptr;
+void __fastcall AdjustInteriorOrientation(uintptr_t camera);
 void __fastcall RenderCabinModelWithBody(uintptr_t model,uintptr_t view);
 void RefreshBorrowedDriverPose();
 struct NativeRigAudit{uintptr_t model=0;DriverIK::V wrists[2]{};};
@@ -232,6 +234,10 @@ bool IsBorrowedPlayerBody(uintptr_t model,const char* path) {
 bool UseAnimatedBody(uintptr_t model,const char* path) {
  if(IsBorrowedPlayerBody(model,path))return true;
  return !std::strcmp(path,"/model/spf_stock_driver/driver.pmd") && !(nativeDriverRenderReady && confirmedPlayerDriverModel.load() && confirmedPlayerDriverModel.load()==expectedPlayerDriverModel.load());
+}
+
+void __fastcall AdjustInteriorOrientation(uintptr_t camera){
+ originalInteriorOrientation(camera);if(!enabled.load()||!bodyCameraValid.load()||bodyCameraType.load()!=2)return;DriverIK::V offset;if(!GetControllerCameraAngles(offset)){SetControllerAppliedCameraAngles({},{});return;}float yaw=0,pitch=0;if(!SafeRead(camera+0x598,&yaw,4)||!SafeRead(camera+0x59c,&pitch,4)||!std::isfinite(yaw)||!std::isfinite(pitch))return;float adjusted[2]{std::remainder(yaw+offset[0],6.283185307f),std::clamp(pitch+offset[1],-1.5f,1.5f)};std::memcpy(reinterpret_cast<void*>(camera+0x598),adjusted,sizeof(adjusted));SetControllerAppliedCameraAngles({yaw,pitch,0},{adjusted[0],adjusted[1],0});static uint64_t report=0;auto now=GetTickCount64();if(now-report>2000){report=now;char message[160];std::snprintf(message,sizeof(message),"CAMERA_ROTATION additive base=%.4f,%.4f offset=%.4f,%.4f",yaw,pitch,offset[0],offset[1]);Log(SPF_LOG_INFO,message);}
 }
 void __fastcall RenderCabinModelWithBody(uintptr_t model,uintptr_t view) {
  originalCabinModelRender(model,view);
@@ -459,6 +465,8 @@ void Activated(const SPF_Core_API* api) {
  auto quick=hooks->Hook_Register(kName,"RadialQuickInfoAction","Merge radial request with native advmouse binding",reinterpret_cast<void*>(RadialQuickObserveStub),&gRadialQuickOriginal,radialQuickPattern,true);
  auto services=hooks->Hook_Register(kName,"RadialServicesAction","Merge radial request with native services binding",reinterpret_cast<void*>(RadialServicesObserveStub),&gRadialServicesOriginal,radialServicesPattern,true);
  constexpr char radialHudPattern[]="48 8B 8E B8 01 00 00 48 85 C9 74 4D 83 B9 F8 00 00 00 02 75 44 E8 05 85 B6 FF 48 8D";
+ constexpr char cameraOffsetPattern[]="40 53 48 81 EC 80 00 00 00 80 B9 44 01 00 00 00 48 8B D9 0F 84 97 04 00 00";
+ if(hooks->Hook_FindPattern(cameraOffsetPattern)==base+0x8b0990)hooks->Hook_Register(kName,"InteriorCameraRotationOffset","Add relative controller camera rotation after native VR look update",reinterpret_cast<void*>(AdjustInteriorOrientation),reinterpret_cast<void**>(&originalInteriorOrientation),cameraOffsetPattern,true);else Log(SPF_LOG_WARN,"CAMERA_ROTATION native update signature unavailable.");
  constexpr char radialCameraPattern[]="48 8B 89 A0 EB 01 00 49 8B DA 48 85 C9 74 12 83 B9 F8 00 00 00 02 75 09 E8 EF 97 C0 FF";
  constexpr char radialActivatePattern[]="48 8B BB 98 09 00 00 48 8B CF E8 68 0C E5 FF 80 BB F4 08 00 00 00 0F 85 65 01 00 00 48";
  SPF_Hook_Handle *hud=nullptr,*camera=nullptr;

@@ -13,9 +13,9 @@ inline ControllerMeshData SetupBoxWireMesh(){
  return mesh;
 }
 inline ControllerMeshPose SetupBoxTrackingPose(const InteractionBox& box,const ControllerSceneFrame& frame,bool label=false){
- using namespace DriverIK;auto q=label?frame.neutralQ:Product(frame.neutralQ,box.rotation);V center=box.center;
+ using namespace DriverIK;auto basis=frame.CabinToTracking();auto q=label?frame.neutralQ:Product(basis,box.rotation);V center=box.center;
  if(label)center=Add(center,Rotate(box.rotation,{0,box.half[1]*box.scale*box.stretch[1]+.045f,0}));
- center=Add(frame.neutral,Rotate(frame.neutralQ,Sub(center,frame.camera)));ControllerMeshPose pose;pose.visible=true;
+ center=frame.CabinPointToTracking(center);ControllerMeshPose pose;pose.visible=true;
  for(unsigned col=0;col<3;++col){V axis{};axis[col]=label?(col==0?.10f:col==1?.014f:1.f):box.half[col]*box.scale*box.stretch[col];auto v=Rotate(q,axis);for(unsigned row=0;row<3;++row)pose.matrix[row*4+col]=v[row];}
  for(unsigned row=0;row<3;++row)pose.matrix[row*4+3]=center[row];return pose;
 }

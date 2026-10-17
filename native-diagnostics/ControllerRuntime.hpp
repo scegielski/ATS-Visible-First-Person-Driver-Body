@@ -46,3 +46,7 @@ VehicleSteeringPose SnapshotVehicleSteeringPose();
 bool ConsumeControllerDisplayRequest(unsigned action);
 
 bool ConsumeControllerCameraPosition(DriverIK::V& position);
+
+bool GetControllerCameraAngles(DriverIK::V& angles);
+
+void SetControllerAppliedCameraAngles(DriverIK::V before,DriverIK::V after);
