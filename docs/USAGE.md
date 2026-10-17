@@ -160,3 +160,5 @@ The retired General Settings options Hold Selectors, Voice Cues, Servo Sounds, a
 The user confirmed the SPF keybind and General Settings cleanup in game. All seven native suites pass, including retirement of the thirteen obsolete actions while retaining unrelated gesture bindings and controller input leases.
 
 In Setup, nudge the left thumbstick left for Undo or right for Redo without clicking it. Return to center between actions. Nudges are inactive while grabbing, adjusting the camera, or using a radial menu. Successful history actions speak Undo or Redo.
+
+Camera rotation: in Setup with Adjust Camera enabled, hold either trigger and rotate the controller to adjust yaw and pitch relative to the grab angle. Release to save per vehicle. The right Setup ring's left segment opens Reset Camera confirmation, resetting camera position and rotation. Undo/Redo includes rotation edits and camera resets.
