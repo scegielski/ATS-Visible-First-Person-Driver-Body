@@ -1062,3 +1062,9 @@ All seven native suites pass; user confirmed the installed setup changes in VR a
 Added per-vehicle live XYZ offsets for every native joint across supported pose families, weighted after retargeting and IK. Invalid edits retain previous settings; other setup saves preserve the joint-edit section. Truck fingers now use native rest poses, independent Y/B thumb control, native-Y activation, and live spread/curl/XYZ controls. Captured the current Western Star calibration, including 20 degrees less closed curl at the four left finger bases.
 
 Right Setup radial lower-left toggles all 72 truck joints with uniform RGB axes and parent/child lines. Visibility remains enabled outside Setup with freshness guards; wheel helper bones are included. The user reviewed the display and requested this checkpoint after live finger tuning; further pose tuning may still be needed. Seven native suites and installer validation accompany this release.
+
+## Skeleton display refinements and left thumb-tip tuning
+
+Hidden terminal joint axes while retaining their bone connections. All remaining axes have five-millimeter origin spheres; the connecting lines use twenty-percent premultiplied opacity. Added sampled diagnostics for pose weight and applied joint rotation, normalized for quaternion length.
+
+The live truck run confirmed full closed-thumb weight and the requested terminal-joint rotation. Mesh weights distinguish the tiny terminal joint from the substantial distal thumb segment. The current Western Star calibration applies +60 degrees local Y to the substantial left thumb-tip segment when closed; the tiny terminal joint has zero added rotation. The user requested this checkpoint after that distinction was resolved. Further visual pose tuning remains possible.

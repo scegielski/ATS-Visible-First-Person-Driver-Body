@@ -1,15 +1,15 @@
 {
-  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.70.exe",
-  "sha256": "4fd47180c3032cc2f8ee4fa97e1b1f4c0b2624004453d01a3028aca663f1b2d8",
+  "installer": "SPF-Visible-First-Person-Driver-Body-Setup-0.39.71.exe",
+  "sha256": "8fae4d686d6cc2c741d274f8a74ae4266ec41e0dd270c49f122122cd983615ec",
   "payload": {
-    "version": "0.39.70",
+    "version": "0.39.71",
     "supportedExe": "c60e8ee02cc97b3cc6ef8c6298bb5c3c23c4ffd330b8185b646fb1b608a3c7b4",
     "files": [
       {
         "source": "plugin/SPF_VisibleFirstPersonDriverBody.dll",
         "destination": "plugin",
         "target": "SPF_VisibleFirstPersonDriverBody.dll",
-        "sha256": "abb3fcab7f3015afd939322a404f9a34eceb0de9516b64f27625a9257e500d6b",
+        "sha256": "981881337d63f9a3afcd78df1e3b19ff057e401a522979db4dbd4b1724218b5e",
         "mutable": false,
         "onlyIfMissing": false
       },
@@ -17,7 +17,7 @@
         "source": "plugin/spf_controller_xr_layer.dll",
         "destination": "plugin",
         "target": "spf_controller_xr_layer.dll",
-        "sha256": "9f7536a98d30907fba0dc94aeccd6b8ced1876757ec9c0d710b59b0b8ee72a4b",
+        "sha256": "68ea62368434cca9468d98545d25f43b5e41ed295bdfa3e6f809128491f0a800",
         "mutable": false,
         "onlyIfMissing": false
       },

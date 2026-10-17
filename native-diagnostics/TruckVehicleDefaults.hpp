@@ -28,4 +28,6 @@ inline constexpr const char* kWesternStarJointPoseDefaults=R"POSE(left_hand_clos
 left_hand_closed 34 -0.34166715 -19.58795547 3.98573303
 left_hand_closed 35 0.69423360 -19.98413849 0.53916764
 left_hand_closed 36 -0.26139480 -19.98253441 -0.84553140
+left_thumb_closed 52 0 60 0
+left_thumb_closed 62 0 0 0
 )POSE";
